@@ -112,6 +112,7 @@ select option, select optgroup{background:var(--s1); color:var(--t1)}
 .pane.on{display:block}
 .cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px}
 .card{border:1px solid var(--l1); border-radius:8px; padding:14px 16px; min-width:0}
+.card h3 span{text-transform:none; letter-spacing:.02em}
 .card h3{margin:0 0 10px; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--t2)}
 .span{grid-column:1 / -1}
 .tbl-wrap{overflow-x:auto}
@@ -216,6 +217,13 @@ input[type=range]::-moz-range-thumb{width:13px; height:13px; border-radius:50%; 
 .tput input{flex:1; min-width:0; background:var(--bg); border:1px solid var(--l2); border-radius:6px; padding:5px 8px; font-family:var(--mono)}
 .tput select{width:auto; margin:0}
 
+.chain{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:12px; font-size:12px; color:var(--t3)}
+.ch-l{text-transform:uppercase; letter-spacing:.08em; font-size:10.5px; margin-right:4px}
+.ch{border:1px solid var(--l2); border-radius:4px; padding:2px 8px; color:var(--t2); white-space:nowrap}
+.ch b{font-family:var(--mono); font-weight:500; color:var(--t1)} .ch i{font-style:normal; color:var(--t3)}
+.ch.warn{border-style:dashed; border-color:var(--warn)} .ch.bad{border-color:var(--t1)}
+.ch.weak{background:var(--t1); color:var(--bg); border-color:var(--t1)} .ch.weak b, .ch.weak i{color:var(--bg)}
+.ch-a{color:var(--l3)}
 details.more{margin-top:14px} details.more > summary, details.legend-d > summary{cursor:pointer; font-size:12.5px; color:var(--t3); list-style:none}
 details.more > summary::-webkit-details-marker, details.legend-d > summary::-webkit-details-marker{display:none}
 details.more > summary::before, details.legend-d > summary::before{content:"+ "; font-family:var(--mono)}
@@ -297,6 +305,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   <form class="ask" id="askForm"><input id="askInput" autocomplete="off" aria-label="Describe the system"
     placeholder="Describe what the system has to do, e.g. “serve a 70B model at 3,000 tokens/s, under 50 ms per token”"><button class="btn">Design it</button></form>
   <div class="verdict" id="verdict" aria-live="polite"></div>
+  <div class="chain" id="chain"></div>
   <div class="req-line" id="reqLine"></div>
   <div class="scen" id="scen"></div>
 </section>
@@ -330,6 +339,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
     <details class="sec" open><summary>Requirements</summary><div id="req"></div></details>
     <details class="sec"><summary>Workload</summary><div id="wl"></div></details>
     <details class="sec"><summary>Scale: accelerators &amp; racks</summary><div id="sc"></div></details>
+    <details class="sec"><summary>Variability &amp; tolerances</summary><div id="va"></div></details>
   </div>
 </aside>
 <aside class="drawer right" id="dComp" aria-label="Component">
@@ -456,6 +466,22 @@ const NOC_PAT = {
   local:     {name:'Mostly local (tiles reuse their own data)', cross:k=>0,        hops:t=>0},
 };
 const SRAM_PJ = 0.08;         // pJ per bit for an SRAM bank access
+/* variability. JIT = coefficient of variation of each stage's time at low / typical / high jitter (lognormal);
+   CORR = pairwise correlation of bursts and of stage delays; Z = standard-normal quantile of each target percentile */
+const JIT = {
+  net:     [0.1, 0.3, 0.6],    ssd: [0.2, 0.5, 1.0],   os:  [0.2, 0.6, 1.5],   link: [0.05, 0.15, 0.3],
+  dram:    [0.1, 0.3, 0.6],    noc: [0.1, 0.3, 0.6],   compute: [0.02, 0.1, 0.3], coll: [0.1, 0.3, 0.6],
+};
+const JIT_LEVEL = {low:0, typical:1, high:2};
+const CORR = {indep:0, partial:0.3, full:1};
+const Z = {0.99:2.326, 0.999:3.090, 0.9999:3.719};
+const JIT_TAU = 10e-6;   // fluctuations (refresh, arbitration, page misses) decorrelate over ~10 µs, so long transfers average them out
+// coefficient of variation of a stage's transfer/service part: full jitter for compute (data-dependent), shrinking as √(duration/τ) otherwise
+const svcCv = (k, svc, s) => k==='compute' ? stageJit(k, s) : stageJit(k, s)/Math.sqrt(Math.max(1, svc/JIT_TAU));
+function stageJit(k, s){ const cls = {src:s.src.startsWith('net')?'net':'ssd', cpu:'os', cpu2:'os', h2d:'link', d2h:'link', dram:'dram', noc:'noc', compute:'compute', up:'coll', out:'coll'}[k];
+  return JIT[cls][JIT_LEVEL[s.vary.jitter]]; }
+// peak of n bursty streams with pairwise correlation r: the excess over the mean shrinks by √(r + (1−r)/n)
+const smoothBurst = (burst, n, s) => 1 + (burst-1)*Math.sqrt(CORR[s.vary.corr] + (1-CORR[s.vary.corr])/Math.max(1,n));
 
 /* =====================================================================
    STATE + PRESETS
@@ -472,6 +498,7 @@ const BASE = {
   nvme:{id:'g5', count:4},
   scale:{perNode:1, nodes:1, racks:1, domain:'node', xUp:0, xOut:0, fabric:'nvl5', nic:'e800', nics:1, rackKW:40},
   noc:{topo:'mesh', tiles:64, width:512, ghz:2, hopNs:1.5, pattern:'local', xNoc:1, banks:64, bankB:64, pj:0.15, ports:8},
+  vary:{deadline:'soft', pct:0.99, ca:1, jitter:'typical', corr:'partial', tol:0},
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const merge = (a,b) => { for(const k in b){ if(b[k] && typeof b[k]==='object' && !Array.isArray(b[k])) { a[k]=merge(a[k]||{}, b[k]); } else a[k]=b[k]; } return a; };
@@ -483,13 +510,13 @@ const PRESETS = [
    d:'A large model served across one rack: 18 nodes of 4 accelerators, all 72 in a single NVLink 5 domain, so expert and tensor-parallel traffic never leaves the rack. HBM bandwidth and the fabric run close. The model puts the rack near 50 kW at this load, within a direct-liquid limit (a real rack of this class is provisioned for well over 100 kW at full load).', p:{
     T:72*6e12, lat:100e-3, block:1e11, burst:1, resident:200, inR:0.00001, outR:0.00001, xR:1, xW:0.02, ops:200,
     pattern:'stream', dev:{dram:'hbm3e_96', units:8}, link:{id:'pcie6', lanes:16, count:1},
-    host:{dram:'lp5x_8533', units:16, cores:72, cpuUs:10}, acc:{tops:5000, util:0.5, pj:0.3, topsMm2:4, sram:50}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
+    host:{dram:'lp5x_8533', units:16, cores:72, cpuUs:10}, acc:{tops:5000, util:0.5, pj:0.3, topsMm2:4, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:4, nodes:18, racks:1, domain:'rack', xUp:0.1, xOut:0.001, fabric:'nvl5', nic:'e800', nics:1, rackKW:132}}},
   {g:'AI & LLMs', id:'train1k', name:'LLM training cluster (1,024 accelerators, 32 racks)',
    d:'Tensor parallelism inside each 8-accelerator NVLink node, data-parallel gradient all-reduce across an 800G scale-out network. The scale-out network is the one to watch; the racks are air-cooled.', p:{
     T:1024*4e12, lat:2, block:4e10, burst:1, resident:150, inR:0.0001, outR:0.0001, xR:1, xW:0.3, ops:400,
     pattern:'block', dev:{dram:'hbm3e_96', units:8}, link:{id:'pcie5', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:16, cores:96, cpuUs:10}, acc:{tops:5000, util:0.5, pj:0.3, topsMm2:4, sram:50}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
+    host:{dram:'ddr5_5600', units:16, cores:96, cpuUs:10}, acc:{tops:5000, util:0.5, pj:0.3, topsMm2:4, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:8, nodes:4, racks:32, domain:'node', xUp:0.1, xOut:0.015, fabric:'nvl5', nic:'e800', nics:1, rackKW:40}}},
   {g:'AI & LLMs', id:'tp8pcie', name:'Tensor-parallel prefill on 8 PCIe cards ✗',
    d:'Deliberately broken: eight GDDR cards in one server splitting each layer eight ways, with only PCIe peer-to-peer between them. The all-reduce traffic swamps PCIe, which is why NVLink-class fabrics exist.', p:{
@@ -501,7 +528,7 @@ const PRESETS = [
    d:'An HGX-style node of eight HBM3 accelerators with NVLink 4. Each decode step streams a shard of the weights from HBM, so HBM bandwidth sets the token rate; the tensor-parallel traffic is light.', p:{
     T:8*2.8e12, lat:50e-3, block:4e10, burst:1, resident:60, inR:0.00001, outR:0.00001, xR:1, xW:0.05, ops:64,
     pattern:'stream', dev:{dram:'hbm3_64', units:5}, link:{id:'pcie5', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:10}, acc:{tops:2000, util:0.5, pj:0.4, topsMm2:3.5, sram:50}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
+    host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:10}, acc:{tops:2000, util:0.5, pj:0.4, topsMm2:3.5, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:8, nodes:1, racks:1, domain:'node', xUp:0.02, xOut:0, fabric:'nvl4', nic:'e400', nics:1, rackKW:40}}},
   {g:'AI & LLMs', id:'moenoc', name:'Mixture-of-experts layer on an 8 × 8 mesh ✗',
    d:'Deliberately broken: tokens are routed all-to-all between expert tiles, four bytes of tile-to-tile traffic per byte processed. HBM keeps up, but the mesh bisection cannot; open the On-chip tab and try a torus, wider links or more tiles.', p:{
@@ -513,10 +540,10 @@ const PRESETS = [
    d:'Every generated token streams all 4 GB of weights from DRAM. At 30 tokens/s that is 120 GB/s: decode is memory-bound and the DRAM width sets the token rate.', p:{
     T:4e9*30, lat:50e-3, block:4e9, burst:1, resident:6, inR:0.00001, outR:0.00001, xR:1, xW:0.02, ops:4,
     pattern:'stream', dev:{dram:'lp5x_8533', units:12}, link:{id:'pcie4', lanes:4, count:1},
-    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:20, wCore:3}, acc:{tops:60, util:0.4, pj:0.7, topsMm2:2.5, sram:16}}},
+    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:20, wCore:3}, acc:{tops:60, util:0.4, pj:0.7, topsMm2:2.5, sram:16}, vary:{ca:0}}},
   {g:'AI & LLMs', id:'prefill', name:'LLM prefill on one accelerator (70B FP8, 2k-token prompts)',
    d:'Each weight byte is reused across 2048 prompt tokens: 4096 op/B. The roofline flips to compute-bound, which is why prefill and decode are often split onto different hardware.', p:{
-    T:0.4e12, lat:0.5, block:70e9, burst:1, resident:140, inR:0.0001, outR:0.0001, xR:1, xW:0.1, ops:4096,
+    T:0.4e12, lat:1.2, block:70e9, burst:1, resident:140, inR:0.0001, outR:0.0001, xR:1, xW:0.1, ops:4096,
     pattern:'stream', dev:{dram:'hbm3e_96', units:6}, link:{id:'pcie5', lanes:16, count:1},
     host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:10}, acc:{tops:4500, util:0.5, pj:0.3, topsMm2:4, sram:50}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5}}},
   {g:'AI & LLMs', id:'dlrm', name:'Recommendation embeddings (DLRM lookups)',
@@ -539,44 +566,44 @@ const PRESETS = [
    d:'Four NV12 camera streams through a CNN on a small NPU with LPDDR5. Frames are staged in DRAM and read twice; a PCIe 4.0 x4 link is comfortably enough.', p:{
     T:4*3840*2160*1.5*60, lat:16e-3, block:3840*2160*1.5, burst:1.2, resident:1, inR:1, outR:0.01, xR:2, xW:1, stageIn:true, ops:150,
     pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:4, count:1},
-    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:8, wCore:3}, acc:{tops:40, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}}},
+    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:8, wCore:3}, acc:{tops:40, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, vary:{ca:0.2}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}}},
   {g:'Imaging & video', id:'8k', name:'8K60 broadcast encoder card',
    d:'10-bit 4:2:0 8K at 60 fps. Motion search re-reads about four reference frames per input byte, so DRAM traffic is 7× the input rate while the compressed output is tiny.', p:{
     T:7680*4320*1.875*60, lat:33e-3, block:7680*4320*1.875, burst:1.1, resident:2, inR:1, outR:0.01, xR:4, xW:1, stageIn:true, ops:500,
     pattern:'block', dev:{dram:'gddr6_20', units:4}, link:{id:'pcie4', lanes:8, count:1},
-    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:10}, acc:{tops:300, util:0.5, pj:0.6, topsMm2:3, sram:32}}},
+    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:10}, acc:{tops:300, util:0.5, pj:0.6, topsMm2:3, sram:32}, vary:{ca:0.2}}},
   {g:'Imaging & video', id:'linescan', name:'Line-scan machine-vision inspection',
    d:'A 16k-pixel line camera at 200 kHz (3.3 GB/s) arrives over 100 GbE straight into the accelerator. The 1 ms decision deadline, not bandwidth, sets the block size.', p:{
     T:16384*200e3, lat:1e-3, block:16384*256, burst:1.2, resident:0.5, src:'net_p2p', inR:1, outR:0.001, xR:0.5, xW:0.2, ops:100,
     pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:8, count:1},
-    host:{dram:'ddr5_5600', units:2, cores:8, cpuUs:3}, acc:{tops:20, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}, net:{id:'e100', count:1, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:2, cores:8, cpuUs:3}, acc:{tops:20, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, vary:{ca:0.2}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}, net:{id:'e100', count:1, mtu:9000}}},
   {g:'Imaging & video', id:'isp', name:'Smartphone camera ISP + NPU',
    d:'A 50 MP RAW10 sensor at 30 fps through the ISP and a portrait-mode network, on a shared 64-bit LPDDR5X. Power is the real budget: watch the pJ per byte.', p:{
     T:50e6*1.25*30, lat:33e-3, block:50e6*1.25, burst:1.3, resident:1, inR:1, outR:0.4, xR:3, xW:2, stageIn:true, stageOut:true, ops:300,
     pattern:'block', dev:{dram:'lp5x_8533', units:4}, link:{id:'ucie', count:1, rtt:0.05},
-    host:{dram:'lp5x_8533', units:4, cores:4, cpuUs:20, wCore:1.5}, acc:{tops:40, util:0.4, pj:0.3, topsMm2:4, sram:8, leak:0.01}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}}},
+    host:{dram:'lp5x_8533', units:4, cores:4, cpuUs:20, wCore:1.5}, acc:{tops:40, util:0.4, pj:0.3, topsMm2:4, sram:8, leak:0.01}, vary:{ca:0.2}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}}},
   {g:'Imaging & video', id:'ultrasound', name:'Ultrasound beamformer (128 channels)',
    d:'128 channels × 40 MS/s × 16 bit = 10 GB/s from the front end over two 100 GbE links, delay-and-sum beamforming, 5 ms frame latency.', p:{
     T:128*40e6*2, lat:5e-3, block:4e6, burst:1, resident:0.5, src:'net_p2p', inR:1, outR:0.02, xR:0.2, xW:0, ops:200,
     pattern:'stream', dev:{dram:'lp5x_8533', units:4}, link:{id:'pcie4', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:3}, acc:{tops:15, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}, net:{id:'e100', count:2, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:3}, acc:{tops:15, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, vary:{ca:0.2}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}, net:{id:'e100', count:2, mtu:9000}}},
   {g:'Imaging & video', id:'adas', name:'Autonomous-driving perception SoC',
    d:'Eight 8 MP cameras at 30 fps through a perception stack on a 256-bit LPDDR5 SoC: a compute-heavy, DRAM-shared design with a 50 ms budget.', p:{
     T:8*8e6*1.5*30, lat:50e-3, block:8*8e6*1.5, burst:1.2, resident:16, inR:1, outR:0.05, xR:6, xW:3, stageIn:true, ops:2000,
     pattern:'block', dev:{dram:'lp5_6400', units:16}, link:{id:'ucie', count:2, rtt:0.05},
-    host:{dram:'lp5_6400', units:4, cores:12, cpuUs:10, wCore:2}, acc:{tops:500, util:0.4, pj:0.5, topsMm2:3, sram:32}, noc:{topo:'axi', tiles:16, width:512, ghz:1.2, ports:8, banks:64}}},
+    host:{dram:'lp5_6400', units:4, cores:12, cpuUs:10, wCore:2}, acc:{tops:500, util:0.4, pj:0.5, topsMm2:3, sram:32}, vary:{ca:0.2}, noc:{topo:'axi', tiles:16, width:512, ghz:1.2, ports:8, banks:64}}},
 
   // ---------------------------------------------------------------- signal processing and comms
   {g:'Signal processing & comms', id:'radar', name:'Radar / SDR front end over 400 GbE',
    d:'Two channels at 4 GS/s of 16-bit IQ (32 GB/s) arrive peer-to-peer over 400 GbE. FFTs and filters at 60 op/B on GDDR6, with a 50 µs latency target.', p:{
     T:2*4e9*4, lat:50e-6, block:65536, burst:1.1, resident:2, src:'net_p2p', inR:1, outR:0.05, xR:0.5, xW:0.5, ops:60,
     pattern:'block', dev:{dram:'gddr6_20', units:4}, link:{id:'pcie5', lanes:16, count:1, rtt:1.0},
-    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:2}, acc:{tops:50, util:0.5, pj:0.6, topsMm2:3, sram:32}, net:{id:'e400', count:1, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:2}, acc:{tops:50, util:0.5, pj:0.6, topsMm2:3, sram:32}, vary:{ca:0.2, jitter:'low', deadline:'hard', pct:0.999}, net:{id:'e400', count:1, mtu:9000}}},
   {g:'Signal processing & comms', id:'oran', name:'5G O-RAN distributed unit (L1 offload)',
    d:'Four 25 GbE eCPRI fronthaul links with standard 1500 B frames and a 0.5 ms slot deadline. LDPC and channel estimation are modest; the deadline is what bites. Push the rate up and the network saturates first.', p:{
     T:6e9, lat:0.5e-3, block:1e6, burst:1.3, resident:1, src:'net_p2p', inR:1, outR:0.1, xR:1, xW:0.5, ops:30,
     pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:6, cores:24, cpuUs:2}, acc:{tops:10, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, net:{id:'e25', count:4, mtu:1500}}},
+    host:{dram:'ddr5_5600', units:6, cores:24, cpuUs:2}, acc:{tops:10, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, vary:{ca:0.3, jitter:'low', deadline:'hard', pct:0.999}, net:{id:'e25', count:4, mtu:1500}}},
   {g:'Signal processing & comms', id:'correlator', name:'Radio-telescope correlator (X-engine)',
    d:'50 GB/s of channelised antenna data over six 100 GbE links into a PCIe 6.0 card, cross-multiplied at 500 op/B. Compute-bound; the output visibilities are tiny. On PCIe 5.0 the link would sit at 96 %.', p:{
     T:50e9, lat:100e-3, block:64e6, burst:1, resident:8, src:'net_p2p', inR:1, outR:0.01, xR:1, xW:0.1, stageIn:true, ops:500,
@@ -586,12 +613,12 @@ const PRESETS = [
    d:'Deliberately broken: a 5 µs tick-to-trade target with a host in the loop. Bandwidth is trivial, but the PCIe round trip and driver time alone exceed the budget, which is why these run on FPGA NICs.', p:{
     T:3e9, lat:5e-6, block:1024, burst:3, resident:0.1, src:'net_p2p', inR:1, outR:0.05, xR:0.1, xW:0, ops:20,
     pattern:'random', dev:{dram:'ddr4_3200', units:2}, link:{id:'pcie4', lanes:8, count:1},
-    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:1}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:16}, noc:{topo:'axi', tiles:8, width:512, ghz:0.4, ports:4, banks:32, hopNs:5}, net:{id:'e25', count:1, mtu:1500}}},
+    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:1}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:16}, vary:{deadline:'hard', pct:0.999}, noc:{topo:'axi', tiles:8, width:512, ghz:0.4, ports:4, banks:32, hopNs:5}, net:{id:'e25', count:1, mtu:1500}}},
   {g:'Signal processing & comms', id:'trigger', name:'Particle-detector trigger board ✗',
    d:'Deliberately broken: 150 GB/s from twelve optical links with a 10 µs decision budget. The host cannot be in the loop; a trigger runs as self-contained logic next to the links.', p:{
     T:150e9, lat:10e-6, block:4096, burst:1, resident:0.5, src:'net_p2p', inR:1, outR:0.001, xR:0, xW:0, ops:20,
     pattern:'stream', dev:{dram:'ddr4_3200', units:2}, link:{id:'pcie5', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:0.5}, acc:{tops:10, util:0.5, pj:0.5, topsMm2:3, sram:32}, noc:{topo:'axis', tiles:16, width:512, ghz:0.5, ports:16, banks:32, hopNs:5}, net:{id:'e100', count:12, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:0.5}, acc:{tops:10, util:0.5, pj:0.5, topsMm2:3, sram:32}, vary:{deadline:'hard', pct:0.999}, noc:{topo:'axis', tiles:16, width:512, ghz:0.5, ports:16, banks:32, hopNs:5}, net:{id:'e100', count:12, mtu:9000}}},
 
   // ---------------------------------------------------------------- data, storage and networking
   {g:'Data, storage & networking', id:'scan', name:'NVMe scan / filter offload',
@@ -729,7 +756,8 @@ function model(s){
   const T = s.T, Tb = T*s.burst;
   const tp = topo(s);
   const Ta = T/tp.nA, Tba = Tb/tp.nA;                                       // per accelerator
-  const Tn = T/tp.nN, Tbn = Tb/tp.nN;                                       // per node (host)
+  const bHost = smoothBurst(s.burst, s.scale.perNode, s);                   // a node's host serves perNode accelerators' streams
+  const Tn = T/tp.nN, Tbn = Tn*bHost;                                       // per node (host)
   const dev = DRAMS[s.dev.dram], hd = DRAMS[s.host.dram];
   const viaHost = s.src==='host' || s.src==='net' || s.src==='nvme';
 
@@ -788,20 +816,21 @@ function model(s){
   let maxT = T/worst.U, maxTceil = maxT*s.ceil;
 
   // latency of one block (per accelerator) through every stage, with M/D/1 queueing
-  const B = s.block, Ua = k => U[k]/s.burst;
-  const q = (svc, u) => u>=1 ? Infinity : svc*u/(2*(1-u));
+  const B = s.block, Ua = k => U[k]/(['src','host','cpu'].includes(k) ? bHost : s.burst);
+  // Kingman (G/G/1): wait ≈ (ca² + cs²)/2 · ρ/(1−ρ) · service; ca = arrival burstiness, cs = the stage's own jitter
+  const q = (svc, u, k) => u>=1 ? Infinity : svc*u/(1-u)*(s.vary.ca**2 + svcCv(k, svc, s)**2)/2;
   const stages = [];
   if(dem.src!==undefined){
     const svc = B*s.inR/srcBW, base = s.src.startsWith('net') ? 5e-6 : 80e-6;
-    stages.push({k:'src', name: s.src.startsWith('net')?'Network ingress':'SSD read', fixed:base, svc, q:q(svc,Ua('src'))});
+    stages.push({k:'src', name: s.src.startsWith('net')?'Network ingress':'SSD read', fixed:base, svc, q:q(svc,Ua('src'),'src')});
   }
   stages.push({k:'cpu', name:'Host submit', fixed:s.host.cpuUs*0.5e-6, svc:0, q:0});
-  { const svc = B*s.inR/lk.h2d; stages.push({k:'h2d', name:'Link H→D', fixed:lk.rtt, svc, q:q(svc,Ua('h2d'))}); }
-  if(dR+dW>0){ const svc = B*(dR+dW)/devBW; stages.push({k:'dram', name:'Device DRAM', fixed:dev.lat*1e-9, svc, q:q(svc,Ua('dram'))}); }
-  { const svc = B*s.ops/ops; stages.push({k:'compute', name:'Compute', fixed:0, svc, q:q(svc,Ua('compute'))}); }
-  if(xUp>0){ const svc = B*xUp/cap.up; stages.push({k:'up', name:'Collective, scale-up', fixed:2*Math.log2(tp.dom)*fab.lat, svc, q:q(svc,Ua('up'))}); }
-  if(xOut>0){ const svc = B*xOut/cap.out; stages.push({k:'out', name:'Collective, scale-out', fixed:2*Math.log2(tp.nA/tp.dom)*5e-6, svc, q:q(svc,Ua('out'))}); }
-  { const svc = B*s.outR/lk.d2h; stages.push({k:'d2h', name:'Link D→H', fixed:lk.rtt/2, svc, q:q(svc,Ua('d2h'))}); }
+  { const svc = B*s.inR/lk.h2d; stages.push({k:'h2d', name:'Link H→D', fixed:lk.rtt, svc, q:q(svc,Ua('h2d'),'h2d')}); }
+  if(dR+dW>0){ const svc = B*(dR+dW)/devBW; stages.push({k:'dram', name:'Device DRAM', fixed:dev.lat*1e-9, svc, q:q(svc,Ua('dram'),'dram')}); }
+  { const svc = B*s.ops/ops; stages.push({k:'compute', name:'Compute', fixed:0, svc, q:q(svc,Ua('compute'),'compute')}); }
+  if(xUp>0){ const svc = B*xUp/cap.up; stages.push({k:'up', name:'Collective, scale-up', fixed:2*Math.log2(tp.dom)*fab.lat, svc, q:q(svc,Ua('up'),'up')}); }
+  if(xOut>0){ const svc = B*xOut/cap.out; stages.push({k:'out', name:'Collective, scale-out', fixed:2*Math.log2(tp.nA/tp.dom)*5e-6, svc, q:q(svc,Ua('out'),'out')}); }
+  { const svc = B*s.outR/lk.d2h; stages.push({k:'d2h', name:'Link D→H', fixed:lk.rtt/2, svc, q:q(svc,Ua('d2h'),'d2h')}); }
   stages.push({k:'cpu2', name:'Completion', fixed:s.host.cpuUs*0.5e-6, svc:0, q:0});
   stages.forEach(st=>st.t = st.fixed+st.svc+st.q);
   let latency = stages.reduce((a,st)=>a+st.t,0);
@@ -828,7 +857,7 @@ function model(s){
   comps.sort((a,b)=>b.U-a.U);
   worst = comps[0]; maxT = T/worst.U; maxTceil = maxT*s.ceil;
   { const fixed = 2*nocHops*nc.hopNs*1e-9 + 64/nocLink, u = U.noc/s.burst;
-    stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip interconnect', fixed, svc:0, q:u>=1?Infinity:fixed*u/(1-u)});
+    stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip interconnect', fixed, svc:0, q:u>=1?Infinity:fixed*u/(1-u)*(s.vary.ca**2 + stageJit('noc', s)**2)/2});
     stages.forEach(st=>st.t = st.fixed+st.svc+st.q); latency = stages.reduce((a,st)=>a+st.t,0); }
 
   // area of one accelerator die
@@ -859,8 +888,57 @@ function model(s){
 
   return {T, Tb, Ta, Tba, Tn, Tbn, tp, dev, hd, lk, fab, nic, multi, xUp, xOut, dR, dW, hR, hW, hIn, ledger, devE, hostE, devBW, hostBW, ops,
     dem, cap, U, comps, worst, maxT, maxTceil, stages, latency, inflightPcie, tags, inflightDram, dramReqs, devCap, sramNeed,
-    A, pAcc, H, pNodeHost, Ptot, Prack, Pmove, area, coreArea, padArea, die, shoreNeed, shoreHave, srcBW, srcName, viaHost,
+    bHost, A, pAcc, H, pNodeHost, Ptot, Prack, Pmove, area, coreArea, padArea, die, shoreNeed, shoreHave, srcBW, srcName, viaHost,
     noc:{N, k:kk, S:nq.S, kind:nq.kind, link:nocLink, inT, outT, localT, hopsEdge, hopsLocal, hops:nocHops, dem:nocDem, cap:nocCap, U:nocU, worst:nocWorst}};
+}
+
+/* Latency distribution: each stage is lognormal around its mean (service CV from the jitter level, queueing
+   wait CV ≈ 1), stages correlated as chosen. A seeded generator keeps the figures steady while you drag. */
+function rng(seed){ return ()=>{ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed>>>15, 1 | seed); t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t; return ((t ^ t>>>14) >>> 0)/4294967296; }; }
+function normals(r){ const u = Math.max(1e-12, r()), v = r(); const m = Math.sqrt(-2*Math.log(u)); return [m*Math.cos(2*Math.PI*v), m*Math.sin(2*Math.PI*v)]; }
+const lnParams = cv => { const sg = Math.sqrt(Math.log(1+cv*cv)); return [-sg*sg/2, sg]; };   // mean 1
+function latencyStats(m){
+  if(m._ls) return m._ls;
+  const pct = S.vary.pct, z = Z[pct], rho = CORR[S.vary.corr];
+  if(!isFinite(m.latency)) return m._ls = {unbounded:true, pct};
+  const parts = [];
+  for(const st of m.stages){
+    if(st.fixed>0) parts.push({mean:st.fixed, ln:lnParams(stageJit(st.k, S)), name:st.name});
+    if(st.svc>0) parts.push({mean:st.svc, ln:lnParams(svcCv(st.k, st.svc, S)), name:st.name+' (transfer)'});
+    if(st.q>0) parts.push({mean:st.q, ln:lnParams(1), name:st.name+' (queue)'});
+  }
+  // tolerance stack: every part at its own percentile, as if the bad cases all coincide
+  const stack = parts.reduce((a,p)=>a + p.mean*Math.exp(p.ln[0]+p.ln[1]*z), 0);
+  const N = pct>=0.9999 ? 40000 : pct>=0.999 ? 20000 : 10000, r = rng(12345), xs = new Float64Array(N), sr = Math.sqrt(rho), si = Math.sqrt(1-rho);
+  let spare = null; const nz = () => { if(spare!==null){ const v = spare; spare = null; return v; } const [a,b] = normals(r); spare = b; return a; };
+  const P = parts.length, mu = parts.map(p=>p.ln[0]), sg = parts.map(p=>p.ln[1]), mean = parts.map(p=>p.mean);
+  for(let i=0;i<N;i++){
+    const z0 = nz(); let sum = 0;
+    for(let j=0;j<P;j++){ sum += sg[j]>0 ? mean[j]*Math.exp(mu[j]+sg[j]*(sr*z0 + si*nz())) : mean[j]; }
+    xs[i] = sum;
+  }
+  xs.sort();
+  const at = f => xs[Math.min(N-1, Math.floor(f*N))];
+  const res = {pct, mean:m.latency, p50:at(0.5), p99:at(0.99), p999:at(0.999), pX:at(pct), stack, xs, parts};
+  res.head = S.vary.deadline==='hard' ? stack : res.pX;
+  return m._ls = res;
+}
+const latHead = m => { const ls = latencyStats(m); return ls.unbounded ? Infinity : ls.head; };
+const pctName = p => 'p'+(+(p*100).toFixed(2));
+const latLabel = () => S.vary.deadline==='hard' ? 'worst case' : pctName(S.vary.pct);
+// catalogue tolerance: capacities uncertain by ±tol (≈ 2σ, independent per component); share of draws that stay under the ceiling and under 100 %
+function tolStats(m){
+  if(m._ts) return m._ts;
+  if(!(S.vary.tol>0)) return m._ts = null;
+  const r = rng(777), N = 4000, sd = S.vary.tol/2, per = m.comps.map(c=>({k:c.k, name:c.name, ceil:0, full:0, U:c.U}));
+  let okCeil = 0, okFull = 0;
+  for(let i=0;i<N;i++){
+    let worst = 0, wi = 0;
+    per.forEach((c,j)=>{ const u = c.U/Math.max(0.05, 1 + sd*normals(r)[0]); if(u<=S.ceil) c.ceil++; if(u<=1) c.full++; if(u>worst){ worst = u; wi = j; } });
+    per[wi].weak = (per[wi].weak||0) + 1;
+    if(worst<=S.ceil) okCeil++; if(worst<=1) okFull++;
+  }
+  return m._ts = {pCeil:okCeil/N, pFull:okFull/N, per:per.map(c=>({...c, ceil:c.ceil/N, full:c.full/N, weak:(c.weak||0)/N}))};
 }
 
 /* sizing: minimum spec of each component for the current requirement (per accelerator) */
@@ -972,6 +1050,15 @@ function buildWl(){
   ctl(el, {k:'pattern', label:'DRAM access pattern', type:'select', options:Object.fromEntries(Object.entries(PATTERNS).map(([k,v])=>[k,v.name+' ('+(v.eff*100).toFixed(0)+' %)']))});
   ctl(el, {k:'ecc', label:'ECC on device DRAM', type:'toggle'});
   ctl(el, {k:'pull', label:'Accelerator pulls input (DMA reads)', type:'toggle'});
+}
+function buildVary(){
+  const el = document.getElementById('va'); el.innerHTML = '';
+  ctl(el, {k:'vary.deadline', label:'Deadline', type:'select', options:{soft:'Soft: judged at a percentile', hard:'Hard: worst-case stack'}, hint:'Hard for safety, trading or triggers; soft where a late result is merely worse.'});
+  ctl(el, {k:'vary.pct', label:'Percentile', type:'select', num:true, options:{0.99:'p99',0.999:'p99.9',0.9999:'p99.99'}});
+  ctl(el, {k:'vary.jitter', label:'Jitter in each stage', type:'select', options:{low:'Low (tuned, isolated)',typical:'Typical',high:'High (shared, interrupts, refresh)'}});
+  ctl(el, {k:'vary.ca', label:'Arrival burstiness (CV)', type:'range', min:0, max:3, step:0.05, fmt:v=>v.toFixed(2), hint:'0 = perfectly regular, 1 = random (Poisson), above 1 = bursty.'});
+  ctl(el, {k:'vary.corr', label:'Do peaks line up?', type:'select', options:{full:'Yes, fully correlated (worst case)',partial:'Partly (ρ = 0.3)',indep:'No, independent'}, hint:'Independent peaks smooth out where many streams share a resource.'});
+  ctl(el, {k:'vary.tol', label:'Catalogue tolerance', type:'select', num:true, options:{0:'Off',0.1:'± 10 %',0.2:'± 20 %',0.3:'± 30 %'}, hint:'Uncertainty in every capacity figure; gives the chance the design holds.'});
 }
 function buildScale(){
   const el = document.getElementById('sc'); el.innerHTML = '';
@@ -1257,19 +1344,29 @@ function tick(ts){
 let scenOpen = false;
 function paintSummary(m){
   const w = m.worst, st = state(w.U), tp = m.tp;
-  const latSt = !isFinite(m.latency) || m.latency>S.lat ? 'bad' : 'ok';
+  const ls = latencyStats(m), lh = latHead(m), latSt = lh>S.lat ? 'bad' : 'ok';
   const scope = ['cpu','host','src'].includes(w.k) ? (tp.nN>1?' per node':'') : (tp.nA>1?' per accelerator':'');
   document.getElementById('verdict').innerHTML = `
     <div class="kpi hero ${st}"><div class="l">${st==='ok'?'Most loaded':st==='warn'?'Limiting (above ceiling)':'Bottleneck'}</div>
       <div class="v">${w.name} · ${fmtPct(w.U)}</div><div class="s">needs ${w.f(w.need)}, has ${w.f(w.have)}${scope}</div></div>
     <div class="kpi ${m.maxT>=m.T?'ok':'bad'}"><div class="l">Max sustainable</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target</div></div>
-    <div class="kpi ${latSt}"><div class="l">Latency per block</div><div class="v">${fmtT(m.latency)}</div><div class="s">budget ${fmtT(S.lat)}</div></div>
+    <div class="kpi ${latSt}"><div class="l">Latency, ${latLabel()}</div><div class="v">${fmtT(lh)}</div><div class="s">${ls.unbounded?'queue unstable':S.vary.deadline==='hard'?'hard deadline · budget '+fmtT(S.lat):'worst-case stack '+fmtT(ls.stack)+' · budget '+fmtT(S.lat)}</div></div>
     <div class="kpi ${m.Prack>S.scale.rackKW*1000&&tp.nA>1?'bad':'ok'}"><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${tp.nA>1?fmtN(tp.nA)+' accelerators · '+fmtW(m.Prack)+'/rack':sig(m.Ptot/m.T*1e12)+' pJ per byte'}</div></div>`;
   const p = PRESETS.find(x=>x.id===S.preset);
   document.getElementById('reqLine').innerHTML = `<span>${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
     <button class="link" data-open="left">Edit inputs</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
   document.getElementById('scen').innerHTML = p && scenOpen ? esc(p.d) : '';
   const sm = document.getElementById('scenMore'); if(sm) sm.onclick = ()=>{ scenOpen = !scenOpen; paintSummary(M); };
+  paintChain(m);
+}
+/* the throughput chain: every component on the data path with the rate it alone could sustain; the weakest link sets the system */
+const CHAIN = [['src','Source'],['host','Host DRAM'],['cpu','Host CPU'],['link','Host link'],['noc','Interconnect'],['sram','SRAM'],['compute','Compute'],['dram','DRAM'],['up','Fabric'],['out','Network']];
+function paintChain(m){
+  const ts = tolStats(m), byK = Object.fromEntries(m.comps.map(c=>[c.k, c]));
+  const items = CHAIN.filter(([k])=>byK[k]).map(([k,label])=>({k, label, c:byK[k], rate:m.T/byK[k].U, weak:ts ? (ts.per.find(x=>x.k===k)||{}).weak||0 : null}));
+  const ranked = [...items].sort((a,b)=>a.rate-b.rate), min = ranked[0].rate, second = ranked[1] ? ranked[1].rate : null;
+  // figures only on the weakest two links (and any the tolerance draws name weakest); the rest on hover
+  document.getElementById('chain').innerHTML = `<span class="ch-l">Weakest link</span>` + items.map((i,n)=>`${n?'<span class="ch-a">→</span>':''}<span class="ch ${i.rate===min?'weak':''} ${state(i.c.U)}" title="${esc(i.c.name)}: alone it would sustain ${fmtBps(i.rate)} (${fmtPct(i.c.U)} loaded at the target)${i.weak!==null?'; weakest in '+fmtPct(i.weak)+' of tolerance draws':''}">${i.label}${i.rate===min||i.rate===second?` <b>${fmtBps(i.rate)}</b>`:''}${i.weak>0.005?` <i>${fmtPct(i.weak)}</i>`:''}</span>`).join('');
 }
 
 /* =====================================================================
@@ -1442,24 +1539,40 @@ function hbar(label, v, max, st, num){
   return `<div class="bar"><span>${label}</span><div class="track"><div class="fill" style="width:${Math.max(0.5,Math.min(100,v/max*100))}%;background:${st==='bad'?'#fff':st==='warn'?'#cfcfcf':'#6b6b6b'}"></div>
     <div style="position:absolute;top:-4px;bottom:-4px;left:50%;border-left:1px dashed #a3a3a3"></div></div><span class="num">${num}</span></div>`; }
 
+function histogram(ls){
+  const W = 760, H = 220, ml = 50, mr = 14, mt = 14, mb = 34, xs = ls.xs, n = xs.length;
+  const lo = xs[0]*0.98, hi = Math.max(xs[Math.floor(n*0.9995)], ls.stack)*1.15, logx = hi/lo > 20;
+  const X = v => ml + (logx ? (Math.log(v)-Math.log(lo))/(Math.log(hi)-Math.log(lo)) : (v-lo)/(hi-lo))*(W-ml-mr);
+  const bins = new Array(60).fill(0);
+  for(let i=0;i<n;i++){ const f = (X(xs[i])-ml)/(W-ml-mr); if(f>=0 && f<1) bins[Math.floor(f*60)]++; }
+  const mx = Math.max(...bins), bw = (W-ml-mr)/60;
+  let g = bins.map((c,i)=>`<rect x="${ml+i*bw}" y="${H-mb-(c/mx)*(H-mt-mb)}" width="${bw-1}" height="${(c/mx)*(H-mt-mb)}" fill="#4a4a4a"/>`).join('');
+  g += `<line class="ax" x1="${ml}" x2="${W-mr}" y1="${H-mb}" y2="${H-mb}"/>`;
+  for(let i=0;i<=5;i++){ const v = logx ? lo*Math.pow(hi/lo, i/5) : lo+(hi-lo)*i/5; g += `<text x="${X(v)}" y="${H-mb+16}" text-anchor="middle">${fmtT(v)}</text>`; }
+  const vl = (v, name, col, dash, row) => v<=hi && v>=lo ? `<line x1="${X(v)}" x2="${X(v)}" y1="${mt}" y2="${H-mb}" stroke="${col}" stroke-dasharray="${dash}" stroke-width="1.5"/><text x="${X(v)+4}" y="${mt+10+row*13}" style="fill:${col}">${name}</text>` : '';
+  g += vl(ls.p50,'p50','#a3a3a3','2 3',0) + vl(ls.pX, pctName(S.vary.pct),'#ededed','',1) + vl(ls.stack,'worst-case stack','#cfcfcf','6 4',2) + (S.lat<=hi ? vl(S.lat,'budget','#ffffff','1 3',3) : `<text x="${W-mr}" y="${mt+10}" text-anchor="end" style="fill:#ededed">budget ${fmtT(S.lat)} →</text>`);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Latency distribution">${g}</svg>`;
+}
 function paneLatency(m){
-  const tot = m.latency, fin = isFinite(tot), scale = fin ? Math.max(tot, S.lat) : 1;
+  const ls = latencyStats(m), tot = m.latency, fin = isFinite(tot), scale = fin ? Math.max(tot, S.lat) : 1;
   const stack = fin ? `<div style="position:relative"><div class="stack">${m.stages.map((s,i)=>`<div class="h${i%10}" title="${esc(s.name)}: ${fmtT(s.t)}" style="width:${s.t/scale*100}%"></div>`).join('')}</div>
-      <div style="position:absolute;top:-6px;bottom:-6px;left:${S.lat/scale*100}%;border-left:2px dashed #ededed"></div></div>
+      <div style="position:absolute;top:-6px;bottom:-6px;left:${Math.min(100,S.lat/scale*100)}%;border-left:2px dashed #ededed"></div></div>
       <div class="keys">${m.stages.map((s,i)=>`<span><i class="hs h${i%10}"></i>${s.name} · ${fmtT(s.t)}</span>`).join('')}<span>dashed line = budget ${fmtT(S.lat)}</span></div>`
     : `<div class="answer"><b>Unbounded.</b> At least one stage is above 100 % utilisation on average, so its queue grows without limit.</div>`;
-  const rows = m.stages.map(s=>`<tr><td>${s.name}</td><td class="n">${fmtT(s.fixed)}</td><td class="n">${fmtT(s.svc)}</td><td class="n">${fmtT(s.q)}</td><td class="n">${fmtT(s.t)}</td></tr>`).join('');
+  const dist = ls.unbounded ? '' : `<div class="card span"><h3>Distribution of one block's latency · ${S.vary.deadline==='hard'?'hard deadline':'soft deadline'}</h3>${histogram(ls)}
+    <div class="rackstat" style="margin:12px 0 0">${[['Mean',ls.mean],['p50',ls.p50],['p99',ls.p99],['p99.9',ls.p999],['Worst-case stack',ls.stack],['Budget',S.lat]].map(([l,v])=>`<div class="${l!=='Budget'&&v>S.lat?'bad':''}"><div class="l">${l}</div><div class="v">${fmtT(v)}</div></div>`).join('')}</div>
+    <p class="note">${fmtN(ls.xs.length)} Monte Carlo draws. Each stage is lognormal around its mean (${S.vary.jitter} jitter; long transfers average out their jitter), queueing waits vary about as much as their mean, and stages are ${({full:'fully correlated',partial:'partly correlated',indep:'independent'})[S.vary.corr]}. The worst-case stack puts every stage at its own ${pctName(S.vary.pct)} together; ${S.vary.corr==='full'?'with full correlation the two agree':'the gap to the '+latLabel()+' line is the margin that tolerance stacking would waste'}.</p></div>`;
+  const rows = m.stages.map(s=>`<tr><td>${s.name}</td><td class="n">${fmtT(s.fixed)}</td><td class="n">${fmtT(s.svc)}</td><td class="n">${fmtT(s.q)}</td><td class="n">${sig(stageJit(s.k,S))} / ${sig(s.svc>0?svcCv(s.k,s.svc,S):0)}</td><td class="n">${fmtT(s.t)}</td></tr>`).join('');
   const xs = [], ys = [], cores = [];
   for(let i=0;i<=60;i++){ const b = Math.pow(10, 3+i/60*8); const mm = model({...S, block:b}); xs.push(b); ys.push(mm.latency); cores.push(mm.dem.cpu); }
-  const chart = lineChart({xs, series:[{ys, col:'#ededed', name:'latency per block'}], xfmt:fmtB, yfmt:fmtT,
+  const chart = lineChart({xs, series:[{ys, col:'#ededed', name:'mean latency per block'}], xfmt:fmtB, yfmt:fmtT,
     hlines:[{y:S.lat, col:'#a3a3a3', name:'budget'}], vlines:[{x:S.block, col:'#6b6b6b', name:'current'}], h:230});
   const chart2 = lineChart({xs, series:[{ys:cores, col:'#ededed', name:'cores'}], xfmt:fmtB, yfmt:v=>sig(v),
     hlines:[{y:S.host.cores, col:'#a3a3a3', name:'available'}], vlines:[{x:S.block, col:'#6b6b6b', name:'current'}], h:230});
-  return `<div class="cols"><div class="card span"><h3>One block, submit to result · ${fmtT(tot)}</h3>${stack}
-    <div class="tbl-wrap" style="margin-top:16px"><table class="t"><thead><tr><th>Stage</th><th class="n">Fixed</th><th class="n">Transfer</th><th class="n">Queueing (M/D/1)</th><th class="n">Total</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="note">Stages run back-to-back for one block; different blocks overlap in a pipeline, so throughput is set by the slowest stage and latency by the sum.</p></div>
-    <div class="card"><h3>Latency vs block size</h3>${chart}</div>
-    <div class="card"><h3>Host cores vs block size</h3>${chart2}<p class="note">Small blocks drown the host in descriptors and interrupts.</p></div></div>`;
+  return `<div class="cols">${dist}<div class="card span"><h3>Mean time per stage · <span>${fmtT(tot)}</span></h3>${stack}
+    <div class="tbl-wrap" style="margin-top:16px"><table class="t"><thead><tr><th>Stage</th><th class="n">Fixed</th><th class="n">Transfer</th><th class="n">Queueing (G/G/1)</th><th class="n">Jitter CV (fixed / transfer)</th><th class="n">Mean</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div class="card"><h3>Mean latency vs block size</h3>${chart}</div>
+    <div class="card"><h3>Host cores vs block size</h3>${chart2}</div></div>`;
 }
 
 const SERIES = {dram:['#ededed',''], link:['#ededed','8 4'], compute:['#a3a3a3',''], host:['#a3a3a3','2 3'], cpu:['#6b6b6b','6 3'],
@@ -1472,6 +1585,8 @@ function paneHeadroom(m){
     vlines:[{x:m.T, col:'#a3a3a3', name:'target'}, {x:m.maxT, col:'#ededed', name:'max'}], h:330, legend:true});
   return `<div class="cols"><div class="card span"><h3>Utilisation of every component as the rate scales</h3>${chart}
     <p class="note">The first line to cross 100 % is the bottleneck; where it crosses is the maximum sustainable rate (${fmtBps(m.maxT)}). After fixing ${m.comps[0].name}, ${m.comps[1]?m.comps[1].name+' limits at '+fmtBps(m.T/m.comps[1].U):'nothing else limits'}.</p></div>
+    ${tolStats(m) ? `<div class="card span"><h3>With ±${(S.vary.tol*100).toFixed(0)} % catalogue tolerance</h3>${stat('Stays under the utilisation ceiling', fmtPct(tolStats(m).pCeil))}${stat('Stays under 100 %', fmtPct(tolStats(m).pFull))}
+      <div class="tbl-wrap" style="margin-top:8px"><table class="t"><thead><tr><th>Component</th><th class="n">Under ceiling</th><th class="n">Under 100 %</th><th class="n">Weakest link</th></tr></thead><tbody>${tolStats(m).per.map(c=>`<tr><td>${c.name}</td><td class="n">${fmtPct(c.ceil)}</td><td class="n">${fmtPct(c.full)}</td><td class="n">${fmtPct(c.weak)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="card span"><h3>Ranking</h3><div class="bars">${m.comps.map(c=>hbar(c.name, Math.min(c.U,2), 2, state(c.U), fmtPct(c.U))).join('')}</div><p class="note">Bars run to 200 %; the dashed line is 100 %.</p></div></div>`;
 }
 
@@ -1500,10 +1615,10 @@ function panePPA(m){
   const rows = sizeDram(S, m);
   const scatter = scatterChart(rows.map(r=>({x:r.phy, y:r.power, label:r.d.name.replace(' Gb/s',''), feas:r.feas, cur:r.id===S.dev.dram, id:r.id, n:r.n})));
   return `<div class="cols">
-    <div class="card"><h3>Performance</h3>${stat('Target rate', fmtBps(m.T))}${stat('Max sustainable', fmtBps(m.maxT))}${stat('Latency per block', fmtT(m.latency))}
+    <div class="card"><h3>Performance</h3>${stat('Target rate', fmtBps(m.T))}${stat('Max sustainable', fmtBps(m.maxT))}${stat('Latency per block, '+latLabel(), fmtT(latHead(m)))}
       ${stat('Throughput per watt', fmtBps(m.T/m.Ptot)+'/W')}${stat('Energy per processed byte', sig(m.Ptot/m.T*1e12)+' pJ')}${stat('Data movement share of power', fmtPct(m.Pmove/m.Ptot))}</div>
-    <div class="card"><h3>Power per accelerator · ${fmtW(m.pAcc)}</h3>${stackOf(pItems, fmtW)}<p class="note">System total ${fmtW(m.Ptot)} including hosts and ${NODE_OVERHEAD*100} % for fans and conversion losses.</p></div>
-    <div class="card"><h3>Die area · ${fmtA(m.die)}</h3>${stackOf(aItems, fmtA)}
+    <div class="card"><h3>Power per accelerator · <span>${fmtW(m.pAcc)}</span></h3>${stackOf(pItems, fmtW)}<p class="note">System total ${fmtW(m.Ptot)} including hosts and ${NODE_OVERHEAD*100} % for fans and conversion losses.</p></div>
+    <div class="card"><h3>Die area · <span>${fmtA(m.die)}</span></h3>${stackOf(aItems, fmtA)}
       ${stat('Core-limited area', fmtA(m.coreArea))}${stat('Pad-limited area', fmtA(m.padArea))}${stat('Die edge needed / available', sig(m.shoreNeed)+' / '+sig(m.shoreHave)+' mm')}
       <p class="note">${m.padArea>m.coreArea ? 'Pad-limited: the edge its PHYs need sizes the die, not its logic. ' : ''}${m.die>830 ? 'Above the ~830 mm² reticle limit: this needs several dies on one package.' : 'Within one reticle (~830 mm²).'}</p></div>
     <div class="card span"><h3>DRAM options sized for this requirement · power against PHY area</h3>${scatter}
@@ -1542,7 +1657,11 @@ function considerations(m){
   add('info', 'DRAM concurrency', `<p>Bandwidth × latency = <b>${fmtB(m.inflightDram)}</b> in flight, <b>${fmtN(m.dramReqs)}</b> outstanding 64 B requests the controllers must sustain.</p>`);
   add(state(m.U.cpu), 'Host CPU overhead per block', `<p>${fmtIOPS(m.Tbn/S.block)} blocks/s × ${sig(S.host.cpuUs)} µs = <b>${sig(m.dem.cpu)}</b> cores busy${tp.nN>1?' per node':''}. Batch, poll and coalesce interrupts.</p>`);
   add(state(m.U.host), 'Host memory is on the data path', `<p>Host DRAM moves <b>${sig(m.hR+m.hW)} B</b> per processed byte. Peer-to-peer DMA removes the input half; NUMA placement matters.</p>`);
-  add(!isFinite(m.latency)||m.latency>S.lat?'bad':'ok', 'Latency budget', `<p>${fmtT(m.latency)} per ${fmtB(S.block)} block against <b>${fmtT(S.lat)}</b>. At 90 % utilisation a stage waits 4.5× its own service time (M/D/1).</p>`);
+  { const ls = latencyStats(m), lh = latHead(m);
+    add(lh>S.lat?'bad':'ok', 'Latency budget', ls.unbounded ? `<p>At least one stage is above 100 % on average, so its queue grows without limit.</p>`
+      : `<p>${S.vary.deadline==='hard' ? `Hard deadline: every stage at its own ${pctName(S.vary.pct)}, added up (a tolerance stack), gives <b>${fmtT(ls.stack)}</b>` : `<b>${fmtT(ls.pX)}</b> at ${latLabel()} (mean ${fmtT(ls.mean)}); stacking every stage's own percentile would give ${fmtT(ls.stack)}`} against a budget of <b>${fmtT(S.lat)}</b>. Waiting time follows Kingman's G/G/1 formula with arrival burstiness ${sig(S.vary.ca)} and ${S.vary.jitter} jitter.</p>`);
+    add('info', 'Variability and stacking', `<p>${S.vary.corr==='full' ? 'Bursts and delays are treated as fully correlated, so peaks coincide everywhere: the conservative worst-case stack.' : `Bursts and delays are ${S.vary.corr==='indep'?'independent':'partly correlated (ρ = 0.3)'}, so they rarely all peak together: a host serving ${S.scale.perNode} accelerator${S.scale.perNode>1?'s':''} is sized for a peak of <b>${sig(m.bHost)}×</b> rather than ${sig(S.burst)}×, and the latency percentile sits below the stack of per-stage percentiles.`} Use full correlation where a common cause (refresh, throttling, synchronised collectives) lines the peaks up.</p>`); }
+  { const ts = tolStats(m); if(ts) add(ts.pCeil<0.9?'warn':'ok', 'Catalogue tolerance', `<p>With capacities uncertain by ±${(S.vary.tol*100).toFixed(0)} %, the design stays under the utilisation ceiling in <b>${fmtPct(ts.pCeil)}</b> of draws and under 100 % in <b>${fmtPct(ts.pFull)}</b>. Most often weakest: ${ts.per.filter(c=>c.weak>0.005).sort((a,b)=>b.weak-a.weak).slice(0,3).map(c=>c.name+' '+fmtPct(c.weak)).join(', ')}.</p>`); }
   add(m.sramNeed>S.acc.sram*1e6?'warn':'ok', 'On-chip buffering', `<p>Hiding link and DRAM latency needs about <b>${fmtB(m.sramNeed)}</b> double-buffered; the accelerator has <b>${sig(S.acc.sram)} MB</b>.</p>`);
   add(m.Pmove/m.Ptot>0.5?'warn':'info', 'Power: moving data vs computing', `<p>Data movement is <b>${fmtPct(m.Pmove/m.Ptot)}</b> of <b>${fmtW(m.Ptot)}</b>. A ${d.name} bit costs ${d.pj} pJ, a PCIe bit ${L.pj} pJ, an operation ${S.acc.pj} pJ.</p>`);
   add(m.die>830?'bad':m.padArea>m.coreArea?'warn':'ok', 'Area and die edge', `<p>Die estimate <b>${fmtA(m.die)}</b>; PHYs need <b>${sig(m.shoreNeed)} mm</b> of edge. ${m.padArea>m.coreArea?'Pad-limited. ':''}${m.die>830?'Beyond one reticle: chiplets.':''}</p>`);
@@ -1571,6 +1690,7 @@ function paneModel(){
   <div class="card span"><h3>Host links</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Rate</th><th class="n">Encoding</th><th class="n">pJ/bit</th><th class="n">PHY mm²/lane</th><th class="n">Read RTT</th></tr></thead><tbody>${lk}</tbody></table></div></div>
   <div class="card span"><h3>Scale-up fabrics (per accelerator, per direction)</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Fabric</th><th class="n">Raw</th><th class="n">Efficiency</th><th class="n">pJ/bit</th><th class="n">Switch W/acc.</th><th class="n">Max domain</th></tr></thead><tbody>${fb}</tbody></table></div>
   <p class="note">Scale-out traffic is charged 15 pJ/bit (NIC, optics, switches) plus NIC power per port.</p></div>
+  <div class="card span"><h3>Variability</h3><p style="margin:0;color:var(--t2)">Sizing uses the peak-to-average ratio, except that a resource shared by n independent streams sees a smoothed peak: the excess over the mean shrinks by √(ρ + (1−ρ)/n), where ρ is the chosen correlation (1 = peaks coincide, the worst case). Queueing waits use Kingman's G/G/1 approximation, (c<sub>a</sub>² + c<sub>s</sub>²)/2 · ρ/(1−ρ) · service time, with arrival burstiness c<sub>a</sub> and each stage's jitter c<sub>s</sub>. Latency is sampled by Monte Carlo (10,000 to 40,000 draws depending on the percentile; lognormal stage delays, correlated as chosen). Fixed latencies carry the full jitter; long transfers average it out, their CV shrinking as √(duration ÷ 10 µs), while compute keeps its full, data-dependent jitter; a soft deadline is judged at the chosen percentile, a hard one at the worst-case stack of per-stage percentiles. Catalogue tolerance draws every capacity independently within ±tol (2σ) and reports how often the design holds and which component is weakest. Jitter CVs (low / typical / high): ${Object.entries(JIT).map(([k,v])=>k+' '+v.join('/')).join(', ')}.</p></div>
   <div class="card span"><h3>On-chip interconnect</h3><p style="margin:0;color:var(--t2)">Traffic entering or leaving the die (DRAM, host link, peers) meets the interconnect at the edge; tile-to-tile traffic follows the chosen pattern. Networks-on-chip (mesh, torus, ring, crossbar, and AMBA CHI as a coherent mesh) are checked at the edge channels (4k for a k × k grid), the bisection (k channels per direction for a mesh, 2k for a torus, 2 for a ring, with 1/16 of edge traffic and a pattern-dependent share of tile traffic crossing) and each tile's port. AMBA AXI and ACE are crossbars of masters and memory-side slave ports with independent read and write channels, checked at the memory ports, the master ports and tile-to-tile traffic through the crossbar. AXI4-Stream is a set of parallel pipelines, checked at their entries and busiest link. AHB and APB are shared buses: every transfer in either direction takes the one bus. Usable share of a link: ${Object.values(NOC_TOPO).map(t=>t.name.replace(/ \(.*\)/,'')+' '+(t.eff*100).toFixed(0)+' %').join(', ')}. Energy ${BASE.noc.pj} pJ/bit per hop plus ${SRAM_PJ} pJ/bit per SRAM access.</p></div></div>`;
 }
 
@@ -1641,7 +1761,7 @@ function update(){
 }
 function buildAll(){
   ctlUpdaters.length = 0;
-  buildReq(); buildWl(); buildScale(); buildInspector(); buildDiagram(); update();
+  buildReq(); buildWl(); buildScale(); buildVary(); buildInspector(); buildDiagram(); update();
 }
 document.addEventListener('click', e=>{
   const u = e.target.closest('[data-dram]');
@@ -1705,6 +1825,9 @@ const REQ_MAP = {
   rack_power_limit_kw:['scale.rackKW','enum',[15,40,80,132,250],null,'rack limit',v=>v+' kW'],
   tile_to_tile_bytes_per_byte:['noc.xNoc','num',0,50,'tile-to-tile traffic',v=>sig(v)+' B/B'],
   tile_traffic_pattern:['noc.pattern','enum',Object.keys(NOC_PAT),null,'tile traffic',v=>NOC_PAT[v].name],
+  deadline_type:['vary.deadline','enum',['hard','soft'],null,'deadline',String], latency_percentile:['vary.pct','enum',[0.99,0.999,0.9999],null,'percentile',pctName],
+  arrival_burstiness_cv:['vary.ca','num',0,3,'arrival burstiness',v=>sig(v)], jitter:['vary.jitter','enum',['low','typical','high'],null,'jitter',String],
+  peak_correlation:['vary.corr','enum',['indep','partial','full'],null,'peak correlation',String], catalogue_tolerance:['vary.tol','enum',[0,0.1,0.2,0.3],null,'tolerance',v=>'±'+v*100+' %'],
 };
 const HW_MAP = {
   dram_type:['dev.dram','enum',Object.keys(DRAMS),null,'DRAM',v=>DRAMS[v].name], dram_units:['dev.units','int',1,64,'DRAM units',String],
@@ -1748,7 +1871,10 @@ function agentSummary(){
   return {
     target_rate: fmtBps(S.T), max_sustainable_rate: fmtBps(m.maxT), bottleneck: m.worst.name, utilisation_ceiling: fmtPct(S.ceil),
     components: m.comps.map(c=>({component:c.name, utilisation:fmtPct(c.U), need:c.f(c.need), have:c.f(c.have)})),
-    latency_per_block: fmtT(m.latency), latency_budget: fmtT(S.lat), meets_latency: isFinite(m.latency) && m.latency<=S.lat,
+    latency_mean: fmtT(m.latency), latency_headline: latLabel()+' '+fmtT(latHead(m)), latency_worst_case_stack: latencyStats(m).unbounded ? 'unbounded' : fmtT(latencyStats(m).stack),
+    latency_budget: fmtT(S.lat), deadline: S.vary.deadline, meets_latency: latHead(m)<=S.lat,
+    weakest_link_chain: m.comps.map(c=>({component:c.name, sustains:fmtBps(m.T/c.U)})),
+    tolerance: tolStats(m) ? {plus_minus:fmtPct(S.vary.tol), p_under_ceiling:fmtPct(tolStats(m).pCeil), p_under_100:fmtPct(tolStats(m).pFull)} : 'off',
     accelerators: m.tp.nA, accelerators_needed_with_this_design: an.n, scaleup_domain_size: m.tp.dom,
     power_system: fmtW(m.Ptot), power_per_accelerator: fmtW(m.pAcc), power_per_rack: fmtW(m.Prack), rack_limit: S.scale.rackKW+' kW',
     die_area: fmtA(m.die), fits_one_reticle: m.die<=830, energy_per_byte: sig(m.Ptot/m.T*1e12)+' pJ',
@@ -1780,6 +1906,7 @@ How the model reads its inputs:
 - rate_bytes_per_s is bytes of input processed per second by the whole system. Everything else is per byte processed: link bytes in and out (host ↔ accelerator), extra DRAM reads and writes (weights, tables, intermediates, multiple passes), arithmetic in operations per byte, tile-to-tile bytes on the on-chip network, and peer bytes exchanged between accelerators inside the scale-up domain or across the network.
 - The rate splits evenly over accelerators (accelerators_per_node × nodes_per_rack × racks) and over nodes for host-side work. block_bytes is the unit of work per accelerator (a frame, a batch, a decode step); latency is one block through every stage.
 - A component is fine below the utilisation ceiling (default 80 %), tight between the ceiling and 100 %, failing above 100 %. Units are decimal.
+- Variability: a soft deadline is judged at a latency percentile (p99 by default) from a Monte Carlo of lognormal stage delays; a hard deadline uses the worst-case stack of per-stage percentiles. peak_correlation full means peaks coincide everywhere (worst case); independent or partial lets shared resources such as the host be sized for a smoothed peak. If a latency target is tight and it is unclear whether missing it is a failure (hard) or a quality issue (soft), ask.
 
 Useful conversions:
 - LLM decode: each step reads every weight once per batch. rate = model bytes × steps per second, where steps/s = tokens/s ÷ batch; ops per byte ≈ 2 × batch ÷ bytes per parameter; dram_reads_per_byte 1; resident data per accelerator = weights ÷ accelerators + KV cache. Prefill reuses each weight across the prompt length, so ops per byte is in the thousands. Training: ops per byte several hundred, tensor-parallel peer traffic 0.05–0.2 B/B inside a domain, data-parallel 0.01–0.02 B/B over the network.

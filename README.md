@@ -78,6 +78,32 @@ settings. Edge-device and FPGA examples use AXI; the detector trigger uses AXI4-
 
 ![On-chip network](onchip.png)
 
+## Variability, percentiles and the weakest link
+
+Sizing everything for the same simultaneous peak, and adding up every stage's worst latency, stacks
+tolerances to a worst case that rarely happens. A collapsed *Variability & tolerances* section offers
+the alternative:
+
+- **Deadline: soft or hard.** A soft deadline is judged at a percentile (p99, p99.9 or p99.99) of a
+  Monte Carlo of the whole path. Each stage's delay is lognormal around its mean; long transfers average
+  out their jitter, compute keeps its data-dependent jitter, and queueing waits vary about as much as
+  their mean. A hard deadline (trading, triggers, 5G slots) keeps the worst-case stack of per-stage
+  percentiles. The Latency tab shows the histogram with p50, the percentile, the worst-case stack and the
+  budget, so the margin that stacking would waste is visible.
+- **Do peaks line up?** Independent or partly correlated bursts smooth out where many streams share a
+  resource: a host serving eight accelerators is sized for a smaller peak than any one of them sees.
+  Fully correlated reproduces the worst case.
+- **Arrival burstiness and jitter** feed Kingman's G/G/1 queueing formula. Clocked work such as LLM
+  decode steps and camera frames arrives regularly; random requests are Poisson.
+- **Catalogue tolerance** (±10–30 %) draws every capacity figure at random and reports how often the
+  design stays under the ceiling, and which component turns out weakest.
+
+A **weakest-link** strip under the headline figures lists every component on the data path, in order,
+with the rate it alone could sustain. The weakest is inverted and sets the system's maximum rate. With
+tolerance on, each link also shows how often it came out weakest.
+
+![Latency distribution](latency.png)
+
 ## The question it was built for
 
 *A system has to process 1 GB of data per millisecond. How wide would a bank of LPDDR4 at full speed
