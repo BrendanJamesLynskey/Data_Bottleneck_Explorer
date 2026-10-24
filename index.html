@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>System Design Explorer</title>
+<title>Hardware System Design Explorer</title>
 <meta name="description" content="Size the host, links, accelerators, DRAM and racks of a data-processing system from its throughput and latency requirements, with power, performance and area (PPA) for every choice.">
 <meta name="color-scheme" content="dark">
 <meta property="og:type" content="website">
-<meta property="og:title" content="System Design Explorer">
+<meta property="og:title" content="Hardware System Design Explorer">
 <meta property="og:description" content="Size the host, links, accelerators, DRAM, on-chip fabric and racks of a data-processing system from its throughput and latency requirements, with power, performance and area, an optimiser and a design assistant.">
-<meta property="og:url" content="https://data-bottleneck-explorer.vercel.app/">
-<meta property="og:image" content="https://data-bottleneck-explorer.vercel.app/og.png">
+<meta property="og:url" content="https://hw-system-design-explorer.vercel.app/">
+<meta property="og:image" content="https://hw-system-design-explorer.vercel.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="canonical" href="https://data-bottleneck-explorer.vercel.app/">
+<link rel="canonical" href="https://hw-system-design-explorer.vercel.app/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -312,7 +312,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 <body>
 <div id="page">
 <header class="top">
-  <a class="brand" href="./" aria-label="System Design Explorer, home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 9h10v14H3zM19 9h10v14H19z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M13 16h6" stroke="currentColor" stroke-width="4"/></svg><h1>System Design Explorer</h1></a>
+  <a class="brand" href="./" aria-label="Hardware System Design Explorer, home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 9h10v14H3zM19 9h10v14H19z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M13 16h6" stroke="currentColor" stroke-width="4"/></svg><h1>Hardware System Design Explorer</h1></a>
   <div class="ctrl">
     <select id="preset" aria-label="Example application"></select>
     <button class="btn" id="openAssist"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12v8H7l-3 3v-3H2z"/></svg>Assistant</button>
@@ -350,7 +350,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 <footer>
   <p class="checked" id="checkedLine"></p>
   A first-order sizing model; every catalogue value is an indicative figure (see the Model tab).
-  Source on <a href="https://github.com/BrendanJamesLynskey/Data_Bottleneck_Explorer">GitHub</a> · built by <a href="https://brendanjameslynskey.github.io/">Brendan Lynskey</a>
+  Source on <a href="https://github.com/BrendanJamesLynskey/HW_System_Design_Explorer">GitHub</a> · built by <a href="https://brendanjameslynskey.github.io/">Brendan Lynskey</a>
 </footer>
 </div>
 
@@ -2206,7 +2206,7 @@ const AGENT_TOOLS = [
    input_schema:{type:'object', properties:{questions:{type:'array', minItems:1, maxItems:3, items:{type:'object', properties:{
      question:{type:'string'}, why:{type:'string', description:'One short clause on why it matters.'}, options:{type:'array', minItems:2, maxItems:4, items:{type:'string'}}}, required:['question','options']}}}, required:['questions']}},
 ];
-const AGENT_SYSTEM = `You are the design assistant inside System Design Explorer, a first-order sizing model of data-processing systems: hosts, host links (PCIe, UCIe), accelerators with an on-chip interconnect (mesh, torus, ring or crossbar NoCs, or AMBA: CHI coherent mesh, AXI and ACE crossbars, AXI4-Stream pipelines, AHB and APB buses) and SRAM, device DRAM, scale-up fabrics, scale-out networks and racks. A person describes in plain language what a system has to do. Turn that into the model's inputs, ask for missing details that matter, then choose hardware that meets the requirement with sensible power and area. The page redraws live as you call tools, so the person watches the design take shape.
+const AGENT_SYSTEM = `You are the design assistant inside Hardware System Design Explorer, a first-order sizing model of data-processing systems: hosts, host links (PCIe, UCIe), accelerators with an on-chip interconnect (mesh, torus, ring or crossbar NoCs, or AMBA: CHI coherent mesh, AXI and ACE crossbars, AXI4-Stream pipelines, AHB and APB buses) and SRAM, device DRAM, scale-up fabrics, scale-out networks and racks. A person describes in plain language what a system has to do. Turn that into the model's inputs, ask for missing details that matter, then choose hardware that meets the requirement with sensible power and area. The page redraws live as you call tools, so the person watches the design take shape.
 
 How the model reads its inputs:
 - rate_bytes_per_s is bytes of input processed per second by the whole system. Everything else is per byte processed: link bytes in and out (host ↔ accelerator), extra DRAM reads and writes (weights, tables, intermediates, multiple passes), arithmetic in operations per byte, tile-to-tile bytes on the on-chip network, and peer bytes exchanged between accelerators inside the scale-up domain or across the network.
@@ -2341,7 +2341,7 @@ const ADAPTERS = {
     pushResults:rs=>rs.forEach(r=>chat.history.push({role:'tool', tool_call_id:r.id, content:r.output})),
     async call(){
       const r = await fetchJSON('https://openrouter.ai/api/v1/chat/completions', {authorization:'Bearer '+prov.key,
-          'HTTP-Referer': location.protocol.startsWith('http') ? location.origin : 'https://data-bottleneck-explorer.vercel.app', 'X-Title':'System Design Explorer'},
+          'HTTP-Referer': location.protocol.startsWith('http') ? location.origin : 'https://hw-system-design-explorer.vercel.app', 'X-Title':'Hardware System Design Explorer'},
         {model:prov.model, messages:[{role:'system', content:AGENT_SYSTEM}, ...chat.history], tools:toolDefs().map(t=>({type:'function', function:t}))});
       const ch = (r.choices||[])[0] || {}, msg = ch.message || {role:'assistant', content:''};
       chat.history.push(msg);

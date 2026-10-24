@@ -1,4 +1,4 @@
-// Regression and reference checks for System Design Explorer, run in headless Chrome.
+// Regression and reference checks for Hardware System Design Explorer, run in headless Chrome.
 //   node test/check.js            check against test/golden.json
 //   node test/check.js --update   rewrite the golden file after an intended model change
 // Checks: no page errors; every published reference figure within tolerance; overhead breakdowns multiply out to the
