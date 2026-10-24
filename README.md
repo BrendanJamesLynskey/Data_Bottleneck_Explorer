@@ -1,8 +1,8 @@
 # Bottleneck Explorer
 
 An interactive sizing tool for data-processing systems: a host CPU and its memory, a host link
-(PCIe or on-package UCIe), an accelerator with on-chip SRAM, and device DRAM, optionally fed from the
-network or NVMe storage. You set the requirements (processing rate, latency budget, block size,
+(PCIe or on-package UCIe), accelerators with on-chip SRAM and device DRAM, scale-up fabrics and
+scale-out networks up to many racks, optionally fed from the network or NVMe storage. You set the requirements (processing rate, latency budget, block size,
 peak-to-average ratio, headroom) and the workload (bytes over the link and through DRAM per byte
 processed, arithmetic per byte), and it shows which component is the bottleneck. It also gives the
 minimum specification of every component, and the power, performance and area (PPA) of the result.
@@ -11,23 +11,27 @@ minimum specification of every component, and the power, performance and area (P
 
 ![System view](system.png)
 
-## The look: an engineer's blueprint
+## Layout
 
-The whole app is drawn as an old engineering print instead of a dashboard:
+A sober black-and-white page: the verdict, a one-line summary of the requirements and a live block diagram
+up front, with the analysis in tabs below. Status is shown by weight and inversion rather than colour
+(grey within the utilisation ceiling, dashed above it, white over capacity, the bottleneck inverted).
+Inputs live in a drawer that slides in from the left; clicking any block opens its settings in a drawer
+on the right. On wide screens the drawers push the page aside so the diagram stays visible while you drag.
 
-- **Paper:** cyanotype blue with grain, uneven exposure and fold creases.
-- **Sheet:** a double-ruled border with zone references, and a third-angle projection symbol as the logo.
-- **Lettering:** stencil titles, draftsman's hand for labels and typewriter figures.
-- **Title block:** drawn by, checked, scale, drawing number and revision. *Checked* reads "passes ✓"
-  or "see notes ✗"; the revision goes to B when you edit a preset.
-- **Status:** ink means within the utilisation ceiling, yellow pencil above it, red pencil over capacity.
-- **Annotations:** the bottleneck is circled by hand in red pencil and every block carries a 0–100 % gauge.
-- **Charts:** hatching instead of colour fills, dash patterns to tell the lines apart, and rubber
-  stamps (*practical*, *stretch*, *impractical*, *fail*, *check*) for verdicts.
+![Inputs drawer](inputs.png)
 
-A *Whiteprint* button switches to the diazo print: blue ink on cream paper.
+## Many accelerators and racks
 
-![Whiteprint](whiteprint.png)
+Set accelerators per node, nodes per rack and racks. Each accelerator then handles its share of the
+rate and each host its node's share. Peer traffic splits into what stays inside the scale-up domain
+(a node or a whole rack, over PCIe peer-to-peer, NVLink 4/5, UALink or Ethernet scale-up) and what
+crosses the scale-out network (200G to 1.6T NICs). The *Racks* tab draws the rack elevation and
+checks rack power against a cooling limit (air, rear-door, direct liquid). The sizing says how many
+accelerators this design needs, and the fabric table shows which fabrics fit and whether the domain is
+too big for them.
+
+![Racks](racks.png)
 
 ## The question it was built for
 
@@ -47,14 +51,15 @@ would have to carry 4 TB/s to feed that link.
 
 ## What's inside
 
-- **Live data-flow diagram**: animated traffic on every path, with each block coloured by
+- **Live data-flow diagram**: moving dashes on every path, with each block marked by its
   utilisation against your ceiling. The bottleneck is flagged. Click a block to configure it.
 - **Verdict strip**: the bottleneck, the maximum sustainable rate, latency per block against the
-  budget, system power, die area and energy per processed byte.
+  budget, system and per-rack power, and the accelerator count.
 - **Minimum specs**: every DRAM technology (DDR4/5, LPDDR4/4X/5/5X/6, GDDR6/6X/7, HBM2 to HBM4)
   sized for the requirement, with bus width, capacity, power, PHY area, beachfront, signal pins and a
   practical / stretch / impractical verdict. Also every link (PCIe 3.0 to 7.0, UCIe), host memory
-  channels, compute, host cores, network ports and SSDs. One click applies any option.
+  channels, scale-up fabrics, scale-out NICs, compute, host cores, network ports and SSDs. One click
+  applies any option.
 - **PPA**: power broken down by component, a die-area estimate that switches to *pad-limited* when
   the memory and link PHYs need more edge than the logic provides, a reticle-limit check, and a DRAM
   design-space plot of power against PHY area.
@@ -68,26 +73,22 @@ would have to carry 4 TB/s to feed that link.
   full-duplex links, access-pattern efficiency, capacity, PCIe TLP efficiency, outstanding read tags
   (Little's law), DRAM concurrency, CPU cost per block, host memory on the data path, queueing,
   on-chip buffering, data-movement power, beachfront, HBM packaging and ECC.
-- **25 example applications** in six groups, each with a one-line note on what it shows. The ones
-  marked ✗ are deliberately broken designs that illustrate a classic bottleneck:
-  - *Start here*: the 1 TB/s question.
-  - *Imaging & video*: 4 × 4K60 edge analytics, an 8K60 broadcast encoder, line-scan machine vision,
-    a smartphone ISP + NPU, a 128-channel ultrasound beamformer, an autonomous-driving perception SoC.
-  - *Signal processing & comms*: a radar/SDR front end over 400 GbE, a 5G O-RAN distributed unit, a
-    radio-telescope correlator, a low-latency trading feed handler ✗, a particle-detector trigger ✗.
-  - *AI & ML*: LLM decode at the edge and in the datacentre, LLM prefill, a training step, DLRM
-    embedding lookups, and a data loader starving a GPU ✗.
-  - *Data, storage & networking*: an NVMe scan offload, a GPU database join over PCIe ✗, 400 GbE TLS
+- **27 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
+  deliberately broken designs that illustrate a classic bottleneck:
+  - *AI & LLMs*: rack-scale inference on 72 accelerators in one NVLink domain, a 1,024-accelerator
+    training cluster over 32 racks, tensor-parallel prefill on 8 PCIe cards ✗, LLM decode on an
+    8-accelerator server and at the edge, prefill on one accelerator, DLRM embedding lookups, and a data
+    loader starving an accelerator ✗.
+  - *Fundamentals*: the 1 TB/s question.
+  - *Imaging & video*: 4 × 4K60 edge analytics, an 8K60 encoder, line-scan vision, a smartphone ISP +
+    NPU, an ultrasound beamformer, an autonomous-driving SoC.
+  - *Signal processing & comms*: radar/SDR over 400 GbE, a 5G O-RAN DU, a radio-telescope correlator,
+    a trading feed handler ✗, a detector trigger ✗.
+  - *Data, storage & networking*: NVMe scan offload, a GPU database join over PCIe ✗, 400 GbE TLS
     offload, storage compression.
-  - *Science, HPC & crypto*: a CFD stencil, genomic read alignment on an FPGA card, an FHE
-    bootstrapping accelerator.
+  - *Science, HPC & crypto*: a CFD stencil, genomic alignment on an FPGA card, an FHE bootstrapping
+    accelerator.
 - **Share links**: the whole configuration lives in the URL.
-
-![Minimum specs](sizing.png)
-
-![PPA](ppa.png)
-
-![Headroom](headroom.png)
 
 ## The model
 
