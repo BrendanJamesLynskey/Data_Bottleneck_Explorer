@@ -53,6 +53,19 @@ kind of workload, and starts from the nearest example.
 
 ![Design assistant](assistant.png)
 
+## Demo without a key
+
+**Watch a demo** (next to *Design it*) replays an assistant session, with no API key needed. Its tool calls
+run for real, so the page changes as you watch: requirements set, two follow-up questions answered, the
+optimiser run. At the moment it is a scripted walkthrough. Its wording is written for the demo and labelled
+as such, and its closing summary is generated from the model's own results.
+
+`ANTHROPIC_API_KEY=… node tools/record_demo.js` records a real session with `claude-opus-5-5` through the
+same page and embeds it between the `DEMO-START` / `DEMO-END` markers. The demo then says it is a recorded
+session, with the date. The key stays in your environment and goes only to `api.anthropic.com`.
+
+Shared links show a social-preview card (`og.png`, rendered by `tools/og.js`).
+
 ## On-chip interconnect
 
 Each accelerator has an on-chip interconnect and SRAM banks. It can be a network-on-chip (2-D mesh,

@@ -6,6 +6,15 @@
 <title>System Design Explorer</title>
 <meta name="description" content="Size the host, links, accelerators, DRAM and racks of a data-processing system from its throughput and latency requirements, with power, performance and area (PPA) for every choice.">
 <meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:title" content="System Design Explorer">
+<meta property="og:description" content="Size the host, links, accelerators, DRAM, on-chip fabric and racks of a data-processing system from its throughput and latency requirements, with power, performance and area, an optimiser and a design assistant.">
+<meta property="og:url" content="https://data-bottleneck-explorer.vercel.app/">
+<meta property="og:image" content="https://data-bottleneck-explorer.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://data-bottleneck-explorer.vercel.app/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -240,6 +249,9 @@ details.legend-d{margin-top:4px}
 .ask input:focus{border-color:var(--t2); outline:none}
 .ask .btn{padding:8px 16px; background:var(--t1); color:var(--bg); border-color:var(--t1); font-weight:500}
 .ask .btn:hover{background:#fff}
+.ask .btn.demo{background:var(--s1); color:var(--t1); border-color:var(--l2); font-weight:400}
+.ask .btn.demo:hover{border-color:var(--t2); background:var(--s2)}
+.demobar{padding:8px 18px; border-top:1px solid var(--l1); font-size:12.5px; color:var(--t2)}
 @media (min-width:1300px){ body.open-right #page{padding-right:var(--dw)} }
 .chat{flex:1; overflow-y:auto; padding:14px 18px; display:flex; flex-direction:column; gap:10px; scrollbar-width:thin; scrollbar-color:var(--l2) transparent}
 .msg{font-size:13.5px; line-height:1.55; max-width:92%}
@@ -287,6 +299,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   #preset{flex:1 1 0; min-width:0; width:0; max-width:none}
   .drawer.wide{width:100vw; max-width:100vw}
   .ask .btn{padding:8px 12px}
+  .ask{flex-wrap:wrap} .ask input{flex-basis:100%}
   #diagram{min-width:660px}
   .cols,.cons{grid-template-columns:minmax(0,1fr)}
   .bar{grid-template-columns:110px 1fr 64px}
@@ -308,7 +321,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 
 <section class="summary">
   <form class="ask" id="askForm"><input id="askInput" autocomplete="off" aria-label="Describe the system"
-    placeholder="Describe what the system has to do, e.g. “serve a 70B model at 3,000 tokens/s, under 50 ms per token”"><button class="btn">Design it</button></form>
+    placeholder="Describe what the system has to do, e.g. “serve a 70B model at 3,000 tokens/s, under 50 ms per token”"><button class="btn">Design it</button><button type="button" class="btn demo" id="demoBtn">Watch a demo</button></form>
   <div class="verdict" id="verdict" aria-live="polite"></div>
   <div class="chain" id="chain"></div>
   <div class="req-line" id="reqLine"></div>
@@ -355,6 +368,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 <aside class="drawer right wide" id="dAssist" aria-label="Design assistant">
   <div class="dhead"><h2>Design assistant</h2><button class="btn" id="asNew" style="padding:4px 10px">New</button><button class="x" data-close aria-label="Close">×</button></div>
   <div class="chat" id="chatLog" aria-live="polite"></div>
+  <div class="demobar" id="demoBar" hidden>Demo playing · <button class="link" id="demoStop">stop</button></div>
   <div class="keybox" id="keyBox"></div>
   <form class="chatin" id="chatForm"><textarea id="chatInput" rows="2" placeholder="Describe the system, or answer the questions…" aria-label="Message"></textarea><button class="btn">Send</button></form>
 </aside>
@@ -1567,7 +1581,7 @@ function paintSummary(m){
       <div class="v">${w.name} · ${fmtPct(w.U)}</div><div class="s">needs ${w.f(w.need)}, has ${w.f(w.have)}${scope}</div></div>
     <div class="kpi ${m.maxT>=m.T?'ok':'bad'}"><div class="l">Max sustainable</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target</div></div>
     <div class="kpi ${latSt}"><div class="l">Latency, ${latLabel()}</div><div class="v">${fmtT(lh)}</div><div class="s">${ls.unbounded?'queue unstable':S.vary.deadline==='hard'?'hard deadline · budget '+fmtT(S.lat):'worst-case stack '+fmtT(ls.stack)+' · budget '+fmtT(S.lat)}</div></div>
-    <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}"><div class="l">Power at target · full load</div><div class="v">${fmtW(m.Ptot)} · ${fmtW(fullPower(S).total)}</div><div class="s">${tp.nA>1?fmtN(tp.nA)+' accelerators · '+fmtW(fullPower(S).rack)+'/rack at full load':sig(m.Ptot/m.T*1e12)+' pJ per byte at target'}</div></div>`;
+    <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}"><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${fmtW(fullPower(S).total)} at full load${tp.nA>1?' · '+fmtW(fullPower(S).rack)+'/rack':' · '+sig(m.Ptot/m.T*1e12)+' pJ/B'}</div></div>`;
   const p = PRESETS.find(x=>x.id===S.preset);
   document.getElementById('reqLine').innerHTML = `<span>${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
     <button class="link" data-open="left">Edit inputs</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
@@ -2035,7 +2049,7 @@ const AGENT_MODEL = 'claude-opus-5-5';
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.133.0/+esm';
 let apiKey = '';
 try{ apiKey = localStorage.getItem('bx-key') || sessionStorage.getItem('bx-key') || ''; }catch(e){}
-const chat = {history:[], pending:null, busy:false, waitingPrompt:null, basic:false};
+const chat = {history:[], pending:null, busy:false, waitingPrompt:null, basic:false, log:[]};
 
 /* tool argument → state path. kind: num | int | bool | enum (with values) */
 const REQ_MAP = {
@@ -2162,7 +2176,7 @@ function paintKeyBox(){
     : `<p>The assistant runs Claude in your browser with <b>your own Anthropic API key</b>. The key is sent only to api.anthropic.com and is never stored unless you tick the box. Each design conversation costs a few cents on your account.</p>
        <div class="tput"><input id="keyInput" type="password" placeholder="sk-ant-…" autocomplete="off" aria-label="Anthropic API key"><button class="btn" id="saveKey">Use key</button></div>
        <label class="tog" style="margin-top:8px"><span>Remember on this device</span><input type="checkbox" id="keyRemember"><span class="k"></span></label>
-       <p class="sub">No key? <button class="link" id="useBasic">Continue with the basic parser</button>: it reads rates, latencies and the kind of workload, and picks the nearest example.</p>`;
+       <p class="sub">No key? <button class="link" id="kbDemo">Watch a demo</button>, or <button class="link" id="useBasic">continue with the basic parser</button>, which reads rates, latencies and the kind of workload and picks the nearest example.</p>`;
   const fk = document.getElementById('forgetKey');
   if(fk) fk.onclick = ()=>{ apiKey = ''; try{ localStorage.removeItem('bx-key'); sessionStorage.removeItem('bx-key'); }catch(e){} paintKeyBox(); };
   const sk = document.getElementById('saveKey');
@@ -2177,11 +2191,11 @@ function paintKeyBox(){
 function setBusy(b){ chat.busy = b; const el = document.getElementById('chatBusy'); if(el) el.remove();
   if(b) chatAdd('busy', '<span class="dots"><i></i><i></i><i></i></span>').id = 'chatBusy';
   document.querySelector('#chatForm button').disabled = b; }
-function newChat(){ chat.history = []; chat.pending = null; chatLog().innerHTML = '';
+function newChat(){ chat.history = []; chat.pending = null; chat.log = []; chatLog().innerHTML = '';
   chatAdd('sys', `Describe what the system has to do, in your own words: what it processes, how fast, how quickly it must answer, and anything you already know about the hardware. I'll ask about what's missing and configure a system on the page.`); }
 function userSays(text){
-  text = text.trim(); if(!text || chat.busy) return;
-  chatAdd('user', mdLite(text));
+  text = text.trim(); if(!text || chat.busy || replay) return;
+  chatAdd('user', mdLite(text)); chat.log.push({t: chat.pending ? 'answer' : 'user', text});
   if(!apiKey && !chat.basic){ chat.waitingPrompt = text; chatAdd('sys', 'Add an API key below, or continue with the basic parser.'); document.getElementById('keyBox').scrollIntoView({block:'nearest'}); return; }
   if(chat.basic) return basicAgent(text);
   if(chat.pending){ // answers to ask_user: every pending tool call gets a tool_result
@@ -2191,13 +2205,16 @@ function userSays(text){
   } else chat.history.push({role:'user', content:text});
   runAgent();
 }
+function questionCard(q){
+  return chatAdd('qcard', `<div class="q">${esc(q.question)}</div>${q.why?`<div class="why">${esc(q.why)}</div>`:''}<div class="opts">${(q.options||[]).map(o=>`<button class="opt">${esc(o)}</button>`).join('')}</div>`);
+}
 function renderQuestions(asks){
   const answers = {};
   const total = asks.reduce((a,b)=>a+(b.input.questions||[]).length, 0);
   let idx = 0;
   for(const b of asks) for(const q of (b.input.questions||[])){
     const i = idx++;
-    const card = chatAdd('qcard', `<div class="q">${esc(q.question)}</div>${q.why?`<div class="why">${esc(q.why)}</div>`:''}<div class="opts">${(q.options||[]).map(o=>`<button class="opt">${esc(o)}</button>`).join('')}</div>`);
+    const card = questionCard(q);
     card.querySelectorAll('.opt').forEach(btn=>btn.onclick = ()=>{
       if(card.classList.contains('done')) return;
       card.querySelectorAll('.opt').forEach(x=>x.classList.toggle('on', x===btn)); answers[i] = q.question+' → '+btn.textContent;
@@ -2230,14 +2247,15 @@ async function runAgent(){
         chatAdd('err', esc(msg)+' Send a message to try again.'); return;
       }
       chat.history.push({role:'assistant', content:resp.content});
-      for(const blk of resp.content) if(blk.type==='text' && blk.text.trim()) chatAdd('bot', mdLite(blk.text));
+      for(const blk of resp.content) if(blk.type==='text' && blk.text.trim()){ chatAdd('bot', mdLite(blk.text)); chat.log.push({t:'bot', text:blk.text}); }
       if(resp.stop_reason==='refusal'){ chatAdd('err', 'The model declined this request.'); return; }
       if(resp.stop_reason==='max_tokens'){ chatAdd('err', 'The reply was cut off; send "continue".'); return; }
       if(resp.stop_reason!=='tool_use') return;
       const results = [], asks = [];
       for(const blk of resp.content){
         if(blk.type!=='tool_use') continue;
-        if(blk.name==='ask_user'){ asks.push(blk); continue; }
+        if(blk.name==='ask_user'){ asks.push(blk); chat.log.push({t:'ask', input:blk.input}); continue; }
+        chat.log.push({t:'tool', name:blk.name, input:blk.input});
         results.push({type:'tool_result', tool_use_id:blk.id, content:JSON.stringify(runTool(blk.name, blk.input))});
       }
       if(asks.length){ chat.pending = {results, asks}; renderQuestions(asks); return; }
@@ -2312,12 +2330,68 @@ function basicAgent(text){
   chatAdd('bot', mdLite((got.length?`I read ${got.join(', ')}. `:'')+`The current design is limited by **${m.worst.name}** at ${fmtPct(m.worst.U)}.`
     + (miss.length?` Tell me ${miss.join('; and ')}.`:' Open Inputs or click a block to refine it; with an API key the assistant can also choose the hardware for you.')));
 }
+/* Demo. DEMO holds a recorded session when tools/record_demo.js has embedded one (real model output); otherwise the
+   scripted walkthrough below runs. Either way every tool call is executed for real, so the page changes live, and
+   the scripted summary is written from the model's own results. */
+const DEMO = /*DEMO-START*/{kind:'scripted', model:null, date:null, events:null}/*DEMO-END*/;
+const DEMO_SCRIPT = [
+  {t:'user', text:'Serve a 70B-parameter model to 2,000 users at 20 tokens/s each, with under 100 ms per token.'},
+  {t:'bot', text:"That's LLM decode at 40,000 tokens/s in total. With FP8 weights (70 GB) and a batch of 32, every decode step reads all the weights once: 1,250 steps/s, or about 88 TB/s of weight reads at 64 operations per byte. I'll start from the 8-accelerator server example and set the requirement."},
+  {t:'tool', name:'load_example', input:{example:'llmdc'}},
+  {t:'tool', name:'set_requirements', input:{rate_bytes_per_s:8.75e13, latency_budget_s:0.1, ops_per_byte:64, dram_reads_per_byte:1, dram_writes_per_byte:0.05,
+    resident_gb_per_accelerator:30, arrival_burstiness_cv:0, assumptions:['FP8 weights, 70 GB', 'batch of 32 per decode step', 'about 20 GB of KV cache per accelerator']}},
+  {t:'ask', input:{questions:[
+    {question:'Is 100 ms per token a hard limit, or a target for nearly every token?', why:'hard limits are sized for the worst case', options:['A target: p99 is fine','Hard: never exceed it']},
+    {question:'How will the racks be cooled?', why:'sets the rack power limit', options:['Air, about 40 kW per rack','Direct liquid, about 132 kW per rack']}]}},
+  {t:'answer', text:'Is 100 ms per token a hard limit, or a target for nearly every token? → A target: p99 is fine\nHow will the racks be cooled? → Direct liquid, about 132 kW per rack'},
+  {t:'tool', name:'set_requirements', input:{deadline_type:'soft', latency_percentile:0.99, rack_power_limit_kw:132}},
+  {t:'bot', text:'Searching the hardware for the lowest-power design that keeps every component under the 80 % ceiling, adding accelerators where one node is not enough.'},
+  {t:'tool', name:'optimise', input:{goal:'power', allow_more_accelerators:true, apply:true}},
+  {t:'summary'},
+];
+function demoSummary(){
+  const m = M, tp = m.tp, fp = fullPower(S), ls = latencyStats(m);
+  return `Proposed system:
+- ${fmtN(tp.nA)} accelerators: ${S.scale.perNode} per node, ${S.scale.nodes} node${S.scale.nodes>1?'s':''}${S.scale.racks>1?' per rack, '+S.scale.racks+' racks':''}
+- each with ${S.dev.units} × ${m.dev.name} (${fmtBps(m.cap.dram)} usable), ${sig(S.acc.tops)} TOPS peak
+- ${m.fab.name.split(' (')[0]} between the accelerators of a node; ${LINKS[S.link.id].name} x${S.link.lanes} to the host
+- ${fmtW(fp.total)} at full load (${fmtW(fp.rack)} per rack), ${fmtW(m.Ptot)} at this rate
+The limit is ${m.worst.name} at ${fmtPct(m.worst.U)}, so it sustains ${sig(m.maxT/m.T)}× the target; p99 latency per token is ${ls.unbounded?'unbounded':fmtT(ls.pX)}, against 100 ms.`;
+}
+let replay = null;
+const sleep = ms => new Promise(r=>setTimeout(r, window.__demoFast ? 1 : ms));
+async function playDemo(){
+  if(chat.busy || replay) return;
+  openDrawer('assist'); newChat(); chatLog().innerHTML = '';
+  const events = DEMO.events || DEMO_SCRIPT;
+  replay = {stop:false};
+  document.getElementById('demoBar').hidden = false;
+  chatAdd('sys', DEMO.events ? `Replay of a recorded session with ${esc(DEMO.model)} (${esc(DEMO.date)}). The tool calls run for real, so the page changes as you watch.`
+    : `Scripted walkthrough of what the assistant does. Its wording here is written for the demo, but every tool call runs for real and the summary comes from the model's own results. Add your API key to run the real assistant.`);
+  try{
+    for(const ev of events){
+      if(replay.stop) break;
+      if(ev.t==='user' || ev.t==='answer'){ await sleep(900); chatAdd('user', mdLite(ev.text)); if(ev.t==='answer') document.querySelectorAll('.qcard').forEach(q=>q.classList.add('done')); }
+      else if(ev.t==='bot' || ev.t==='summary'){ setBusy(true); await sleep(1300); setBusy(false); chatAdd('bot', mdLite(ev.t==='summary' ? demoSummary() : ev.text)); }
+      else if(ev.t==='tool'){ setBusy(true); await sleep(800); setBusy(false); runTool(ev.name, ev.input); }
+      else if(ev.t==='ask'){ setBusy(true); await sleep(1000); setBusy(false);
+        const next = events[events.indexOf(ev)+1], chosen = next && next.t==='answer' ? next.text.split('\n').map(l=>l.split(' → ')[1]) : [];
+        const cards = (ev.input.questions||[]).map(q=>questionCard(q));
+        await sleep(1400);
+        cards.forEach((c,i)=>c.querySelectorAll('.opt').forEach(b=>b.classList.toggle('on', b.textContent===chosen[i]))); }
+    }
+    if(!replay.stop) chatAdd('sys', 'End of the demo. The design stays on the page: explore it, or describe your own system.');
+  } finally { replay = null; setBusy(false); document.getElementById('demoBar').hidden = true; }
+}
 document.getElementById('chatForm').addEventListener('submit', e=>{ e.preventDefault(); const i = document.getElementById('chatInput'); const t = i.value; i.value = ''; userSays(t); });
 document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('chatForm').requestSubmit(); } });
 document.getElementById('askForm').addEventListener('submit', e=>{ e.preventDefault(); const i = document.getElementById('askInput'); const t = i.value; i.value = '';
   openDrawer('assist'); if(t.trim()) userSays(t); else document.getElementById('chatInput').focus(); });
 document.getElementById('openAssist').onclick = ()=> openDrawer(document.getElementById('dAssist').classList.contains('open') ? null : 'assist');
-document.getElementById('asNew').onclick = newChat;
+document.getElementById('asNew').onclick = ()=>{ if(replay) replay.stop = true; newChat(); };
+document.getElementById('demoBtn').onclick = playDemo;
+document.getElementById('demoStop').onclick = ()=>{ if(replay) replay.stop = true; };
+document.addEventListener('click', e=>{ if(e.target.id==='kbDemo') playDemo(); });
 paintKeyBox(); newChat();
 
 if(!loadHash()){ S = merge(clone(BASE), clone(PRESETS[0].p)); S.preset = PRESETS[0].id; }
