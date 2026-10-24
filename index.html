@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bottleneck Explorer</title>
+<meta name="description" content="Size the host, link, accelerator and DRAM of a data-processing system from its throughput and latency requirements, and see power, performance and area (PPA) for every choice.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2305070d'/%3E%3Cpath d='M8 20h18l6 12-6 12H8M56 20H38l-6 12 6 12h18' fill='none' stroke='%233cf2ff' stroke-width='5' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23ff3cac'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#05070d; --bg2:#0a1020; --panel:rgba(14,20,38,.78); --panel2:rgba(22,30,56,.7);
+  --line:rgba(120,160,255,.16); --line2:rgba(120,160,255,.32);
+  --text:#e8eeff; --mute:#8d99bd; --faint:#5b6688;
+  --cyan:#3cf2ff; --mag:#ff3cac; --violet:#9b7bff; --amber:#ffb547; --green:#3dffa8; --red:#ff4d6d;
+  --ok:var(--green); --warn:var(--amber); --bad:var(--red);
+  --glow:0 0 24px rgba(60,242,255,.18);
+  --grid:rgba(90,130,255,.06);
+  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  --sans:'Space Grotesk',system-ui,-apple-system,Segoe UI,sans-serif;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#eef2fb; --bg2:#e2e8f7; --panel:rgba(255,255,255,.86); --panel2:rgba(240,244,255,.9);
+    --line:rgba(40,60,140,.14); --line2:rgba(40,60,140,.3);
+    --text:#121a33; --mute:#4c5878; --faint:#8590ad;
+    --cyan:#0089a8; --mag:#c4127a; --violet:#5b3fd6; --amber:#a86400; --green:#0a8a55; --red:#c8243f;
+    --glow:0 0 0 transparent; --grid:rgba(40,60,140,.06);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#eef2fb; --bg2:#e2e8f7; --panel:rgba(255,255,255,.86); --panel2:rgba(240,244,255,.9);
+  --line:rgba(40,60,140,.14); --line2:rgba(40,60,140,.3);
+  --text:#121a33; --mute:#4c5878; --faint:#8590ad;
+  --cyan:#0089a8; --mag:#c4127a; --violet:#5b3fd6; --amber:#a86400; --green:#0a8a55; --red:#c8243f;
+  --glow:0 0 0 transparent; --grid:rgba(40,60,140,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.45;
+  background-image:
+    radial-gradient(1200px 600px at 85% -10%, rgba(155,123,255,.16), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(60,242,255,.10), transparent 60%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:auto,auto,32px 32px,32px 32px;
+  background-attachment:fixed;
+  min-height:100vh; overflow-x:hidden;
+}
+a{color:var(--cyan)}
+button,select,input{font:inherit;color:inherit}
+.mono{font-family:var(--mono)}
+
+/* ---------- top bar ---------- */
+header.top{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:14px 22px; border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(5,7,13,.6), transparent);
+  position:sticky; top:0; z-index:20; backdrop-filter:blur(10px);
+}
+:root[data-theme="light"] header.top{background:rgba(238,242,251,.8)}
+.brand{display:flex; align-items:center; gap:12px; margin-right:auto}
+.brand svg{width:34px;height:34px;filter:drop-shadow(0 0 8px rgba(60,242,255,.5))}
+.brand h1{margin:0; font-size:19px; letter-spacing:.14em; text-transform:uppercase; font-weight:700}
+.brand h1 b{color:var(--cyan); font-weight:700}
+.brand h1 i{color:var(--mag); font-style:normal}
+.brand small{display:block; color:var(--mute); font-size:11.5px; letter-spacing:.04em}
+.top .ctrl{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.btn{
+  background:var(--panel2); border:1px solid var(--line2); border-radius:9px; padding:7px 12px;
+  cursor:pointer; transition:.15s; font-size:13px;
+}
+.btn:hover{border-color:var(--cyan); box-shadow:var(--glow)}
+.btn.primary{border-color:var(--cyan); color:var(--cyan)}
+select{
+  background:var(--panel2); border:1px solid var(--line2); border-radius:9px; padding:7px 10px; max-width:100%;
+}
+select option{background:var(--bg2); color:var(--text)}
+
+/* ---------- verdict strip ---------- */
+.verdict{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; padding:16px 22px 4px}
+.kpi{
+  background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; position:relative; overflow:hidden;
+}
+.kpi::before{content:""; position:absolute; inset:0 0 auto 0; height:2px; background:var(--k,var(--cyan)); opacity:.9}
+.kpi .l{font-size:10.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--mute)}
+.kpi .v{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.kpi .s{font-size:12px; color:var(--mute); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.kpi.bad{--k:var(--red)} .kpi.warn{--k:var(--amber)} .kpi.ok{--k:var(--green)}
+.kpi.bad .v{color:var(--red)} .kpi.warn .v{color:var(--amber)} .kpi.ok .v{color:var(--green)}
+.kpi.hero{grid-column:span 2}
+.kpi.hero .v{font-size:22px}
+.kpi.bad.hero{animation:alarm 2.4s ease-in-out infinite}
+@keyframes alarm{50%{box-shadow:0 0 28px rgba(255,77,109,.28)}}
+
+/* ---------- main grid ---------- */
+main{display:grid; grid-template-columns:310px minmax(0,1fr) 330px; grid-template-areas:"left stage insp" "left tabs insp"; gap:14px; padding:14px 22px 30px; align-items:start}
+#left{grid-area:left} .stage{grid-area:stage} #inspector{grid-area:insp} .tabs{grid-area:tabs; min-width:0}
+#left,#inspector{position:sticky; top:84px; max-height:calc(100vh - 96px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line2) transparent}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px 16px; backdrop-filter:blur(6px); min-width:0}
+.panel h2{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan); margin:2px 0 10px; font-weight:600; display:flex; align-items:center; gap:8px}
+.panel h2::after{content:""; flex:1; height:1px; background:var(--line)}
+.panel h3{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--mute); margin:16px 0 6px; font-weight:600}
+.side{display:flex; flex-direction:column; gap:14px; min-width:0}
+
+/* controls */
+.c{margin:9px 0 12px}
+.c .row{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+.c label{font-size:12.5px; color:var(--text)}
+.c .val{font-family:var(--mono); font-size:12.5px; color:var(--cyan); white-space:nowrap}
+.c .hint{font-size:11px; color:var(--faint); margin-top:2px}
+.c select{width:100%; margin-top:4px}
+input[type=range]{width:100%; -webkit-appearance:none; appearance:none; background:transparent; height:22px; margin:2px 0 0}
+input[type=range]::-webkit-slider-runnable-track{height:4px; border-radius:4px; background:linear-gradient(90deg,var(--cyan) var(--p,50%), var(--line2) var(--p,50%))}
+input[type=range]::-moz-range-track{height:4px; border-radius:4px; background:linear-gradient(90deg,var(--cyan) var(--p,50%), var(--line2) var(--p,50%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; margin-top:-6px; border-radius:50%; background:var(--bg); border:2px solid var(--cyan); box-shadow:0 0 10px rgba(60,242,255,.6)}
+input[type=range]::-moz-range-thumb{width:13px; height:13px; border-radius:50%; background:var(--bg); border:2px solid var(--cyan)}
+input[type=range]:focus-visible{outline:1px dashed var(--cyan); outline-offset:2px}
+.tog{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; cursor:pointer; font-size:12.5px}
+.tog input{display:none}
+.tog .sw{width:34px; height:18px; border-radius:18px; background:var(--line2); position:relative; transition:.2s; flex:none}
+.tog .sw::after{content:""; position:absolute; width:14px; height:14px; top:2px; left:2px; border-radius:50%; background:var(--mute); transition:.2s}
+.tog input:checked + .sw{background:rgba(60,242,255,.35)}
+.tog input:checked + .sw::after{left:18px; background:var(--cyan); box-shadow:0 0 8px var(--cyan)}
+.tput{display:flex; gap:6px; margin-top:4px}
+.tput input{flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line2); border-radius:8px; padding:6px 8px; font-family:var(--mono)}
+.tput select{width:auto; margin:0}
+
+/* diagram */
+.stage{position:relative; padding:10px 10px 6px}
+.stage h2{margin-left:6px}
+#diagram{width:100%; height:auto; display:block}
+.dwrap{overflow-x:auto}
+.node rect.box{fill:var(--panel2); stroke:var(--line2); stroke-width:1.2; transition:stroke .3s}
+.node{cursor:pointer}
+.node:hover rect.box{stroke:var(--cyan)}
+.node.sel rect.box{stroke:var(--cyan); stroke-width:2}
+.node.bott rect.box{stroke:var(--red); stroke-width:2.2; animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{stroke-opacity:.35}}
+.node text{fill:var(--text); font-family:var(--sans)}
+.node .t1{font-size:13px; font-weight:600; letter-spacing:.06em; text-transform:uppercase}
+.node .t2{font-size:11px; fill:var(--mute)}
+.node .t3{font-size:11.5px; font-family:var(--mono)}
+.node .tag{font-size:9.5px; font-weight:700; letter-spacing:.16em; fill:var(--red)}
+.ring-bg{fill:none; stroke:var(--line2); stroke-width:5}
+.ring{fill:none; stroke-width:5; stroke-linecap:round; transform-origin:center; transition:stroke-dasharray .4s}
+.ringtxt{font-family:var(--mono); font-size:10px; font-weight:600; text-anchor:middle; dominant-baseline:central}
+.edge{fill:none; stroke-linecap:round; opacity:.38; transition:stroke .3s}
+.edgelbl{font-family:var(--mono); font-size:10.5px; fill:var(--mute)}
+.particle{filter:url(#glow)}
+.legend{display:flex; gap:16px; flex-wrap:wrap; font-size:11.5px; color:var(--mute); padding:4px 10px 8px}
+.legend span::before{content:""; display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; background:var(--c)}
+
+/* inspector */
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px}
+.chip{font-size:11.5px; padding:4px 9px; border-radius:20px; border:1px solid var(--line2); cursor:pointer; background:transparent; color:var(--mute)}
+.chip.on{border-color:var(--cyan); color:var(--cyan); box-shadow:var(--glow)}
+.chip .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:var(--c,var(--faint))}
+.ledger{width:100%; border-collapse:collapse; font-size:12px; margin-top:4px}
+.ledger td{padding:4px 0; border-bottom:1px dashed var(--line)}
+.ledger td:last-child{text-align:right; font-family:var(--mono); white-space:nowrap; padding-left:10px}
+.ledger tr.tot td{color:var(--cyan); border-bottom:none; font-weight:600}
+.stat{display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0}
+.stat b{font-family:var(--mono); font-weight:600}
+
+/* tabs */
+.tabs{padding:0}
+.tabbar{display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:14px}
+.tab{background:none; border:none; border-bottom:2px solid transparent; padding:10px 12px; cursor:pointer; color:var(--mute); font-size:13px; letter-spacing:.04em}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--cyan); border-bottom-color:var(--cyan)}
+.tab .n{font-family:var(--mono); font-size:10.5px; margin-left:5px; padding:1px 6px; border-radius:10px; background:var(--line)}
+.tab .n.bad{background:rgba(255,77,109,.2); color:var(--red)}
+.tab .n.warn{background:rgba(255,181,71,.18); color:var(--amber)}
+.pane{display:none}
+.pane.on{display:block; animation:fade .25s}
+@keyframes fade{from{opacity:0; transform:translateY(4px)}}
+.cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:14px}
+.tbl-wrap{overflow-x:auto}
+table.t{width:100%; border-collapse:collapse; font-size:12.5px}
+table.t th{text-align:left; font-weight:600; color:var(--mute); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid var(--line2); white-space:nowrap}
+table.t td{padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap}
+table.t td.n{font-family:var(--mono); text-align:right}
+table.t th.n{text-align:right}
+table.t tr.cur td{background:rgba(60,242,255,.07)}
+table.t tr:hover td{background:rgba(120,160,255,.06)}
+.pill{display:inline-block; font-size:10.5px; font-weight:600; letter-spacing:.06em; padding:2px 8px; border-radius:10px; text-transform:uppercase}
+.pill.ok{background:rgba(61,255,168,.14); color:var(--green)}
+.pill.warn{background:rgba(255,181,71,.16); color:var(--amber)}
+.pill.bad{background:rgba(255,77,109,.16); color:var(--red)}
+.use{font-size:11px; padding:3px 8px; border-radius:7px; border:1px solid var(--line2); background:none; cursor:pointer}
+.use:hover{border-color:var(--cyan); color:var(--cyan)}
+.note{font-size:12px; color:var(--mute); margin:8px 0 0}
+.answer{border-left:3px solid var(--cyan); padding:8px 12px; margin:0 0 12px; background:rgba(60,242,255,.05); border-radius:0 10px 10px 0; font-size:13px}
+.answer b{color:var(--cyan)}
+.cons{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px}
+.con{border:1px solid var(--line); border-radius:12px; padding:12px 14px; background:var(--panel); border-left:3px solid var(--c)}
+.con h4{margin:0 0 6px; font-size:13.5px; display:flex; gap:8px; align-items:center}
+.con p{margin:4px 0; font-size:12.5px; color:var(--mute)}
+.con p b{color:var(--text); font-family:var(--mono); font-weight:600}
+.con.ok{--c:var(--green)} .con.warn{--c:var(--amber)} .con.bad{--c:var(--red)} .con.info{--c:var(--violet)}
+svg.chart{width:100%; height:auto; display:block}
+svg.chart text{font-family:var(--mono); font-size:10.5px; fill:var(--mute)}
+svg.chart .ax{stroke:var(--line2)}
+svg.chart .gl{stroke:var(--line); stroke-dasharray:2 4}
+.bars{display:flex; flex-direction:column; gap:8px}
+.bar{display:grid; grid-template-columns:130px 1fr 90px; gap:10px; align-items:center; font-size:12px}
+.bar .track{height:12px; border-radius:6px; background:var(--line); overflow:hidden; position:relative}
+.bar .fill{height:100%; border-radius:6px}
+.bar .num{font-family:var(--mono); text-align:right}
+.stack{display:flex; height:30px; border-radius:8px; overflow:hidden; border:1px solid var(--line2)}
+.stack div{height:100%; min-width:2px; position:relative}
+.keys{display:flex; flex-wrap:wrap; gap:10px 18px; margin-top:10px; font-size:12px}
+.keys span::before{content:""; display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px; background:var(--c)}
+.big{font-family:var(--mono); font-size:26px; font-weight:600}
+.cat td,.cat th{font-size:11.5px}
+footer{padding:20px 22px 40px; color:var(--faint); font-size:12px; text-align:center}
+footer a{color:var(--mute)}
+.toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--cyan); padding:9px 16px; border-radius:10px; opacity:0; transition:.3s; pointer-events:none; z-index:50}
+.toast.on{opacity:1}
+
+@media (max-width:1280px){
+  main{grid-template-columns:300px minmax(0,1fr); grid-template-areas:"left stage" "left insp" "left tabs"}
+  #inspector{position:static; max-height:none}
+  .verdict{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:820px){
+  header.top{padding:12px 16px}
+  main{grid-template-columns:minmax(0,1fr); grid-template-areas:"stage" "insp" "left" "tabs"; padding:12px 16px}
+  #left{position:static; max-height:none}
+  #diagram{min-width:640px}
+  .verdict{grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 16px 0}
+  .kpi.hero{grid-column:1 / -1}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .cons{grid-template-columns:minmax(0,1fr)}
+  .bar{grid-template-columns:96px 1fr 76px}
+  .brand h1{font-size:16px}
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M6 18h18l7 14-7 14H6M58 18H40l-7 14 7 14h18" fill="none" stroke="#3cf2ff" stroke-width="4" stroke-linejoin="round"/><circle cx="32" cy="32" r="5" fill="#ff3cac"/></svg>
+    <div>
+      <h1><b>Bottleneck</b><i>//</i>Explorer</h1>
+      <small>Size a data-processing system from its requirements: bandwidth, latency, power and area</small>
+    </div>
+  </div>
+  <div class="ctrl">
+    <select id="preset" aria-label="Preset scenario"></select>
+    <button class="btn" id="share" title="Copy a link to this configuration">⧉ Share</button>
+    <button class="btn" id="theme" title="Toggle light / dark" aria-label="Toggle theme"><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+  </div>
+</header>
+
+<section class="verdict" id="verdict" aria-live="polite"></section>
+
+<main>
+  <aside class="side" id="left">
+    <div class="panel" id="reqPanel">
+      <h2>Requirements</h2>
+      <div id="req"></div>
+    </div>
+    <div class="panel" id="wlPanel">
+      <h2>Workload</h2>
+      <div id="wl"></div>
+    </div>
+  </aside>
+
+  <section class="panel stage">
+    <h2>System — live data flow</h2>
+    <div class="dwrap"><svg id="diagram" viewBox="0 0 1000 460" role="img" aria-label="System block diagram with data flow"></svg></div>
+    <div class="legend">
+      <span style="--c:var(--green)">within utilisation ceiling</span>
+      <span style="--c:var(--amber)">above ceiling, below 100 %</span>
+      <span style="--c:var(--red)">over capacity</span>
+      <span style="--c:var(--faint)">click a block to configure it</span>
+    </div>
+  </section>
+
+  <aside class="panel" id="inspector">
+    <h2 id="inspTitle">Component</h2>
+    <div class="chips" id="chips"></div>
+    <div id="insp"></div>
+  </aside>
+
+  <section class="tabs">
+    <nav class="tabbar" id="tabbar" role="tablist"></nav>
+    <div id="panes"></div>
+  </section>
+</main>
+
+<footer>
+  Bottleneck Explorer · a first-order sizing model — every catalogue number is indicative and editable in spirit; see <a href="#" data-tab="model">Model &amp; assumptions</a>.
+  · <a href="https://github.com/BrendanJamesLynskey/Data_Bottleneck_Explorer">Source on GitHub</a>
+  · Built by <a href="https://brendanjameslynskey.github.io/">Brendan Lynskey</a>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   CATALOGUES  (indicative, first-order numbers; see the Model tab)
+   rate   = data rate per pin, MT/s
+   width  = data bits per unit (channel / device / stack)
+   dEff   = fraction of the data bits that carry user data (LPDDR6 metadata)
+   cap    = typical capacity per unit, GB
+   lat    = loaded idle read latency at the controller, ns
+   pj     = system energy per bit moved (DRAM core + I/O + PHY), pJ/bit
+   bg     = background power per unit (refresh, standby, PHY idle), W
+   phy    = controller + PHY area on the accelerator die per unit, mm² (5 nm-class)
+   shore  = die-edge (beachfront) needed per unit, mm
+   sig    = signal pins per unit
+   pract / ext = practical / extreme maximum unit count on one device
+   ===================================================================== */
+const DRAMS = {
+  ddr4_3200:  {name:'DDR4-3200',        fam:'DDR',   rate:3200,  width:64,  unit:'64-bit channel', cap:32, lat:85,  pj:15,  bg:1.5,  phy:4.5, shore:4.0, sig:120, pract:8,  ext:12},
+  ddr5_5600:  {name:'DDR5-5600',        fam:'DDR',   rate:5600,  width:64,  unit:'64-bit channel', cap:64, lat:90,  pj:12,  bg:2.0,  phy:5.0, shore:4.0, sig:120, pract:8,  ext:12},
+  ddr5_6400:  {name:'DDR5-6400',        fam:'DDR',   rate:6400,  width:64,  unit:'64-bit channel', cap:64, lat:90,  pj:12,  bg:2.0,  phy:5.0, shore:4.0, sig:120, pract:8,  ext:12},
+  ddr5_8800:  {name:'DDR5-8800 MRDIMM', fam:'DDR',   rate:8800,  width:64,  unit:'64-bit channel', cap:64, lat:95,  pj:12,  bg:3.0,  phy:5.5, shore:4.0, sig:125, pract:8,  ext:12},
+  lp4_3200:   {name:'LPDDR4-3200',      fam:'LPDDR', rate:3200,  width:16,  unit:'x16 channel',    cap:2,  lat:100, pj:6,   bg:0.05, phy:1.1, shore:0.9, sig:34,  pract:16, ext:64},
+  lp4x_4266:  {name:'LPDDR4X-4266',     fam:'LPDDR', rate:4266,  width:16,  unit:'x16 channel',    cap:2,  lat:100, pj:5,   bg:0.05, phy:1.1, shore:0.9, sig:34,  pract:16, ext:64},
+  lp5_6400:   {name:'LPDDR5-6400',      fam:'LPDDR', rate:6400,  width:16,  unit:'x16 channel',    cap:2,  lat:110, pj:4.5, bg:0.05, phy:1.2, shore:1.0, sig:36,  pract:16, ext:64},
+  lp5x_8533:  {name:'LPDDR5X-8533',     fam:'LPDDR', rate:8533,  width:16,  unit:'x16 channel',    cap:3,  lat:110, pj:4,   bg:0.06, phy:1.3, shore:1.0, sig:36,  pract:16, ext:64},
+  lp5x_10667: {name:'LPDDR5X-10667',    fam:'LPDDR', rate:10667, width:16,  unit:'x16 channel',    cap:4,  lat:110, pj:4,   bg:0.06, phy:1.4, shore:1.0, sig:36,  pract:16, ext:64},
+  lp6_14400:  {name:'LPDDR6-14400',     fam:'LPDDR6',rate:14400, width:24,  unit:'x24 channel',    cap:4,  lat:110, pj:3.5, bg:0.07, phy:1.7, shore:1.3, sig:46,  pract:12, ext:44, dEff:256/288},
+  gddr6_20:   {name:'GDDR6 20 Gb/s',    fam:'GDDR',  rate:20000, width:32,  unit:'x32 device',     cap:2,  lat:150, pj:7.5, bg:0.4,  phy:3.0, shore:2.5, sig:70,  pract:12, ext:16},
+  gddr6x_24:  {name:'GDDR6X 24 Gb/s',   fam:'GDDR',  rate:24000, width:32,  unit:'x32 device',     cap:2,  lat:150, pj:7.25,bg:0.45, phy:3.2, shore:2.5, sig:70,  pract:12, ext:16},
+  gddr7_32:   {name:'GDDR7 32 Gb/s',    fam:'GDDR',  rate:32000, width:32,  unit:'x32 device',     cap:3,  lat:150, pj:6,   bg:0.45, phy:3.4, shore:2.5, sig:72,  pract:12, ext:16},
+  hbm2_24:    {name:'HBM2 2.4 Gb/s',    fam:'HBM',   rate:2400,  width:1024,unit:'stack',          cap:8,  lat:120, pj:3.9, bg:1.0,  phy:12,  shore:7,   sig:1700,pract:4,  ext:6},
+  hbm2e_36:   {name:'HBM2E 3.6 Gb/s',   fam:'HBM',   rate:3600,  width:1024,unit:'stack',          cap:16, lat:120, pj:3.6, bg:1.0,  phy:12,  shore:7,   sig:1700,pract:4,  ext:6},
+  hbm3_64:    {name:'HBM3 6.4 Gb/s',    fam:'HBM',   rate:6400,  width:1024,unit:'stack',          cap:24, lat:110, pj:3.2, bg:1.2,  phy:12,  shore:7,   sig:1700,pract:6,  ext:8},
+  hbm3e_96:   {name:'HBM3E 9.6 Gb/s',   fam:'HBM',   rate:9600,  width:1024,unit:'stack',          cap:36, lat:110, pj:3.0, bg:1.5,  phy:13,  shore:7,   sig:1700,pract:8,  ext:12},
+  hbm4_8:     {name:'HBM4 8 Gb/s',      fam:'HBM',   rate:8000,  width:2048,unit:'stack',          cap:48, lat:110, pj:2.6, bg:2.0,  phy:18,  shore:9,   sig:2900,pract:8,  ext:12},
+};
+const HOST_DRAMS = ['ddr4_3200','ddr5_5600','ddr5_6400','ddr5_8800','lp5x_8533','lp5x_10667'];
+
+/* Links. pcie: gt = GT/s per lane per direction; flit = 6.0+ FLIT mode.
+   pj = end-to-end energy per bit, idle = W per lane (both ends), phy/shore per lane on the accelerator die. */
+const LINKS = {
+  pcie3: {name:'PCIe 3.0', kind:'pcie', gt:8,   flit:false, pj:6,   idle:0.10, phy:0.45, shore:0.35, rtt:0.9},
+  pcie4: {name:'PCIe 4.0', kind:'pcie', gt:16,  flit:false, pj:6,   idle:0.10, phy:0.50, shore:0.35, rtt:0.9},
+  pcie5: {name:'PCIe 5.0', kind:'pcie', gt:32,  flit:false, pj:5.5, idle:0.12, phy:0.55, shore:0.40, rtt:1.0},
+  pcie6: {name:'PCIe 6.0', kind:'pcie', gt:64,  flit:true,  pj:5,   idle:0.14, phy:0.65, shore:0.45, rtt:1.0},
+  pcie7: {name:'PCIe 7.0', kind:'pcie', gt:128, flit:true,  pj:5,   idle:0.16, phy:0.80, shore:0.50, rtt:1.0},
+  ucie:  {name:'UCIe-A x64 module (32 GT/s, on-package)', kind:'ucie', gbps:256, eff:0.90, pj:0.5, idle:0.05, phy:0.6, shore:0.39, rtt:0.05},
+};
+const ETH = {
+  e25:  {name:'25 GbE',  gbps:25,  w:5},
+  e100: {name:'100 GbE', gbps:100, w:12},
+  e200: {name:'200 GbE', gbps:200, w:18},
+  e400: {name:'400 GbE', gbps:400, w:24},
+  e800: {name:'800 GbE', gbps:800, w:32},
+};
+const NVME = {
+  g4: {name:'NVMe PCIe 4.0 x4 SSD', bw:7e9,  w:8},
+  g5: {name:'NVMe PCIe 5.0 x4 SSD', bw:14e9, w:14},
+};
+const PATTERNS = {
+  stream: {name:'Sequential streaming', eff:0.92},
+  block:  {name:'Large blocks, mixed R/W', eff:0.82},
+  random: {name:'Random 64 B accesses', eff:0.50},
+};
+const SOURCES = {
+  host:     'Host application (data in host memory)',
+  net:      'Network → host memory → accelerator',
+  net_p2p:  'Network → accelerator (peer-to-peer DMA)',
+  nvme:     'NVMe SSDs → host memory → accelerator',
+  nvme_p2p: 'NVMe SSDs → accelerator (peer-to-peer DMA)',
+};
+
+/* =====================================================================
+   STATE + PRESETS
+   ===================================================================== */
+const BASE = {
+  T:1e12, lat:1e-3, block:4e6, burst:1, ceil:0.8, resident:8,
+  src:'host', inR:1, outR:1, xR:1, xW:0, stageIn:false, stageOut:false, ops:2,
+  pattern:'stream', ecc:false, pull:true,
+  dev:{dram:'hbm3e_96', units:2},
+  link:{id:'pcie5', lanes:16, count:1, mps:256, cpl:128, mrrs:512, rtt:1.0},
+  host:{dram:'ddr5_5600', units:8, cores:32, cpuUs:4, wCore:6},
+  acc:{tops:100, util:0.6, pj:0.6, topsMm2:3, sram:64, leak:0.02},
+  net:{id:'e400', count:2, mtu:9000},
+  nvme:{id:'g5', count:4},
+};
+const clone = o => JSON.parse(JSON.stringify(o));
+const merge = (a,b) => { for(const k in b){ if(b[k] && typeof b[k]==='object' && !Array.isArray(b[k])) { a[k]=merge(a[k]||{}, b[k]); } else a[k]=b[k]; } return a; };
+const PRESETS = [
+  {id:'gbms', name:'1 GB per ms stream (the 1 TB/s question)', p:{}},
+  {id:'video', name:'4 × 4K60 video analytics at the edge', p:{
+    T:4*3840*2160*1.5*60, lat:16e-3, block:3840*2160*1.5, burst:1.2, resident:1, inR:1, outR:0.01, xR:2, xW:1, stageIn:true, ops:150,
+    pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:4, count:1},
+    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:8, wCore:3}, acc:{tops:40, util:0.5, pj:0.8, topsMm2:2.5, sram:8}}},
+  {id:'radar', name:'Radar / SDR front end over 400 GbE', p:{
+    T:2*4e9*4, lat:50e-6, block:65536, burst:1.1, resident:2, src:'net_p2p', inR:1, outR:0.05, xR:0.5, xW:0.5, ops:60,
+    pattern:'block', dev:{dram:'gddr6_20', units:4}, link:{id:'pcie5', lanes:16, count:1, rtt:1.0},
+    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:2}, acc:{tops:50, util:0.5, pj:0.6, topsMm2:3, sram:32}, net:{id:'e400', count:1, mtu:9000}}},
+  {id:'llm', name:'LLM decode on an edge accelerator (8B, INT4)', p:{
+    T:4e9*30, lat:50e-3, block:4e9, burst:1, resident:6, inR:0.00001, outR:0.00001, xR:1, xW:0.02, ops:4,
+    pattern:'stream', dev:{dram:'lp5x_8533', units:12}, link:{id:'pcie4', lanes:4, count:1},
+    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:20, wCore:3}, acc:{tops:60, util:0.4, pj:0.7, topsMm2:2.5, sram:16}}},
+  {id:'scan', name:'NVMe scan / filter offload', p:{
+    T:40e9, lat:5e-3, block:2e6, burst:1, resident:4, src:'nvme_p2p', inR:1, outR:0.05, xR:0, xW:0, stageIn:true, ops:8,
+    pattern:'stream', dev:{dram:'lp5x_8533', units:8}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:4}, acc:{tops:8, util:0.6, pj:0.8, topsMm2:3, sram:16}, nvme:{id:'g5', count:4}}},
+  {id:'hbmtrain', name:'Datacentre accelerator, HBM-fed GEMMs', p:{
+    T:3e12, lat:2e-3, block:64e6, burst:1, resident:120, inR:0.01, outR:0.01, xR:1, xW:0.3, ops:200,
+    pattern:'block', dev:{dram:'hbm3e_96', units:6}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:4}, acc:{tops:1500, util:0.6, pj:0.4, topsMm2:3.5, sram:100, leak:0.02}}},
+];
+let S = clone(BASE);
+let selected = 'dram';
+
+/* =====================================================================
+   FORMATTING
+   ===================================================================== */
+const SI = [[1e15,'P'],[1e12,'T'],[1e9,'G'],[1e6,'M'],[1e3,'k'],[1,'']];
+function sig(x, d=3){ if(!isFinite(x)) return '∞'; const a=Math.abs(x); if(a===0) return '0';
+  if(a>=100) return x.toFixed(0); if(a>=10) return x.toFixed(d>2?1:0); if(a>=1) return x.toFixed(d>2?2:1); return x.toPrecision(2); }
+function fmtB(b){ if(!isFinite(b)) return '∞'; for(const [m,p] of SI) if(Math.abs(b)>=m) return sig(b/m)+' '+(p==='k'?'K':p)+'B'; return sig(b)+' B'; }
+const fmtBps = b => fmtB(b)+'/s';
+function fmtT(s){ if(!isFinite(s)) return '∞'; const a=Math.abs(s);
+  if(a>=1) return sig(s)+' s'; if(a>=1e-3) return sig(s*1e3)+' ms'; if(a>=1e-6) return sig(s*1e6)+' µs'; return sig(s*1e9)+' ns'; }
+function fmtW(w){ if(w>=1000) return sig(w/1000)+' kW'; if(w>=1) return sig(w)+' W'; return sig(w*1000)+' mW'; }
+function fmtOps(o){ for(const [m,p] of SI) if(o>=m) return sig(o/m)+' '+p+'OPS'; return sig(o)+' OPS'; }
+const fmtPct = u => !isFinite(u) ? '∞' : (u>=10 ? (u*100).toFixed(0) : u>=1 ? (u*100).toFixed(0) : (u*100).toFixed(u<0.1?1:0))+' %';
+const fmtA = a => sig(a)+' mm²';
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function state(u){ return u>1 ? 'bad' : u>S.ceil ? 'warn' : 'ok'; }
+const COL = {ok:'var(--green)', warn:'var(--amber)', bad:'var(--red)'};
+
+/* =====================================================================
+   THE MODEL
+   ===================================================================== */
+function dramUnitBW(d){ return d.rate*1e6*d.width/8*(d.dEff||1); }           // peak B/s per unit
+function dramEff(d, pattern, r, w, ecc){
+  // access-pattern efficiency (refresh, page misses), a read/write turnaround penalty that peaks
+  // at a 50/50 mix, and inline-ECC overhead on LPDDR4/5 and GDDR (DDR and HBM carry ECC side-band;
+  // LPDDR6 already pays for metadata in dEff).
+  const mix = (r+w)>0 ? 2*Math.min(r,w)/(r+w) : 0;
+  const rw = pattern==='stream' ? 1-0.10*mix : 1-0.06*mix;
+  const inline = ecc && (d.fam==='LPDDR' || d.fam==='GDDR') ? 0.85 : 1;
+  return PATTERNS[pattern].eff*rw*inline;
+}
+function dramCapPerUnit(d, ecc){ return d.cap*(ecc && (d.fam==='LPDDR'||d.fam==='GDDR') ? 0.875 : 1); }
+
+function linkRaw(L, lanes, count){                                          // B/s per direction
+  if(L.kind==='pcie') return L.gt*1e9*lanes/8*(L.flit?1:128/130)*count;
+  return L.gbps*1e9*count;                                                  // UCIe: per module
+}
+function tlpEff(L, payload, hdr){
+  // payload / (payload + per-TLP overhead) × link-level overhead
+  if(L.kind!=='pcie') return L.eff;
+  if(L.flit) return (236/256)*payload/(payload+hdr);                        // 256 B flit: 236 B TLP, DLP, CRC, FEC
+  return 0.96*payload/(payload+hdr+8);                                      // +STP framing & LCRC; ~4 % DLLPs (ACK, FC)
+}
+function linkSpec(s){
+  const L = LINKS[s.link.id];
+  const lanes = L.kind==='pcie' ? s.link.lanes : 64;
+  const raw = linkRaw(L, lanes, s.link.count);
+  const effW = tlpEff(L, s.link.mps, 16);                                   // posted writes, 4DW header
+  const effR = tlpEff(L, s.link.cpl, 12);                                   // completions, 3DW header
+  const h2dEff = s.pull ? effR : effW;
+  return {L, lanes, raw, effW, effR, h2dEff, h2d:raw*h2dEff, d2h:raw*effW,
+    totalLanes: (L.kind==='pcie' ? lanes : 1)*s.link.count, rtt:s.link.rtt*1e-6};
+}
+
+function model(s){
+  const T = s.T, Tb = T*s.burst;
+  const dev = DRAMS[s.dev.dram], hd = DRAMS[s.host.dram];
+  const viaHost = s.src==='host' || s.src==='net' || s.src==='nvme';
+
+  // ---- device DRAM traffic, bytes per processed byte
+  const ledger = [];
+  if(s.stageIn)  ledger.push(['Link input lands in DRAM (write)', 0, s.inR], ['Compute reads staged input', s.inR, 0]);
+  if(s.xR>0)     ledger.push(['Compute reads (resident data, weights, passes)', s.xR, 0]);
+  if(s.xW>0)     ledger.push(['Compute writes (intermediates, scratch)', 0, s.xW]);
+  if(s.stageOut) ledger.push(['Compute writes results', 0, s.outR], ['Link output read from DRAM', s.outR, 0]);
+  const dR = ledger.reduce((a,l)=>a+l[1],0), dW = ledger.reduce((a,l)=>a+l[2],0);
+
+  // ---- host DRAM: input arrives (write) and is DMA-read; output is DMA-written and consumed (read)
+  const hIn = viaHost ? s.inR : 0;
+  const hR = hIn + s.outR, hW = hIn + s.outR;
+
+  // ---- capacities
+  const devE = dramEff(dev, s.pattern, dR, dW, s.ecc);
+  const devBW = s.dev.units*dramUnitBW(dev)*devE;
+  const hostE = dramEff(hd, 'block', hR, hW, false);
+  const hostBW = s.host.units*dramUnitBW(hd)*hostE;
+  const lk = linkSpec(s);
+  const ops = s.acc.tops*1e12*s.acc.util;
+
+  // ---- demands (sizing uses the peak = average × burst factor)
+  const dem = {
+    dram: Tb*(dR+dW), host: Tb*(hR+hW), h2d: Tb*s.inR,
+    d2h: Tb*s.outR + (s.pull && lk.L.kind==='pcie' ? Tb*s.inR*24/s.link.mrrs*lk.effW : 0), // read requests ride D2H
+    compute: Tb*s.ops,
+    cpu: Tb/s.block*s.host.cpuUs*1e-6,                                       // cores busy
+  };
+  const cap = {dram:devBW, host:hostBW, h2d:lk.h2d, d2h:lk.d2h, compute:ops, cpu:s.host.cores};
+  let srcBW = 0, srcName = '';
+  if(s.src==='net'||s.src==='net_p2p'){
+    const e = ETH[s.net.id], eff = (s.net.mtu-28)/(s.net.mtu+38);          // UDP/IP headers in, Ethernet framing + IFG out
+    srcBW = e.gbps*1e9/8*eff*s.net.count; srcName = s.net.count+' × '+e.name;
+    dem.src = Tb*s.inR; cap.src = srcBW;
+  } else if(s.src==='nvme'||s.src==='nvme_p2p'){
+    const n = NVME[s.nvme.id]; srcBW = n.bw*s.nvme.count; srcName = s.nvme.count+' × '+n.name;
+    dem.src = Tb*s.inR; cap.src = srcBW;
+  }
+  const U = {}; for(const k in dem) U[k] = cap[k]>0 ? dem[k]/cap[k] : Infinity;
+  U.link = Math.max(U.h2d, U.d2h);
+  U.hostSys = Math.max(U.host, U.cpu);
+
+  const comps = [
+    {k:'dram',    name:'Device DRAM',   U:U.dram,    need:dem.dram,    have:cap.dram,    f:fmtBps},
+    {k:'link',    name:'Host link '+(U.h2d>=U.d2h?'(H→D)':'(D→H)'), U:U.link, need:U.h2d>=U.d2h?dem.h2d:dem.d2h, have:U.h2d>=U.d2h?cap.h2d:cap.d2h, f:fmtBps},
+    {k:'compute', name:'Accelerator compute', U:U.compute, need:dem.compute, have:cap.compute, f:fmtOps},
+    {k:'host',    name:'Host DRAM',     U:U.host,    need:dem.host,    have:cap.host,    f:fmtBps},
+    {k:'cpu',     name:'Host CPU',      U:U.cpu,     need:dem.cpu,     have:cap.cpu,     f:x=>sig(x)+' cores'},
+  ];
+  if(dem.src!==undefined) comps.push({k:'src', name: s.src.startsWith('net')?'Network ingress':'NVMe storage', U:U.src, need:dem.src, have:cap.src, f:fmtBps});
+  comps.sort((a,b)=>b.U-a.U);
+  const worst = comps[0];
+  const maxT = T/worst.U;                  // sustainable average rate: the peak then just reaches 100 %
+  const maxTceil = maxT*s.ceil;
+
+  // ---- latency of one block through the pipeline (+ M/D/1 queueing at each stage)
+  const B = s.block, Ua = k => U[k]/s.burst;                                 // average utilisation for queueing
+  const q = (svc, u) => u>=1 ? Infinity : svc*u/(2*(1-u));
+  const stages = [];
+  if(dem.src!==undefined){
+    const svc = B*s.inR/srcBW, base = s.src.startsWith('net') ? 5e-6 : 80e-6;
+    stages.push({k:'src', name: s.src.startsWith('net')?'Network ingress':'SSD read', fixed:base, svc, q:q(svc,Ua('src'))});
+  }
+  stages.push({k:'cpu', name:'Host submit (driver, doorbell)', fixed:s.host.cpuUs*0.5e-6, svc:0, q:0});
+  { const svc = B*s.inR/lk.h2d; stages.push({k:'h2d', name:'Link H→D transfer', fixed:lk.rtt, svc, q:q(svc,Ua('h2d'))}); }
+  if(dR+dW>0){ const svc = B*(dR+dW)/devBW; stages.push({k:'dram', name:'Device DRAM traffic', fixed:dev.lat*1e-9, svc, q:q(svc,Ua('dram'))}); }
+  { const svc = B*s.ops/ops; stages.push({k:'compute', name:'Compute', fixed:0, svc, q:q(svc,Ua('compute'))}); }
+  { const svc = B*s.outR/lk.d2h; stages.push({k:'d2h', name:'Link D→H transfer', fixed:lk.rtt/2, svc, q:q(svc,Ua('d2h'))}); }
+  stages.push({k:'cpu2', name:'Completion (interrupt / poll)', fixed:s.host.cpuUs*0.5e-6, svc:0, q:0});
+  stages.forEach(st=>st.t = st.fixed+st.svc+st.q);
+  const latency = stages.reduce((a,st)=>a+st.t,0);
+
+  // ---- Little's law: data in flight
+  const inflightPcie = T*s.inR*lk.rtt;                                       // bytes outstanding on H→D reads
+  const tags = s.pull ? Math.ceil(inflightPcie/s.link.mrrs) : 0;
+  const inflightDram = T*(dR+dW)*dev.lat*1e-9;
+  const dramReqs = Math.ceil(inflightDram/64);
+
+  // ---- capacity
+  const devCap = s.dev.units*dramCapPerUnit(dev, s.ecc);
+  const sramNeed = 2*(inflightPcie + inflightDram);                         // double-buffered data in flight
+
+  // ---- POWER (average, not burst)
+  const P = {};
+  P.devDram = T*(dR+dW)*8*dev.pj*1e-12 + dev.bg*s.dev.units;
+  P.link = T*(s.inR+s.outR)*8*lk.L.pj*1e-12 + lk.L.idle*lk.totalLanes;
+  const area = {};
+  area.compute = s.acc.tops/s.acc.topsMm2;
+  area.sram = s.acc.sram*0.45;
+  area.dramPhy = s.dev.units*dev.phy;
+  area.linkPhy = lk.totalLanes*lk.L.phy;
+  area.misc = 0.15*(area.compute+area.sram+area.dramPhy+area.linkPhy);
+  const coreArea = area.compute+area.sram+area.dramPhy+area.linkPhy+area.misc;
+  const shoreNeed = s.dev.units*dev.shore + lk.totalLanes*lk.L.shore;
+  const padArea = Math.pow(shoreNeed/(4*0.8), 2);                            // square die, 80 % of edge usable
+  const die = Math.max(coreArea, padArea);
+  const shoreHave = 4*Math.sqrt(die)*0.8;
+  P.compute = T*s.ops*s.acc.pj*1e-12;
+  P.leak = die*s.acc.leak;
+  P.hostDram = T*(hR+hW)*8*hd.pj*1e-12 + hd.bg*s.host.units;
+  P.hostCpu = (T/s.block*s.host.cpuUs*1e-6)*s.host.wCore;
+  P.src = s.src.startsWith('net') ? ETH[s.net.id].w*s.net.count : s.src.startsWith('nvme') ? NVME[s.nvme.id].w*s.nvme.count : 0;
+  const Pacc = P.devDram+P.link+P.compute+P.leak;
+  const Ptot = Pacc+P.hostDram+P.hostCpu+P.src;
+  const Pmove = P.devDram+P.link+P.hostDram+P.src;
+
+  return {T, Tb, dev, hd, lk, dR, dW, hR, hW, hIn, ledger, devE, hostE, devBW, hostBW, ops, dem, cap, U, comps, worst,
+    maxT, maxTceil, stages, latency, inflightPcie, tags, inflightDram, dramReqs, devCap, sramNeed,
+    P, Pacc, Ptot, Pmove, area, coreArea, padArea, die, shoreNeed, shoreHave, srcBW, srcName, viaHost};
+}
+
+/* ---- sizing: minimum spec of each component for the current requirement */
+function sizeDram(s, m){
+  const need = m.Tb*(m.dR+m.dW)/s.ceil;
+  return Object.entries(DRAMS).map(([id,d])=>{
+    const per = dramUnitBW(d)*dramEff(d, s.pattern, m.dR, m.dW, s.ecc);
+    const nBW = need>0 ? Math.ceil(need/per) : 0;
+    const nCap = Math.ceil(s.resident/dramCapPerUnit(d, s.ecc));
+    const n = Math.max(1, nBW, nCap);
+    const feas = n<=d.pract ? 'ok' : n<=d.ext ? 'warn' : 'bad';
+    const power = m.T*(m.dR+m.dW)*8*d.pj*1e-12 + d.bg*n;
+    const pins = n*d.sig*(s.ecc && d.fam==='DDR' ? 72/64 : 1);
+    return {id, d, n, nBW, nCap, width:n*d.width, peak:n*dramUnitBW(d), cap:n*dramCapPerUnit(d,s.ecc), feas, power,
+      phy:n*d.phy, shore:n*d.shore, pins, capLimited: nCap>nBW};
+  });
+}
+function sizeLink(s, m){
+  const out = [];
+  for(const [id,L] of Object.entries(LINKS)){
+    const opts = L.kind==='pcie' ? [1,2,4,8,16] : [64];
+    const effR = tlpEff(L, s.link.cpl, 12), effW = tlpEff(L, s.link.mps, 16);
+    const h2dEff = s.pull ? effR : effW;
+    const needH = m.Tb*s.inR/s.ceil, needD = m.Tb*s.outR/s.ceil;
+    let best = null;
+    for(const lanes of opts){
+      const raw = linkRaw(L, lanes, 1);
+      const k = Math.max(1, Math.ceil(Math.max(needH/(raw*h2dEff), needD/(raw*effW))));
+      if(k===1 || lanes===opts[opts.length-1]){ best = {lanes, count:k, raw, perDir:raw*h2dEff*k}; break; }
+    }
+    const total = (L.kind==='pcie'?best.lanes:1)*best.count;
+    const feas = best.count===1 ? 'ok' : best.count<=4 ? 'warn' : 'bad';
+    out.push({id, L, ...best, totalLanes:total, feas,
+      power: m.T*(s.inR+s.outR)*8*L.pj*1e-12 + L.idle*total, phy:total*L.phy, shore:total*L.shore});
+  }
+  return out;
+}
+
+/* =====================================================================
+   UI: CONTROLS
+   ===================================================================== */
+const get = p => p.split('.').reduce((o,k)=>o[k], S);
+const set = (p,v) => { const ks=p.split('.'); let o=S; for(let i=0;i<ks.length-1;i++) o=o[ks[i]]; o[ks[ks.length-1]]=v; };
+const ctlUpdaters = [];
+
+function ctl(host, c){
+  const wrap = document.createElement('div');
+  if(c.type==='toggle'){
+    wrap.innerHTML = `<label class="tog"><span>${c.label}</span><input type="checkbox"><span class="sw"></span></label>${c.hint?`<div class="c"><div class="hint">${c.hint}</div></div>`:''}`;
+    const inp = wrap.querySelector('input'); inp.checked = !!get(c.k);
+    inp.addEventListener('change', ()=>{ set(c.k, inp.checked); if(c.rebuild) buildAll(); else update(); });
+    ctlUpdaters.push(()=>{ inp.checked = !!get(c.k); });
+    host.appendChild(wrap); return;
+  }
+  wrap.className = 'c';
+  if(c.type==='select'){
+    wrap.innerHTML = `<div class="row"><label>${c.label}</label></div><select aria-label="${esc(c.label)}">${
+      Object.entries(c.options).map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join('')}</select>${c.hint?`<div class="hint">${c.hint}</div>`:''}`;
+    const sel = wrap.querySelector('select'); sel.value = String(get(c.k));
+    sel.addEventListener('change', ()=>{ const v = c.num ? +sel.value : sel.value; set(c.k, v); if(c.after) c.after(v); if(c.rebuild) buildAll(); else update(); });
+    ctlUpdaters.push(()=>{ sel.value = String(get(c.k)); });
+    host.appendChild(wrap); return;
+  }
+  // range or log range
+  const log = c.type==='log';
+  const toPos = v => log ? (Math.log10(v)-Math.log10(c.min))/(Math.log10(c.max)-Math.log10(c.min))*1000 : v;
+  const fromPos = p => log ? Math.pow(10, Math.log10(c.min)+p/1000*(Math.log10(c.max)-Math.log10(c.min))) : p;
+  wrap.innerHTML = `<div class="row"><label>${c.label}</label><span class="val"></span></div>
+    <input type="range" aria-label="${esc(c.label)}" min="${log?0:c.min}" max="${log?1000:c.max}" step="${log?1:(c.step||1)}">${c.hint?`<div class="hint">${c.hint}</div>`:''}`;
+  const r = wrap.querySelector('input'), val = wrap.querySelector('.val');
+  const paint = () => { const v = get(c.k); r.value = toPos(v); val.textContent = c.fmt ? c.fmt(v) : v;
+    r.style.setProperty('--p', ((r.value-r.min)/(r.max-r.min)*100)+'%'); };
+  r.addEventListener('input', ()=>{ let v = fromPos(+r.value); if(c.snap) v = c.snap(v); set(c.k, v); paint(); if(c.after) c.after(v); update(); });
+  ctlUpdaters.push(paint); paint();
+  host.appendChild(wrap);
+}
+function snapLog(v){ const e = Math.pow(10, Math.floor(Math.log10(v))); const m = v/e;
+  const steps = [1,1.2,1.5,2,2.5,3,4,5,6,8,10]; return steps.reduce((a,b)=>Math.abs(b-m)<Math.abs(a-m)?b:a)*e; }
+
+const TUNITS = {'MB/s':1e6, 'GB/s':1e9, 'GB/ms':1e12, 'TB/s':1e12};
+let tUnit = 'GB/ms';
+function buildReq(){
+  const el = document.getElementById('req'); el.innerHTML = '';
+  // throughput: free entry + log slider
+  const tw = document.createElement('div'); tw.className = 'c';
+  tw.innerHTML = `<div class="row"><label>Processing rate (sustained)</label><span class="val" id="tAlt"></span></div>
+    <div class="tput"><input id="tNum" inputmode="decimal" aria-label="Processing rate value"><select id="tUnit" aria-label="Processing rate unit">${Object.keys(TUNITS).map(u=>`<option>${u}</option>`).join('')}</select></div>`;
+  el.appendChild(tw);
+  const tNum = tw.querySelector('#tNum'), tU = tw.querySelector('#tUnit');
+  tU.value = tUnit;
+  const paintT = () => { tNum.value = +(S.T/TUNITS[tUnit]).toPrecision(4); document.getElementById('tAlt').textContent = '= '+fmtBps(S.T); };
+  tNum.addEventListener('change', ()=>{ const v = parseFloat(tNum.value); if(v>0){ S.T = v*TUNITS[tUnit]; update(); ctlUpdaters.forEach(f=>f()); } });
+  tU.addEventListener('change', ()=>{ tUnit = tU.value; paintT(); });
+  ctlUpdaters.push(paintT); paintT();
+  ctl(el, {k:'T', label:'', type:'log', min:1e6, max:1e14, snap:snapLog, fmt:v=>'', hint:'Bytes of input processed per second. 1 GB/ms = 1 TB/s.'});
+  ctl(el, {k:'lat', label:'End-to-end latency budget', type:'log', min:1e-6, max:1, snap:snapLog, fmt:fmtT, hint:'Time for one block from submit to result back on the host.'});
+  ctl(el, {k:'block', label:'Block (transfer) size', type:'log', min:512, max:16e9, snap:snapLog, fmt:fmtB, hint:'Granularity of work: one DMA / one frame / one batch.'});
+  ctl(el, {k:'burst', label:'Peak-to-average ratio', type:'range', min:1, max:4, step:0.05, fmt:v=>v.toFixed(2)+'×', hint:'Size for the peak, not the average.'});
+  ctl(el, {k:'ceil', label:'Utilisation ceiling', type:'range', min:0.5, max:1, step:0.01, fmt:v=>(v*100).toFixed(0)+' %', hint:'Headroom target. Queueing delay rises sharply above ~80 %.'});
+  ctl(el, {k:'resident', label:'Device-resident data', type:'log', min:0.01, max:2048, snap:snapLog, fmt:v=>fmtB(v*1e9), hint:'Working set that must live in device DRAM (weights, tables, buffers).'});
+}
+function buildWl(){
+  const el = document.getElementById('wl'); el.innerHTML = '';
+  ctl(el, {k:'src', label:'Where the data comes from', type:'select', options:SOURCES, rebuild:true});
+  ctl(el, {k:'inR', label:'Link bytes in, per byte processed', type:'range', min:0, max:4, step:0.01, fmt:v=>v.toFixed(2)+' B'});
+  ctl(el, {k:'outR', label:'Link bytes out, per byte processed', type:'range', min:0, max:4, step:0.01, fmt:v=>v.toFixed(2)+' B'});
+  ctl(el, {k:'xR', label:'Extra DRAM reads per byte', type:'range', min:0, max:8, step:0.05, fmt:v=>v.toFixed(2)+' B', hint:'Resident data, weights, lookup tables, multiple passes.'});
+  ctl(el, {k:'xW', label:'Extra DRAM writes per byte', type:'range', min:0, max:8, step:0.05, fmt:v=>v.toFixed(2)+' B', hint:'Intermediates and scratch that spill to DRAM.'});
+  ctl(el, {k:'stageIn', label:'Stage input in device DRAM', type:'toggle'});
+  ctl(el, {k:'stageOut', label:'Stage results in device DRAM', type:'toggle', hint:'Staging lets compute and link run decoupled, but every staged byte costs a DRAM write and a read.'});
+  ctl(el, {k:'ops', label:'Arithmetic per byte processed', type:'log', min:0.01, max:10000, snap:snapLog, fmt:v=>sig(v)+' op/B'});
+  ctl(el, {k:'pattern', label:'DRAM access pattern', type:'select', options:Object.fromEntries(Object.entries(PATTERNS).map(([k,v])=>[k,v.name+' ('+(v.eff*100).toFixed(0)+' %)']))});
+  ctl(el, {k:'ecc', label:'ECC on device DRAM', type:'toggle'});
+  ctl(el, {k:'pull', label:'Accelerator pulls input (DMA reads)', type:'toggle', hint:'Off = host pushes with posted writes (cheaper on the link, costs CPU).'});
+}
+
+/* ---- inspector */
+const COMPS = {
+  dram:{name:'Device DRAM'}, link:{name:'Host ↔ accelerator link'}, acc:{name:'Accelerator'},
+  host:{name:'Host CPU & memory'}, src:{name:'Data source'},
+};
+function buildInspector(){
+  const chips = document.getElementById('chips'); chips.innerHTML='';
+  for(const [k,c] of Object.entries(COMPS)){
+    if(k==='src' && S.src==='host') continue;
+    const b = document.createElement('button'); b.className = 'chip'+(k===selected?' on':''); b.dataset.k = k;
+    b.innerHTML = `<span class="dot"></span>${c.name}`; b.onclick = ()=>{ selected = k; buildInspector(); update(); };
+    chips.appendChild(b);
+  }
+  document.getElementById('inspTitle').textContent = COMPS[selected].name;
+  const el = document.getElementById('insp'); el.innerHTML = '';
+  if(selected==='dram'){
+    ctl(el, {k:'dev.dram', label:'Technology', type:'select', options:Object.fromEntries(Object.entries(DRAMS).map(([k,d])=>[k,d.name])), rebuild:true});
+    const d = DRAMS[S.dev.dram];
+    ctl(el, {k:'dev.units', label:`Number of ${d.unit}s`, type:'range', min:1, max:Math.max(d.ext*2, 8), step:1,
+      fmt:v=>`${v} → ${v*d.width}-bit, ${fmtBps(v*dramUnitBW(d))} peak`});
+    el.insertAdjacentHTML('beforeend', `<h3>Traffic ledger · bytes per processed byte</h3><table class="ledger" id="ledger"></table><div id="dramStats"></div>`);
+  } else if(selected==='link'){
+    ctl(el, {k:'link.id', label:'Link type', type:'select', options:Object.fromEntries(Object.entries(LINKS).map(([k,l])=>[k,l.name])),
+      after:v=>{ S.link.rtt = LINKS[v].rtt; }, rebuild:true});
+    const L = LINKS[S.link.id];
+    if(L.kind==='pcie'){
+      ctl(el, {k:'link.lanes', label:'Lanes per link', type:'select', num:true, options:{1:'x1',2:'x2',4:'x4',8:'x8',16:'x16'}});
+      ctl(el, {k:'link.count', label:'Number of links', type:'range', min:1, max:32, step:1, fmt:v=>v+' × x'+S.link.lanes, hint:'More than one x16 means multiple ports, bifurcation or several devices.'});
+      ctl(el, {k:'link.mps', label:'Max payload size (posted writes)', type:'select', num:true, options:{128:'128 B',256:'256 B',512:'512 B'}});
+      ctl(el, {k:'link.cpl', label:'Read completion size from host', type:'select', num:true, options:{64:'64 B',128:'128 B',256:'256 B',512:'512 B'}, hint:'Many root complexes return 64 B completions, which costs efficiency.'});
+      ctl(el, {k:'link.mrrs', label:'Max read request size', type:'select', num:true, options:{256:'256 B',512:'512 B',1024:'1 KB',2048:'2 KB',4096:'4 KB'}});
+    } else {
+      ctl(el, {k:'link.count', label:'UCIe modules', type:'range', min:1, max:64, step:1, fmt:v=>v+' × x64'});
+    }
+    ctl(el, {k:'link.rtt', label:'Read round-trip latency', type:'log', min:0.02, max:5, snap:snapLog, fmt:v=>sig(v)+' µs'});
+    el.insertAdjacentHTML('beforeend', `<div id="linkStats"></div>`);
+  } else if(selected==='acc'){
+    ctl(el, {k:'acc.tops', label:'Peak compute', type:'log', min:0.1, max:20000, snap:snapLog, fmt:v=>sig(v)+' TOPS'});
+    ctl(el, {k:'acc.util', label:'Achieved compute utilisation', type:'range', min:0.05, max:1, step:0.01, fmt:v=>(v*100).toFixed(0)+' %'});
+    ctl(el, {k:'acc.sram', label:'On-chip SRAM', type:'log', min:0.25, max:1024, snap:snapLog, fmt:v=>sig(v)+' MB'});
+    el.insertAdjacentHTML('beforeend', `<h3>PPA technology assumptions</h3>`);
+    ctl(el, {k:'acc.pj', label:'Energy per operation', type:'log', min:0.05, max:20, snap:snapLog, fmt:v=>sig(v)+' pJ/op'});
+    ctl(el, {k:'acc.topsMm2', label:'Compute density', type:'log', min:0.1, max:20, snap:snapLog, fmt:v=>sig(v)+' TOPS/mm²'});
+    ctl(el, {k:'acc.leak', label:'Leakage power density', type:'range', min:0, max:0.1, step:0.005, fmt:v=>v.toFixed(3)+' W/mm²'});
+    el.insertAdjacentHTML('beforeend', `<div id="accStats"></div>`);
+  } else if(selected==='host'){
+    ctl(el, {k:'host.dram', label:'Host memory', type:'select', options:Object.fromEntries(HOST_DRAMS.map(k=>[k,DRAMS[k].name])), rebuild:true});
+    const d = DRAMS[S.host.dram];
+    ctl(el, {k:'host.units', label:`Host memory ${d.unit}s`, type:'range', min:1, max:d.fam==='DDR'?16:32, step:1, fmt:v=>v+' → '+fmtBps(v*dramUnitBW(d))+' peak'});
+    ctl(el, {k:'host.cores', label:'Cores available for I/O', type:'range', min:1, max:256, step:1, fmt:v=>v+' cores'});
+    ctl(el, {k:'host.cpuUs', label:'CPU time per block', type:'log', min:0.1, max:200, snap:snapLog, fmt:v=>sig(v)+' µs', hint:'Descriptor setup, doorbell, interrupt or poll, bookkeeping. Polling ≈ 1 µs, interrupts ≈ 5–20 µs.'});
+    ctl(el, {k:'host.wCore', label:'Power per busy core', type:'range', min:1, max:15, step:0.5, fmt:v=>v+' W'});
+    el.insertAdjacentHTML('beforeend', `<div id="hostStats"></div>`);
+  } else if(selected==='src'){
+    if(S.src.startsWith('net')){
+      ctl(el, {k:'net.id', label:'Ethernet port speed', type:'select', options:Object.fromEntries(Object.entries(ETH).map(([k,e])=>[k,e.name]))});
+      ctl(el, {k:'net.count', label:'Ports', type:'range', min:1, max:32, step:1, fmt:v=>v+' ports'});
+      ctl(el, {k:'net.mtu', label:'MTU', type:'select', num:true, options:{1500:'1500 B (standard)',4096:'4096 B',9000:'9000 B (jumbo)'}});
+    } else {
+      ctl(el, {k:'nvme.id', label:'SSD type', type:'select', options:Object.fromEntries(Object.entries(NVME).map(([k,n])=>[k,n.name]))});
+      ctl(el, {k:'nvme.count', label:'Drives', type:'range', min:1, max:48, step:1, fmt:v=>v+' drives'});
+    }
+    el.insertAdjacentHTML('beforeend', `<div id="srcStats"></div>`);
+  }
+}
+
+/* =====================================================================
+   DIAGRAM
+   ===================================================================== */
+const NS = 'http://www.w3.org/2000/svg';
+const G = {                                                    // node boxes in the 1000 × 460 viewBox
+  src:  {x:10,  y:175, w:150, h:130, sel:'src'},
+  cpu:  {x:190, y:22,  w:200, h:140, sel:'host'},
+  host: {x:190, y:298, w:200, h:140, sel:'host'},
+  link: {x:430, y:165, w:170, h:130, sel:'link'},
+  acc:  {x:640, y:84,  w:180, h:300, sel:'acc'},
+  dram: {x:850, y:140, w:145, h:150, sel:'dram'},
+};
+let edges = [];
+function buildDiagram(){
+  const svg = document.getElementById('diagram');
+  svg.innerHTML = `<defs>
+    <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="accg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="rgba(155,123,255,.20)"/><stop offset="1" stop-color="rgba(60,242,255,.06)"/></linearGradient>
+  </defs><g id="eg"></g><g id="pg"></g><g id="ng"></g>`;
+  const p = (a,b)=>`M${a[0]},${a[1]} L${b[0]},${b[1]}`;
+  const c = (a,b,c1,c2)=>`M${a[0]},${a[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${b[0]},${b[1]}`;
+  edges = [
+    {id:'cpuW', d:p([276,162],[276,298]), res:'host', lbl:[266,234,'end']},
+    {id:'cpuR', d:p([304,298],[304,162]), res:'host'},
+    {id:'h2dA', d:c([390,345],[430,215],[414,345],[408,215]), res:'h2d'},
+    {id:'h2dB', d:p([600,215],[640,215]), res:'h2d', lbl:[515,316]},
+    {id:'d2hB', d:p([640,245],[600,245]), res:'d2h'},
+    {id:'d2hA', d:c([430,245],[390,395],[404,245],[414,395]), res:'d2h', lbl:[515,332]},
+    {id:'ddW',  d:p([820,205],[850,205]), res:'dram', lbl:[922,312]},
+    {id:'ddR',  d:p([850,245],[820,245]), res:'dram'},
+  ];
+  if(S.src!=='host'){
+    if(S.src.endsWith('p2p')) edges.push({id:'srcE', d:p([160,240],[430,231]), res:'src', lbl:[85,326]});
+    else edges.push({id:'srcE', d:c([160,240],[190,368],[178,240],[172,368]), res:'src', lbl:[85,326]});
+  }
+  svg.setAttribute('viewBox', S.src==='host' ? '178 0 822 460' : '0 0 1000 460');
+  const eg = svg.querySelector('#eg');
+  for(const e of edges){
+    const path = document.createElementNS(NS,'path'); path.setAttribute('d', e.d); path.setAttribute('class','edge'); path.id = 'e_'+e.id;
+    eg.appendChild(path); e.el = path; e.len = path.getTotalLength(); e.parts = []; e.acc = Math.random();
+    if(e.lbl){ const t = document.createElementNS(NS,'text'); t.setAttribute('x',e.lbl[0]); t.setAttribute('y',e.lbl[1]); t.setAttribute('class','edgelbl');
+      t.setAttribute('text-anchor',e.lbl[2]||'middle'); t.id = 'l_'+e.id; eg.appendChild(t); }
+  }
+  const ng = svg.querySelector('#ng');
+  for(const [k,b] of Object.entries(G)){
+    if(k==='src' && S.src==='host') continue;
+    const g = document.createElementNS(NS,'g'); g.setAttribute('class','node'); g.id = 'n_'+k; g.dataset.sel = b.sel;
+    g.setAttribute('tabindex','0'); g.setAttribute('role','button');
+    let inner = `<rect class="box" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="14" ${k==='acc'?'style="fill:url(#accg)"':''}/>
+      <text class="tag" x="${b.x+12}" y="${b.y-7}" id="tag_${k}"></text>
+      <text class="t1" x="${b.x+14}" y="${b.y+24}" id="t1_${k}"></text>
+      <text class="t2" x="${b.x+14}" y="${b.y+46}" id="t2_${k}"></text>`;
+    if(k==='acc'){
+      inner += `<rect x="${b.x+14}" y="${b.y+62}" width="${b.w-28}" height="70" rx="8" fill="none" stroke="var(--line2)" stroke-dasharray="3 3"/>
+        <text class="t2" x="${b.x+24}" y="${b.y+80}">COMPUTE</text><text class="t3" x="${b.x+24}" y="${b.y+99}" id="t3_acc"></text><text class="t3" x="${b.x+24}" y="${b.y+118}" id="t4_acc"></text>
+        <rect x="${b.x+14}" y="${b.y+144}" width="${b.w-28}" height="70" rx="8" fill="none" stroke="var(--line2)" stroke-dasharray="3 3"/>
+        <text class="t2" x="${b.x+24}" y="${b.y+162}">SRAM</text><text class="t3" x="${b.x+24}" y="${b.y+181}" id="t5_acc"></text><text class="t2" x="${b.x+24}" y="${b.y+200}" id="t8_acc"></text>
+        <text class="t2" x="${b.x+14}" y="${b.y+246}" id="t6_acc"></text><text class="t2" x="${b.x+14}" y="${b.y+264}" id="t7_acc"></text>`;
+    } else {
+      inner += `<text class="t3" x="${b.x+14}" y="${b.y+72}" id="t3_${k}"></text><text class="t3" x="${b.x+14}" y="${b.y+92}" id="t4_${k}"></text>
+        <text class="t2" x="${b.x+14}" y="${b.y+114}" id="t5_${k}"></text>`;
+    }
+    const rx = b.x+b.w-24, ry = b.y+24, C = 2*Math.PI*14;
+    inner += `<circle class="ring-bg" cx="${rx}" cy="${ry}" r="14"/><circle class="ring" id="r_${k}" cx="${rx}" cy="${ry}" r="14" stroke-dasharray="0 ${C}" transform="rotate(-90 ${rx} ${ry})"/>
+      <text class="ringtxt" x="${rx}" y="${ry}" id="rt_${k}"></text>`;
+    g.innerHTML = inner;
+    const go = ()=>{ selected = b.sel; buildInspector(); update(); };
+    g.addEventListener('click', go); g.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } });
+    ng.appendChild(g);
+  }
+}
+const txt = (id, s) => { const e = document.getElementById(id); if(e) e.textContent = s; };
+function ring(k, u){
+  const e = document.getElementById('r_'+k); if(!e) return; const C = 2*Math.PI*14;
+  e.setAttribute('stroke-dasharray', `${Math.min(u,1)*C} ${C}`); e.style.stroke = COL[state(u)];
+  txt('rt_'+k, !isFinite(u) ? '∞' : u>=10 ? '>999' : Math.round(u*100)); document.getElementById('rt_'+k).style.fill = COL[state(u)];
+}
+function paintDiagram(m){
+  const U = m.U, botK = m.worst.k;
+  const nodeU = {cpu:U.cpu, host:U.host, link:U.link, acc:U.compute, dram:U.dram, src:U.src};
+  const nodeComp = {cpu:'cpu', host:'host', link:'link', acc:'compute', dram:'dram', src:'src'};
+  for(const k in G){
+    const g = document.getElementById('n_'+k); if(!g) continue;
+    ring(k, nodeU[k]);
+    const isB = nodeComp[k]===botK && m.worst.U>S.ceil;
+    g.classList.toggle('bott', isB); g.classList.toggle('sel', G[k].sel===selected);
+    txt('tag_'+k, isB ? (m.worst.U>1 ? '▲ BOTTLENECK' : '▲ LIMITING') : '');
+  }
+  txt('t1_cpu','Host CPU'); txt('t2_cpu', `${S.host.cores} cores for I/O`);
+  txt('t3_cpu', `${fmtIOPS(m.Tb/S.block)} blocks/s`); txt('t4_cpu', `need ${sig(m.dem.cpu)} cores`); txt('t5_cpu', `${sig(S.host.cpuUs)} µs CPU per block`);
+  txt('t1_host','Host DRAM'); txt('t2_host', `${S.host.units} × ${m.hd.name}`);
+  txt('t3_host', `need ${fmtBps(m.dem.host)}`); txt('t4_host', `have ${fmtBps(m.cap.host)}`); txt('t5_host', `${sig(m.hR+m.hW)} B per byte processed`);
+  const L = m.lk.L;
+  txt('t1_link', L.kind==='pcie' ? L.name : 'UCIe'); txt('t2_link', L.kind==='pcie' ? `${S.link.count>1?S.link.count+' × ':''}x${S.link.lanes}` : `${S.link.count} × x64 module`);
+  txt('t3_link', `need ${fmtBps(Math.max(m.dem.h2d, m.dem.d2h))}`); txt('t4_link', `have ${fmtBps(Math.min(m.cap.h2d, m.cap.d2h))}`);
+  txt('t5_link', `per direction · ${fmtPct(m.lk.h2dEff)} eff.`);
+  txt('t1_acc','Accelerator'); txt('t2_acc', `${sig(S.acc.tops)} TOPS · ${fmtA(m.die)}`);
+  txt('t3_acc', `need ${fmtOps(m.dem.compute)}`); txt('t4_acc', `have ${fmtOps(m.cap.compute)}`);
+  txt('t5_acc', `${sig(S.acc.sram)} MB`); txt('t8_acc', `${fmtB(m.sramNeed)} in flight`);
+  txt('t6_acc', `${fmtW(m.Pacc)} accelerator side`); txt('t7_acc', `${sig(m.Ptot/m.T*1e12)} pJ / byte (system)`);
+  txt('t1_dram','DRAM'); txt('t2_dram', `${S.dev.units} × ${m.dev.name.split(' ')[0]}`);
+  txt('t3_dram', `need ${fmtBps(m.dem.dram)}`); txt('t4_dram', `have ${fmtBps(m.cap.dram)}`);
+  txt('t5_dram', `${(S.dev.units*m.dev.width).toLocaleString()}-bit · ${fmtB(m.devCap*1e9)}`);
+  if(S.src!=='host'){ txt('t1_src', S.src.startsWith('net')?'Network':'Storage'); txt('t2_src', m.srcName.replace('NVMe PCIe ','Gen').replace(' x4 SSD',''));
+    txt('t3_src', `need ${fmtBps(m.dem.src)}`); txt('t4_src', `have ${fmtBps(m.cap.src)}`); txt('t5_src', S.src.endsWith('p2p')?'peer-to-peer DMA':'via host memory'); }
+  // edges
+  const traffic = {cpuW:m.T*m.hW, cpuR:m.T*m.hR, h2dA:m.T*S.inR, h2dB:m.T*S.inR, d2hA:m.T*S.outR, d2hB:m.T*S.outR,
+    ddW:m.T*m.dW, ddR:m.T*m.dR, srcE:m.T*S.inR};
+  for(const e of edges){
+    const bps = traffic[e.id]||0, u = U[e.res];
+    e.bps = bps; e.u = u; e.col = COL[state(u)];
+    e.el.style.stroke = e.col; e.el.style.strokeWidth = bps>0 ? Math.max(1.5, Math.min(9, 1+Math.log10(bps/1e6))) : 0.8;
+    e.el.style.opacity = bps>0 ? .38 : .12;
+  }
+  txt('l_cpuW', `${fmtBps(m.T*(m.hR+m.hW))}`); txt('l_srcE', `${fmtBps(m.T*S.inR)}`);
+  txt('l_h2dB', `H→D ${fmtBps(m.T*S.inR)}`); txt('l_d2hA', `D→H ${fmtBps(m.T*S.outR)}`);
+  txt('l_ddW', `bus ${fmtBps(m.T*(m.dR+m.dW))}`); txt('l_srcE', `${fmtBps(m.T*S.inR)}`);
+}
+const fmtIOPS = x => { for(const [m,p] of SI) if(x>=m) return sig(x/m)+p; return sig(x); };
+
+/* particles */
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let lastTs = 0;
+function tick(ts){
+  const dt = Math.min(0.05, (ts-lastTs)/1000||0); lastTs = ts;
+  const pg = document.getElementById('pg');
+  if(pg && !reduceMotion){
+    for(const e of edges){
+      if(!e.el) continue;
+      const rate = e.bps>0 ? Math.max(1.5, Math.min(26, 3*Math.log10(e.bps/1e5))) : 0;   // particles per second
+      const speed = 150/Math.sqrt(Math.max(1, e.u||0));                                   // over-capacity edges crawl
+      e.acc += rate*dt;
+      while(e.acc>=1 && e.parts.length<60){ e.acc -= 1;
+        const c = document.createElementNS(NS,'circle'); c.setAttribute('r', 2.6); c.setAttribute('class','particle'); pg.appendChild(c);
+        e.parts.push({el:c, s:0}); }
+      if(e.acc>1) e.acc = 1;
+      for(let i=e.parts.length-1;i>=0;i--){
+        const pt = e.parts[i]; pt.s += speed*dt;
+        if(pt.s>=e.len){ pt.el.remove(); e.parts.splice(i,1); continue; }
+        const P = e.el.getPointAtLength(pt.s); pt.el.setAttribute('cx',P.x); pt.el.setAttribute('cy',P.y); pt.el.style.fill = e.col;
+      }
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+/* =====================================================================
+   VERDICT + INSPECTOR STATS
+   ===================================================================== */
+function paintVerdict(m){
+  const w = m.worst, st = state(w.U);
+  const latOK = m.latency<=S.lat, latSt = !isFinite(m.latency) ? 'bad' : latOK ? 'ok' : 'bad';
+  const ppaTxt = `${fmtW(m.Ptot)} system · ${fmtA(m.die)}`;
+  document.getElementById('verdict').innerHTML = `
+    <div class="kpi hero ${st}"><div class="l">${st==='ok'?'Most loaded component':st==='warn'?'Limiting component (above ceiling)':'Bottleneck'}</div>
+      <div class="v">${w.name} · ${fmtPct(w.U)}</div><div class="s">needs ${w.f(w.need)} at peak, has ${w.f(w.have)}</div></div>
+    <div class="kpi ${m.maxT>=m.T?'ok':'bad'}"><div class="l">Max sustainable rate</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target · ${fmtBps(m.maxTceil)} at ceiling</div></div>
+    <div class="kpi ${latSt}"><div class="l">Latency per block</div><div class="v">${fmtT(m.latency)}</div><div class="s">budget ${fmtT(S.lat)}${isFinite(m.latency)?' · '+fmtPct(m.latency/S.lat)+' used':' · queue unstable'}</div></div>
+    <div class="kpi" style="--k:var(--violet)"><div class="l">Power · area</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${fmtW(m.Pacc)} accel · die ${fmtA(m.die)}</div></div>
+    <div class="kpi" style="--k:var(--mag)"><div class="l">Energy per byte</div><div class="v">${sig(m.Ptot/m.T*1e12)} pJ/B</div><div class="s">${fmtPct(m.Pmove/m.Ptot)} spent moving data</div></div>`;
+}
+function stat(l,v){ return `<div class="stat"><span>${l}</span><b>${v}</b></div>`; }
+function paintInspector(m){
+  document.querySelectorAll('#chips .chip').forEach(c=>{
+    const u = {dram:m.U.dram, link:m.U.link, acc:m.U.compute, host:m.U.hostSys, src:m.U.src}[c.dataset.k];
+    c.querySelector('.dot').style.setProperty('--c', COL[state(u)]);
+  });
+  const L = document.getElementById('ledger');
+  if(L){
+    L.innerHTML = m.ledger.map(l=>`<tr><td>${l[0]}</td><td>${l[1]?'R '+sig(l[1]):'W '+sig(l[2])}</td></tr>`).join('')
+      + `<tr class="tot"><td>Total on the DRAM bus (half duplex)</td><td>${sig(m.dR+m.dW)} B</td></tr>`;
+    document.getElementById('dramStats').innerHTML = `<h3>This configuration</h3>`
+      + stat('Peak bandwidth', fmtBps(S.dev.units*dramUnitBW(m.dev)))
+      + stat('Achievable ('+fmtPct(m.devE)+' efficient)', fmtBps(m.devBW))
+      + stat('Demand at peak', fmtBps(m.dem.dram))
+      + stat('Capacity', fmtB(m.devCap*1e9)+(m.devCap<S.resident?' ✗ short':' ✓'))
+      + stat('Bus width', (S.dev.units*m.dev.width)+' bits')
+      + stat('Requests in flight (64 B)', m.dramReqs.toLocaleString())
+      + stat('Power', fmtW(m.P.devDram))
+      + stat('PHY area · beachfront', fmtA(m.area.dramPhy)+' · '+sig(S.dev.units*m.dev.shore)+' mm');
+  }
+  const ls = document.getElementById('linkStats');
+  if(ls) ls.innerHTML = `<h3>This configuration</h3>`
+    + stat('Raw, per direction', fmtBps(m.lk.raw))
+    + stat('Write (posted) efficiency', fmtPct(m.lk.effW))
+    + stat('Read-completion efficiency', fmtPct(m.lk.effR))
+    + stat('H→D usable · demand', fmtBps(m.cap.h2d)+' · '+fmtBps(m.dem.h2d))
+    + stat('D→H usable · demand', fmtBps(m.cap.d2h)+' · '+fmtBps(m.dem.d2h))
+    + (S.pull && m.lk.L.kind==='pcie' ? stat('Outstanding read tags', m.tags.toLocaleString()) : '')
+    + stat('Power', fmtW(m.P.link))
+    + stat('PHY area · beachfront', fmtA(m.area.linkPhy)+' · '+sig(m.lk.totalLanes*m.lk.L.shore)+' mm');
+  const as = document.getElementById('accStats');
+  if(as) as.innerHTML = `<h3>This configuration</h3>`
+    + stat('Usable compute', fmtOps(m.cap.compute)) + stat('Demand at peak', fmtOps(m.dem.compute))
+    + stat('Intensity vs device DRAM', (m.dR+m.dW>0? sig(S.ops/(m.dR+m.dW)) : '∞')+' op/B')
+    + stat('Machine balance', sig(m.cap.compute/m.devBW)+' op/B')
+    + stat('Compute power (dyn + leak)', fmtW(m.P.compute+m.P.leak))
+    + stat('Die area', fmtA(m.die)+(m.padArea>m.coreArea?' (pad-limited)':''))
+    + stat('Beachfront used', sig(m.shoreNeed)+' / '+sig(m.shoreHave)+' mm');
+  const hs = document.getElementById('hostStats');
+  if(hs) hs.innerHTML = `<h3>This configuration</h3>`
+    + stat('Host DRAM usable · demand', fmtBps(m.cap.host)+' · '+fmtBps(m.dem.host))
+    + stat('Each byte crosses host DRAM', sig(m.hR+m.hW)+'×')
+    + stat('Blocks per second', fmtIOPS(m.Tb/S.block))
+    + stat('Cores busy on I/O', sig(m.dem.cpu)+' of '+S.host.cores)
+    + stat('Host power (DRAM + I/O cores)', fmtW(m.P.hostDram+m.P.hostCpu));
+  const ss = document.getElementById('srcStats');
+  if(ss) ss.innerHTML = `<h3>This configuration</h3>` + stat('Usable', fmtBps(m.srcBW)) + stat('Demand at peak', fmtBps(m.dem.src||0)) + stat('Power', fmtW(m.P.src));
+}
+
+/* =====================================================================
+   TABS
+   ===================================================================== */
+const TABS = [
+  {id:'sizing', name:'Min specs'}, {id:'ppa', name:'PPA'}, {id:'latency', name:'Latency'},
+  {id:'headroom', name:'Headroom'}, {id:'roofline', name:'Roofline'}, {id:'cons', name:'Considerations'}, {id:'model', name:'Model'},
+];
+let tab = 'sizing';
+function buildTabs(){
+  document.getElementById('tabbar').innerHTML = TABS.map(t=>`<button class="tab${t.id===tab?' on':''}" role="tab" data-t="${t.id}">${t.name}<span class="n" id="n_${t.id}" hidden></span></button>`).join('');
+  document.getElementById('panes').innerHTML = TABS.map(t=>`<div class="pane${t.id===tab?' on':''}" id="p_${t.id}"></div>`).join('');
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ tab=b.dataset.t; document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on', p.id==='p_'+tab)); update(); });
+}
+const pill = (f, t) => `<span class="pill ${f}">${t || {ok:'practical',warn:'stretch',bad:'impractical'}[f]}</span>`;
+
+function paneSizing(m){
+  const rows = sizeDram(S, m);
+  const need = m.Tb*(m.dR+m.dW)/S.ceil;
+  const lp4 = rows.find(r=>r.id==='lp4_3200'), lp4x = rows.find(r=>r.id==='lp4x_4266');
+  const firstOK = rows.filter(r=>r.feas==='ok').sort((a,b)=>a.power-b.power)[0];
+  const hbm = rows.filter(r=>r.d.fam==='HBM');
+  const needHBM = rows.filter(r=>r.d.fam!=='HBM').every(r=>r.feas==='bad');
+  const links = sizeLink(S, m);
+  const pcieOK = links.filter(l=>l.L.kind==='pcie' && l.feas==='ok');
+  const ans = `<div class="answer">To carry <b>${fmtBps(m.T*(m.dR+m.dW))}</b> on the device DRAM bus
+    (${sig(m.dR+m.dW)} B per processed byte${S.burst>1?', ×'+S.burst.toFixed(2)+' peak':''}, at a ${(S.ceil*100).toFixed(0)} % ceiling: <b>${fmtBps(need)}</b> of achievable bandwidth),
+    LPDDR4-3200 at full speed needs <b>${lp4.nBW} x16 channels = a ${(lp4.nBW*16).toLocaleString()}-bit bus</b> (LPDDR4X-4266: ${(lp4x.nBW*16).toLocaleString()}-bit;
+    even at 100 % efficiency with no headroom LPDDR4-3200 would need ${(Math.ceil(m.Tb*(m.dR+m.dW)/dramUnitBW(lp4.d))*16).toLocaleString()} bits).
+    ${needHBM ? `<b>Only HBM gets there</b>: ${hbm.filter(r=>r.feas!=='bad').map(r=>r.n+' × '+r.d.name).join(', ')||'not even HBM in one package — split the problem'}.`
+      : firstOK ? `The lowest-power practical option is <b>${firstOK.n} × ${firstOK.d.name}</b> (${fmtW(firstOK.power)}).` : ''}
+    On the host link, ${pcieOK.length ? `the narrowest PCIe that fits is <b>${pcieOK.map(l=>l.L.name+' x'+l.lanes).slice(0,2).join(' or ')}</b>.`
+      : `<b>no single PCIe x16 is enough</b> — ${links.filter(l=>l.L.kind==='pcie').map(l=>l.L.name+' needs '+l.count+' × x16').slice(-2).join(', ')}. Move less data across it, or put the accelerator on the package (UCIe: ${links.find(l=>l.id==='ucie').count} modules).`}</div>`;
+  const dramT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>DRAM</th><th class="n">Units</th><th class="n">Bus width</th><th class="n">Peak</th><th class="n">Capacity</th><th class="n">Power</th><th class="n">PHY area</th><th class="n">Beachfront</th><th class="n">Signal pins</th><th>Verdict</th><th></th></tr></thead><tbody>${
+    rows.map(r=>`<tr class="${r.id===S.dev.dram?'cur':''}"><td>${r.d.name}</td><td class="n">${r.n} × ${r.d.unit}${r.capLimited?' ⓒ':''}</td><td class="n">${r.width.toLocaleString()}-bit</td>
+      <td class="n">${fmtBps(r.peak)}</td><td class="n">${fmtB(r.cap*1e9)}</td><td class="n">${fmtW(r.power)}</td><td class="n">${fmtA(r.phy)}</td><td class="n">${sig(r.shore)} mm</td><td class="n">${Math.round(r.pins).toLocaleString()}</td>
+      <td>${pill(r.feas)}</td><td><button class="use" data-dram="${r.id}" data-n="${r.n}">use</button></td></tr>`).join('')}</tbody></table></div>
+    <p class="note">ⓒ = sized by capacity (device-resident data) rather than bandwidth. Practical / extreme limits per technology: DDR 8 / 12 channels, LPDDR 256-bit / 1024-bit, GDDR 384-bit / 512-bit, HBM about 6–8 / 12 stacks.</p>`;
+  const linkT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Config</th><th class="n">Usable H→D</th><th class="n">Power</th><th class="n">PHY area</th><th class="n">Beachfront</th><th>Verdict</th><th></th></tr></thead><tbody>${
+    links.map(l=>`<tr class="${l.id===S.link.id?'cur':''}"><td>${l.L.name}</td><td class="n">${l.L.kind==='pcie' ? (l.count>1?l.count+' × ':'')+'x'+l.lanes : l.count+' × x64'}</td>
+      <td class="n">${fmtBps(l.perDir)}</td><td class="n">${fmtW(l.power)}</td><td class="n">${fmtA(l.phy)}</td><td class="n">${sig(l.shore)} mm</td><td>${pill(l.feas, l.feas==='ok'?'one link':l.feas==='warn'?'several links':'impractical')}</td>
+      <td><button class="use" data-link="${l.id}" data-lanes="${l.lanes}" data-count="${l.count}">use</button></td></tr>`).join('')}</tbody></table></div>`;
+  // other components
+  const hostRows = HOST_DRAMS.map(id=>{ const d = DRAMS[id]; const per = dramUnitBW(d)*dramEff(d,'block',m.hR,m.hW,false);
+    const n = Math.max(1, Math.ceil(m.Tb*(m.hR+m.hW)/S.ceil/per)); return `<tr class="${id===S.host.dram?'cur':''}"><td>${d.name}</td><td class="n">${n} × ${d.unit}</td><td>${pill(n<=8?'ok':n<=12?'warn':'bad', n<=8?'desktop/server':n<=12?'big server':'multi-socket')}</td></tr>`; }).join('');
+  const topsNeed = m.Tb*S.ops/(S.acc.util*S.ceil)/1e12;
+  const coresNeed = m.dem.cpu/S.ceil;
+  let srcRow = '';
+  if(S.src.startsWith('net')) srcRow = Object.values(ETH).map(e=>{ const eff=(S.net.mtu-28)/(S.net.mtu+38); const n=Math.ceil(m.Tb*S.inR/S.ceil/(e.gbps*1e9/8*eff)); return `${n} × ${e.name}`; }).join(' · ');
+  if(S.src.startsWith('nvme')) srcRow = Object.values(NVME).map(n=>`${Math.ceil(m.Tb*S.inR/S.ceil/n.bw)} × ${n.name}`).join(' · ');
+  return ans + `<div class="cols"><div class="panel" style="grid-column:1/-1"><h2>Device DRAM — every technology, sized for this requirement</h2>${dramT}</div>
+    <div class="panel" style="grid-column:1/-1"><h2>Host ↔ accelerator link</h2>${linkT}<p class="note">PCIe is full duplex: each direction is sized on its own. Usable rate includes 128b/130b or FLIT encoding, TLP headers at your payload and completion sizes, and DLLP traffic.</p></div>
+    <div class="panel"><h2>Host memory</h2><div class="tbl-wrap"><table class="t"><tbody>${hostRows}</tbody></table></div><p class="note">Host DRAM sees ${sig(m.hR+m.hW)} B per processed byte: ${m.viaHost?'input written, then DMA-read; ':''}output DMA-written, then consumed.</p></div>
+    <div class="panel"><h2>Compute, CPU${srcRow?' &amp; source':''}</h2>
+      ${stat('Accelerator peak needed', sig(topsNeed)+' TOPS')}${stat('at', (S.acc.util*100).toFixed(0)+' % achieved utilisation')}
+      ${stat('Host cores for I/O', sig(coresNeed)+' cores')}${stat('Blocks per second', fmtIOPS(m.Tb/S.block))}
+      ${srcRow?`<h3>${S.src.startsWith('net')?'Network ports':'SSDs'} (any one of)</h3><p class="note">${srcRow}</p>`:''}</div></div>`;
+}
+
+function hbar(label, v, max, col, num){ return `<div class="bar"><span>${label}</span><div class="track"><div class="fill" style="width:${Math.max(0.5,Math.min(100,v/max*100))}%;background:${col}"></div></div><span class="num">${num}</span></div>`; }
+function paneLatency(m){
+  const cols = ['var(--cyan)','var(--violet)','var(--mag)','var(--amber)','var(--green)','#5ea2ff','#ff7a59','#c08bff'];
+  const tot = m.latency, fin = isFinite(tot);
+  const scale = fin ? Math.max(tot, S.lat) : 1;
+  const stack = fin ? `<div style="position:relative"><div class="stack">${m.stages.map((s,i)=>`<div title="${esc(s.name)}: ${fmtT(s.t)}" style="width:${s.t/scale*100}%;background:${cols[i%cols.length]}"></div>`).join('')}</div>
+      <div style="position:absolute;top:-6px;bottom:-6px;left:${S.lat/scale*100}%;border-left:2px dashed var(--red)"></div></div>
+      <div class="keys">${m.stages.map((s,i)=>`<span style="--c:${cols[i%cols.length]}">${s.name} · ${fmtT(s.t)}</span>`).join('')}<span style="--c:var(--red)">budget ${fmtT(S.lat)}</span></div>`
+    : `<div class="answer" style="border-color:var(--red)"><b style="color:var(--red)">Unbounded.</b> At least one stage is above 100 % utilisation on average, so its queue grows without limit.</div>`;
+  const rows = m.stages.map(s=>`<tr><td>${s.name}</td><td class="n">${fmtT(s.fixed)}</td><td class="n">${fmtT(s.svc)}</td><td class="n">${fmtT(s.q)}</td><td class="n">${fmtT(s.t)}</td></tr>`).join('');
+  // latency vs block size sweep
+  const xs = [], ys = [];
+  for(let i=0;i<=60;i++){ const b = Math.pow(10, 3+i/60*7); const mm = model({...S, block:b}); xs.push(b); ys.push(mm.latency); }
+  const cores = xs.map(b=>model({...S, block:b}).dem.cpu);
+  const chart = lineChart({xs, series:[{ys, col:'var(--cyan)', name:'latency per block'}], xlog:true, ylog:true, xfmt:fmtB, yfmt:fmtT,
+    hlines:[{y:S.lat, col:'var(--red)', name:'budget'}], vlines:[{x:S.block, col:'var(--mag)', name:'current'}], h:240});
+  const chart2 = lineChart({xs, series:[{ys:cores, col:'var(--amber)', name:'cores'}], xlog:true, ylog:true, xfmt:fmtB, yfmt:v=>sig(v),
+    hlines:[{y:S.host.cores, col:'var(--red)', name:'available'}], vlines:[{x:S.block, col:'var(--mag)', name:'current'}], h:240});
+  return `<div class="cols"><div class="panel" style="grid-column:1/-1"><h2>One block, submit to result</h2>
+    <p class="note" style="margin:0 0 12px">Total <b class="mono">${fmtT(tot)}</b> for a ${fmtB(S.block)} block against a ${fmtT(S.lat)} budget. Stages run back-to-back for one block; different blocks overlap in a pipeline, which is why throughput is set by the slowest stage and latency by the sum.</p>${stack}
+    <div class="tbl-wrap" style="margin-top:14px"><table class="t"><thead><tr><th>Stage</th><th class="n">Fixed</th><th class="n">Transfer / service</th><th class="n">Queueing (M/D/1)</th><th class="n">Total</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div class="panel"><h2>Latency vs block size</h2>${chart}<p class="note">Small blocks: fixed costs dominate. Large blocks: transfer and compute time grow with the block. The budget caps the block size.</p></div>
+    <div class="panel"><h2>Host cores vs block size</h2>${chart2}<p class="note">Blocks per second = rate ÷ block size. Too-small blocks drown the host in descriptors and interrupts; batching is the cure.</p></div></div>`;
+}
+
+function paneHeadroom(m){
+  const xs = []; for(let i=0;i<=80;i++) xs.push(m.T*Math.pow(10, -2+i/80*4));
+  const cols = {dram:'var(--cyan)', link:'var(--mag)', compute:'var(--violet)', host:'var(--amber)', cpu:'#5ea2ff', src:'var(--green)'};
+  const series = m.comps.map(c=>({name:c.name, col:cols[c.k], ys:xs.map(x=>c.U*x/m.T)}));
+  const chart = lineChart({xs, series, xlog:true, ylog:true, xfmt:fmtBps, yfmt:v=>fmtPct(v), ymin:0.001, ymax:1000,
+    hlines:[{y:1, col:'var(--red)', name:'100 %'}, {y:S.ceil, col:'var(--amber)', name:'ceiling', left:true}],
+    vlines:[{x:m.T, col:'var(--text)', name:'target'}, {x:m.maxT, col:'var(--red)', name:'max'}], h:340, legend:true});
+  return `<div class="cols"><div class="panel" style="grid-column:1/-1"><h2>Utilisation of every component as the rate scales</h2>${chart}
+    <p class="note">Each line is one component's peak utilisation. The first to cross 100 % is the bottleneck, and where it crosses is the maximum sustainable rate (${fmtBps(m.maxT)}). The gap between lines is how much the next fix buys you: after fixing ${m.comps[0].name}, ${m.comps[1]?m.comps[1].name+' limits at '+fmtBps(m.T/m.comps[1].U):'nothing else limits'}.</p></div>
+    <div class="panel" style="grid-column:1/-1"><h2>Ranking</h2><div class="bars">${m.comps.map(c=>hbar(c.name, Math.min(c.U,2), 2, COL[state(c.U)], fmtPct(c.U))).join('')}</div><p class="note">Bars are drawn to 200 %.</p></div></div>`;
+}
+
+function paneRoofline(m){
+  const peak = m.cap.compute, bw = m.devBW;
+  const ai = (m.dR+m.dW)>0 ? S.ops/(m.dR+m.dW) : 1e4;
+  const xs = []; for(let i=0;i<=100;i++) xs.push(Math.pow(10, -2+i/100*6));
+  const roof = xs.map(x=>Math.min(peak, bw*x));
+  const linkCap = Math.min(S.inR>0? m.cap.h2d/S.inR : Infinity, S.outR>0? m.cap.d2h/S.outR : Infinity)*S.ops;  // OPS the link can feed
+  const hl = [{y:m.dem.compute, col:'var(--mag)', name:'required'}];
+  if(isFinite(linkCap)) hl.push({y:linkCap, col:'var(--amber)', name:'link-fed ceiling'});
+  const chart = lineChart({xs, series:[{ys:roof, col:'var(--cyan)', name:'DRAM / compute roof'}], xlog:true, ylog:true, xfmt:v=>sig(v)+' op/B', yfmt:fmtOps,
+    hlines:hl, vlines:[{x:ai, col:'var(--text)', name:'this workload'}, {x:peak/bw, col:'var(--violet)', name:'ridge'}], points:[{x:Math.min(Math.max(ai,0.01),1e4), y:m.dem.compute, col:'var(--mag)'}], h:340});
+  const bound = ai < peak/bw ? 'memory-bound' : 'compute-bound';
+  return `<div class="cols"><div class="panel" style="grid-column:1/-1"><h2>Roofline · device DRAM vs compute</h2>${chart}
+    <p class="note">Arithmetic intensity against device DRAM is <b class="mono">${sig(ai)} op/B</b>; the ridge point (machine balance) is <b class="mono">${sig(peak/bw)} op/B</b>, so this workload is <b>${bound}</b>.
+    The pink point is the throughput you need; it must sit under the roof. The amber line is the compute rate the host link can feed at this workload's link bytes per byte, a second, lower roof that often wins.</p></div></div>`;
+}
+
+function panePPA(m){
+  const P = m.P;
+  const pItems = [['Device DRAM',P.devDram,'var(--cyan)'],['Host link',P.link,'var(--mag)'],['Compute (dynamic)',P.compute,'var(--violet)'],['Leakage',P.leak,'#8c6cff'],
+    ['Host DRAM',P.hostDram,'var(--amber)'],['Host I/O cores',P.hostCpu,'#5ea2ff'],['Source (NICs / SSDs)',P.src,'var(--green)']].filter(x=>x[1]>0);
+  const aItems = [['Compute',m.area.compute,'var(--violet)'],['SRAM',m.area.sram,'var(--cyan)'],['DRAM PHY',m.area.dramPhy,'var(--amber)'],['Link PHY',m.area.linkPhy,'var(--mag)'],['Other (15 %)',m.area.misc,'var(--faint)']];
+  if(m.padArea>m.coreArea) aItems.push(['Pad-limited filler', m.padArea-m.coreArea, 'rgba(255,77,109,.5)']);
+  const stackOf = (items, f) => { const t = items.reduce((a,x)=>a+x[1],0); return `<div class="stack">${items.map(x=>`<div title="${x[0]}: ${f(x[1])}" style="width:${x[1]/t*100}%;background:${x[2]}"></div>`).join('')}</div>
+    <div class="keys">${items.map(x=>`<span style="--c:${x[2]}">${x[0]} · ${f(x[1])}</span>`).join('')}</div>`; };
+  // DRAM PPA plane
+  const rows = sizeDram(S, m);
+  const scatter = scatterChart(rows.map(r=>({x:r.phy, y:r.power, label:r.d.name.replace(' Gb/s',''), col:COL[r.feas], cur:r.id===S.dev.dram, id:r.id, n:r.n})));
+  const reticle = m.die>830;
+  return `<div class="cols">
+    <div class="panel"><h2>Performance</h2>
+      ${stat('Target rate', fmtBps(m.T))}${stat('Max sustainable', fmtBps(m.maxT))}${stat('Latency per block', fmtT(m.latency))}
+      ${stat('Throughput per watt', fmtBps(m.T/m.Ptot)+' /W')}${stat('Throughput per mm²', fmtBps(m.T/m.die)+' /mm²')}${stat('Energy per processed byte', sig(m.Ptot/m.T*1e12)+' pJ')}
+      ${stat('Data movement share of power', fmtPct(m.Pmove/m.Ptot))}</div>
+    <div class="panel"><h2>Power · ${fmtW(m.Ptot)}</h2>${stackOf(pItems, fmtW)}<p class="note">Average power at the target rate. Accelerator side (DRAM, link, compute, leakage): <b class="mono">${fmtW(m.Pacc)}</b>. Each moved bit costs its technology's pJ/bit; standby and refresh power is charged per unit whether or not it is busy.</p></div>
+    <div class="panel"><h2>Area · ${fmtA(m.die)} die</h2>${stackOf(aItems, fmtA)}
+      ${stat('Core-limited area', fmtA(m.coreArea))}${stat('Pad (beachfront)-limited area', fmtA(m.padArea))}${stat('Beachfront needed / available', sig(m.shoreNeed)+' / '+sig(m.shoreHave)+' mm')}
+      <p class="note">${m.padArea>m.coreArea ? '<b style="color:var(--amber)">Pad-limited:</b> the die is sized by the edge length its memory and link PHYs need, not by its logic. ' : ''}${reticle ? '<b style="color:var(--red)">Above the ~830 mm² reticle limit</b>: this needs several dies (chiplets) joined on a package.' : 'Within one reticle (~830 mm²).'}</p></div>
+    <div class="panel" style="grid-column:1/-1"><h2>DRAM design space — power vs PHY area, each sized to meet the requirement</h2>${scatter}
+      <p class="note">Every technology sized to the minimum count that meets bandwidth and capacity. Down and left is better. Colour shows feasibility (green practical, amber stretch, red impractical). Click a point to use it.</p></div></div>`;
+}
+
+function considerations(m){
+  const C = [], add = (lvl, title, body) => C.push({lvl, title, body});
+  const d = m.dev, L = m.lk.L;
+  // bottleneck
+  add(state(m.worst.U)==='ok'?'ok':state(m.worst.U), 'Bottleneck and headroom', `<p>${m.worst.name} runs at <b>${fmtPct(m.worst.U)}</b> at peak. The system sustains up to <b>${fmtBps(m.maxT)}</b>, ${sig(m.maxT/m.T)}× the target.</p>`);
+  // DRAM half duplex
+  add('info', 'DRAM is half duplex; links are not', `<p>Reads and writes share one DRAM bus, so the bus must carry <b>${sig(m.dR+m.dW)} B</b> per processed byte (${sig(m.dR)} R + ${sig(m.dW)} W). PCIe carries each direction separately at full rate. Every read/write turnaround costs dead cycles (tWTR, tRTW): a 50/50 mix loses up to 10 % here.</p>`);
+  // efficiency
+  add(m.devE<0.6?'warn':'info', 'Achievable vs peak DRAM bandwidth', `<p>${PATTERNS[S.pattern].name} reaches about <b>${fmtPct(m.devE)}</b> of peak after refresh, page misses, bank conflicts${S.ecc&&(d.fam==='LPDDR'||d.fam==='GDDR')?' and inline-ECC overhead':''}. Random small accesses can halve usable bandwidth; address hashing and bank-group interleaving win some of it back.</p>`);
+  // capacity
+  add(m.devCap<S.resident?'bad':'ok', 'Capacity, not only bandwidth', `<p>Device-resident data <b>${fmtB(S.resident*1e9)}</b>; this configuration holds <b>${fmtB(m.devCap*1e9)}</b>. LPDDR is capacity-rich and cheap per GB; HBM gives bandwidth per stack but costs much more per GB, and GDDR gives the least capacity per unit.</p>`);
+  // pins / width practicality
+  const pins = S.dev.units*d.sig;
+  add(S.dev.units>d.ext?'bad':S.dev.units>d.pract?'warn':'ok', 'Bus width, pins and package', `<p>${S.dev.units} × ${d.unit} = <b>${(S.dev.units*d.width).toLocaleString()}-bit</b> bus, about <b>${pins.toLocaleString()}</b> signal ${d.fam==='HBM'?'micro-bumps on an interposer':'balls'}${d.fam!=='HBM'?' (roughly double with power and ground)':''}. ${S.dev.units>d.pract?`Beyond the usual ${d.pract*d.width}-bit for ${d.fam}. `:''}Wide buses also need length matching, more PCB layers and more PHY beachfront.</p>`);
+  // PCIe efficiency + tags
+  if(L.kind==='pcie'){
+    add(m.lk.effR<0.8 && S.pull ? 'warn':'info', 'PCIe protocol efficiency', `<p>Posted writes at ${S.link.mps} B payload: <b>${fmtPct(m.lk.effW)}</b> of raw. Read completions at ${S.link.cpl} B: <b>${fmtPct(m.lk.effR)}</b>. Device-initiated reads also put request TLPs on the opposite direction. ${L.flit?'PCIe 6.0+ FLIT mode trades per-TLP framing for a fixed 256 B flit with FEC.':'Encoding is 128b/130b.'}</p>`);
+    if(S.pull){
+      const lvl = m.tags>1024 ? 'bad' : m.tags>256 ? 'warn' : 'ok';
+      add(lvl, 'Outstanding reads (Little\'s law)', `<p>To keep <b>${fmtBps(m.T*S.inR)}</b> flowing across a <b>${sig(S.link.rtt)} µs</b> round trip, <b>${fmtB(m.inflightPcie)}</b> must be in flight: <b>${m.tags.toLocaleString()}</b> read requests of ${S.link.mrrs} B. 8-bit tags allow 256 outstanding; 10-bit tags (PCIe 4.0+) 1024; 14-bit tags (6.0) 16 384. ${lvl!=='ok'?'Use bigger read requests, more DMA engines, several links, or push data with writes.':''}</p>`);
+    }
+  }
+  add(m.dramReqs/Math.max(1,S.dev.units*(d.fam==='HBM'?16:d.fam==='DDR'?2:1))>64?'warn':'info', 'DRAM concurrency', `<p>Bandwidth × latency: <b>${fmtB(m.inflightDram)}</b> in flight = <b>${m.dramReqs.toLocaleString()}</b> outstanding 64 B requests across the memory controllers. The controller queues and the requesters must sustain that many misses, or the bandwidth is never reached.</p>`);
+  // CPU / IOPS
+  const cpuU = m.U.cpu;
+  add(state(cpuU), 'Host CPU overhead per block', `<p>${fmtIOPS(m.Tb/S.block)} blocks/s × ${sig(S.host.cpuUs)} µs = <b>${sig(m.dem.cpu)}</b> cores busy. Bigger blocks, descriptor batching, polling instead of interrupts, and interrupt coalescing cut this; very small blocks are an IOPS problem before they are a bandwidth problem.</p>`);
+  // host memory
+  add(state(m.U.host), 'Host memory is on the data path', `<p>Host DRAM moves <b>${sig(m.hR+m.hW)} B</b> per processed byte. ${m.viaHost?'Input is written (by the CPU, NIC or SSD) and then read by DMA; ':''}output is written by DMA and read by the consumer. Peer-to-peer DMA (NIC or SSD straight to the accelerator) removes the input half. NUMA placement matters: DMA from the far socket crosses the inter-socket link.</p>`);
+  // latency + queueing
+  const lat = m.latency;
+  add(!isFinite(lat)?'bad':lat>S.lat?'bad':'ok', 'Latency budget', `<p>${fmtT(lat)} per ${fmtB(S.block)} block against <b>${fmtT(S.lat)}</b>. Queueing delay grows as ρ/(1−ρ): at 90 % utilisation a stage waits 4.5× its own service time on average (M/D/1). That is why the utilisation ceiling exists.</p>`);
+  // SRAM
+  add(m.sramNeed>S.acc.sram*1e6?'warn':'ok', 'On-chip buffering', `<p>Hiding link and DRAM latency at this rate needs about <b>${fmtB(m.sramNeed)}</b> of double-buffered on-chip storage (data in flight on the link and in DRAM)${S.stageIn?'':'; unstaged input must also be tiled through SRAM'}; the accelerator has <b>${sig(S.acc.sram)} MB</b>.</p>`);
+  // power
+  add(m.Pmove/m.Ptot>0.5?'warn':'info', 'Power: moving data vs computing', `<p>Data movement is <b>${fmtPct(m.Pmove/m.Ptot)}</b> of <b>${fmtW(m.Ptot)}</b>. A DRAM bit costs ${d.pj} pJ (${d.name}), a PCIe bit about ${L.pj} pJ, an operation ${S.acc.pj} pJ. Reusing data on-chip and keeping traffic on the package (HBM, UCIe) are the big levers.</p>`);
+  // area / beachfront
+  add(m.die>830?'bad':m.padArea>m.coreArea?'warn':'ok', 'Area and beachfront', `<p>Die estimate <b>${fmtA(m.die)}</b>; memory and link PHYs need <b>${sig(m.shoreNeed)} mm</b> of die edge. ${m.padArea>m.coreArea?'The design is pad-limited: wide LPDDR or many GDDR devices consume edge faster than logic consumes area. ':''}${m.die>830?'Beyond one reticle: split into chiplets.':''}</p>`);
+  // thermal
+  if(d.fam==='HBM') add('info', 'HBM packaging and thermals', `<p>HBM needs a silicon interposer or bridge (CoWoS, EMIB-class), known-good-die testing and careful thermal design: the DRAM stack sits beside a hot die and DRAM refresh doubles above 85 °C. Supply and cost are real constraints.</p>`);
+  if(d.fam==='LPDDR') add('info', 'LPDDR in a wide configuration', `<p>LPDDR is point-to-point with short reach: package-on-package or on-package placement. Very wide LPDDR (Apple M-series Max/Ultra style, 512–1024-bit) is possible but needs a large package and many PHYs.</p>`);
+  // ECC
+  add('info', 'Reliability (ECC)', `<p>${S.ecc ? (d.fam==='DDR'?'DDR ECC adds 8 bits per 64 side-band: more pins, no bandwidth loss.' : d.fam==='HBM'?'HBM carries ECC side-band at no bandwidth cost.' : d.fam==='LPDDR6'?'LPDDR6 carries metadata bits in every burst (already charged).':'Inline ECC on '+d.fam+' costs about 12.5 % capacity and ~15 % bandwidth here.') : 'ECC is off. Long-running or safety-related systems normally need it; turn it on to see the cost.'}</p>`);
+  add('info', 'Not modelled here', `<p>IOMMU/ATS translation misses, cache coherence (CXL.cache, snooping), PCIe switches and retimers (latency, shared uplinks), power states and wake latency, software stacks (copies, page pinning), error recovery and link retraining, and cost.</p>`);
+  return C;
+}
+function paneCons(m){
+  const C = considerations(m);
+  const order = {bad:0, warn:1, ok:2, info:3};
+  C.sort((a,b)=>order[a.lvl]-order[b.lvl]);
+  const icon = {bad:'✗', warn:'!', ok:'✓', info:'i'};
+  return `<div class="cons">${C.map(c=>`<div class="con ${c.lvl}"><h4><span class="pill ${c.lvl==='info'?'':c.lvl}" style="${c.lvl==='info'?'background:rgba(155,123,255,.16);color:var(--violet)':''}">${icon[c.lvl]}</span>${c.title}</h4>${c.body}</div>`).join('')}</div>`;
+}
+
+function paneModel(){
+  const dr = Object.values(DRAMS).map(d=>`<tr><td>${d.name}</td><td class="n">${d.rate}</td><td class="n">${d.width}</td><td class="n">${fmtBps(dramUnitBW(d))}</td><td class="n">${d.cap} GB</td><td class="n">${d.lat} ns</td><td class="n">${d.pj}</td><td class="n">${d.bg}</td><td class="n">${d.phy}</td><td class="n">${d.shore}</td><td class="n">${d.pract} / ${d.ext}</td></tr>`).join('');
+  const lk = Object.values(LINKS).map(l=>`<tr><td>${l.name}</td><td class="n">${l.kind==='pcie'?l.gt+' GT/s':l.gbps+' GB/s/module'}</td><td class="n">${l.kind==='pcie'?(l.flit?'FLIT 236/256':'128b/130b'):'~90 %'}</td><td class="n">${l.pj}</td><td class="n">${l.phy}</td><td class="n">${l.shore}</td><td class="n">${l.rtt} µs</td></tr>`).join('');
+  return `<div class="cols"><div class="panel" style="grid-column:1/-1"><h2>How the model works</h2>
+  <p class="note" style="color:var(--text)">Everything flows from one number: the processing rate <i>T</i> (bytes of input per second). Each component's demand is <i>T</i> × peak-to-average × bytes it moves per processed byte. Its capacity is peak × efficiency. Utilisation = demand ÷ capacity; the bottleneck is the largest. Power is the average traffic × energy per bit plus standby per unit; area is compute + SRAM + PHYs + 15 %, or the area a square die needs to give the PHYs enough edge, whichever is larger. Latency is one block's trip through every stage plus M/D/1 queueing at each stage's average utilisation.</p>
+  <p class="note">Units are decimal (1 GB = 10⁹ B). All catalogue values are indicative first-order figures for a 5 nm-class accelerator, collected from public datasheets, JEDEC data rates and published estimates; energy and area vary by a factor of two between implementations. Use them to see which component limits and roughly by how much, not as sign-off numbers.</p></div>
+  <div class="panel" style="grid-column:1/-1"><h2>DRAM catalogue</h2><div class="tbl-wrap"><table class="t cat"><thead><tr><th>Technology</th><th class="n">MT/s</th><th class="n">Bits/unit</th><th class="n">Peak/unit</th><th class="n">Cap/unit</th><th class="n">Latency</th><th class="n">pJ/bit</th><th class="n">Standby W</th><th class="n">PHY mm²</th><th class="n">Edge mm</th><th class="n">Max units</th></tr></thead><tbody>${dr}</tbody></table></div>
+  <p class="note">LPDDR6 carries 256 data bits in every 288-bit burst; the rest is metadata (ECC and similar). HBM4 is JEDEC's 8 Gb/s across a 2048-bit interface; vendors are shipping faster bins.</p></div>
+  <div class="panel" style="grid-column:1/-1"><h2>Link catalogue</h2><div class="tbl-wrap"><table class="t cat"><thead><tr><th>Link</th><th class="n">Rate</th><th class="n">Encoding</th><th class="n">pJ/bit</th><th class="n">PHY mm²/lane</th><th class="n">Edge mm/lane</th><th class="n">Read RTT</th></tr></thead><tbody>${lk}</tbody></table></div>
+  <p class="note">PCIe usable rate = raw × encoding × payload ÷ (payload + header + framing) × ~0.96 for DLLPs (FLIT mode: × 236/256 and no per-TLP framing). Write TLPs use a 16 B header, completions 12 B. Ethernet efficiency = (MTU − 28) ÷ (MTU + 38).</p></div></div>`;
+}
+
+/* ---- tiny SVG charts */
+function lineChart(o){
+  const W = 760, H = o.h||260, ml = 64, mr = 14, mt = 14, mb = 34;
+  const all = o.series.flatMap(s=>s.ys).filter(v=>isFinite(v) && v>0).concat((o.hlines||[]).map(h=>h.y).filter(v=>isFinite(v)&&v>0));
+  let ymin = o.ymin ?? Math.min(...all)/2, ymax = o.ymax ?? Math.max(...all)*2;
+  if(!(ymin>0)) ymin = 1e-9; if(!(ymax>ymin)) ymax = ymin*10;
+  const xmin = o.xs[0], xmax = o.xs[o.xs.length-1];
+  const X = x => ml + (Math.log10(x)-Math.log10(xmin))/(Math.log10(xmax)-Math.log10(xmin))*(W-ml-mr);
+  const Y = y => mt + (1-(Math.log10(Math.min(Math.max(y,ymin),ymax))-Math.log10(ymin))/(Math.log10(ymax)-Math.log10(ymin)))*(H-mt-mb);
+  let g = '';
+  const e0 = Math.ceil(Math.log10(ymin)), e1 = Math.floor(Math.log10(ymax)), step = Math.max(1, Math.ceil((e1-e0+1)/6));
+  for(let e=e0; e<=e1; e+=step){ const y = Y(Math.pow(10,e)); g += `<line class="gl" x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}"/><text x="${ml-6}" y="${y+3}" text-anchor="end">${o.yfmt(Math.pow(10,e))}</text>`; }
+  const x0 = Math.ceil(Math.log10(xmin)), x1 = Math.floor(Math.log10(xmax)), xs = Math.max(1, Math.ceil((x1-x0+1)/7));
+  for(let e=x0; e<=x1; e+=xs){ const x = X(Math.pow(10,e)); g += `<line class="gl" y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}"/><text x="${x}" y="${H-mb+16}" text-anchor="middle">${o.xfmt(Math.pow(10,e))}</text>`; }
+  g += `<line class="ax" x1="${ml}" x2="${ml}" y1="${mt}" y2="${H-mb}"/><line class="ax" x1="${ml}" x2="${W-mr}" y1="${H-mb}" y2="${H-mb}"/>`;
+  for(const h of o.hlines||[]){ if(!isFinite(h.y)||h.y<=0) continue; const y = Y(h.y); g += `<line x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}" stroke="${h.col}" stroke-dasharray="6 4" stroke-width="1.4"/><text x="${h.left?ml+6:W-mr-4}" y="${h.left?y+13:y-5}" text-anchor="${h.left?'start':'end'}" style="fill:${h.col}">${h.name}</text>`; }
+  for(const v of o.vlines||[]){ if(!isFinite(v.x)||v.x<xmin||v.x>xmax) continue; const x = X(v.x); g += `<line y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}" stroke="${v.col}" stroke-dasharray="3 4" stroke-width="1.2" opacity=".8"/><text x="${x+4}" y="${mt+10}" style="fill:${v.col}">${v.name}</text>`; }
+  for(const s of o.series){
+    const pts = o.xs.map((x,i)=>isFinite(s.ys[i]) && s.ys[i]>0 ? `${X(x).toFixed(1)},${Y(s.ys[i]).toFixed(1)}` : null).filter(Boolean);
+    g += `<polyline fill="none" stroke="${s.col}" stroke-width="2.2" points="${pts.join(' ')}" style="filter:drop-shadow(0 0 4px ${s.col})"/>`;
+  }
+  for(const p of o.points||[]) g += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="6" fill="${p.col}" stroke="var(--bg)" stroke-width="2" style="filter:drop-shadow(0 0 6px ${p.col})"/>`;
+  let leg = '';
+  if(o.legend) leg = `<div class="keys">${o.series.map(s=>`<span style="--c:${s.col}">${s.name}</span>`).join('')}</div>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>${leg}`;
+}
+function scatterChart(pts){
+  const W = 760, H = 320, ml = 64, mr = 20, mt = 16, mb = 36;
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  const xmin = Math.min(...xs)/1.5, xmax = Math.max(...xs)*1.5, ymin = Math.min(...ys)/1.5, ymax = Math.max(...ys)*1.5;
+  const X = x => ml + (Math.log10(x)-Math.log10(xmin))/(Math.log10(xmax)-Math.log10(xmin))*(W-ml-mr);
+  const Y = y => mt + (1-(Math.log10(y)-Math.log10(ymin))/(Math.log10(ymax)-Math.log10(ymin)))*(H-mt-mb);
+  let g = '';
+  const tick = (lo,hi) => { const out=[]; for(let e=Math.floor(Math.log10(lo)); e<=Math.ceil(Math.log10(hi)); e++) for(const m of [1,3]) { const v=m*Math.pow(10,e); if(v>=lo&&v<=hi) out.push(v);} return out; };
+  for(const v of tick(ymin,ymax)){ const y=Y(v); g += `<line class="gl" x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}"/><text x="${ml-6}" y="${y+3}" text-anchor="end">${fmtW(v)}</text>`; }
+  for(const v of tick(xmin,xmax)){ const x=X(v); g += `<line class="gl" y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}"/><text x="${x}" y="${H-mb+16}" text-anchor="middle">${sig(v)} mm²</text>`; }
+  g += `<line class="ax" x1="${ml}" x2="${ml}" y1="${mt}" y2="${H-mb}"/><line class="ax" x1="${ml}" x2="${W-mr}" y1="${H-mb}" y2="${H-mb}"/>`;
+  g += `<text x="${W-mr}" y="${H-4}" text-anchor="end">PHY area on the accelerator die →</text><text x="${ml+6}" y="${mt+10}">↑ DRAM power</text>`;
+  const placed = [];
+  for(const p of [...pts].sort((a,b)=>b.y-a.y)){ const x=X(p.x), y=Y(p.y); let ly = y+3;
+    while(placed.some(q=>Math.abs(q[0]-x)<90 && Math.abs(q[1]-ly)<11)) ly += 11;
+    placed.push([x,ly]); p.ly = ly; }
+  for(const p of pts){ const x=X(p.x), y=Y(p.y);
+    g += `<g class="sc" data-dram="${p.id}" data-n="${p.n}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${p.cur?8:6}" fill="${p.col}" fill-opacity=".85" stroke="${p.cur?'var(--text)':'var(--bg)'}" stroke-width="2" style="filter:drop-shadow(0 0 5px ${p.col})"/>
+      <text x="${x+9}" y="${p.ly}" style="fill:var(--text);font-size:10px">${esc(p.label)}</text><title>${esc(p.label)}: ${p.n} units, ${fmtW(p.y)}, ${fmtA(p.x)}</title></g>`; }
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="DRAM options: power vs PHY area">${g}</svg>`;
+}
+
+/* =====================================================================
+   UPDATE LOOP
+   ===================================================================== */
+let M = null;
+function update(){
+  const m = model(S); M = m;
+  paintVerdict(m); paintDiagram(m); paintInspector(m);
+  const panes = {sizing:paneSizing, ppa:panePPA, latency:paneLatency, headroom:paneHeadroom, roofline:paneRoofline, cons:paneCons, model:paneModel};
+  const el = document.getElementById('p_'+tab); if(el) el.innerHTML = panes[tab](m);
+  const C = considerations(m), nb = C.filter(c=>c.lvl==='bad').length, nw = C.filter(c=>c.lvl==='warn').length;
+  const n = document.getElementById('n_cons'); if(n){ n.hidden = !(nb||nw); n.className = 'n '+(nb?'bad':'warn'); n.textContent = nb||nw; }
+  saveHash();
+}
+function buildAll(){
+  ctlUpdaters.length = 0;
+  if(selected==='src' && S.src==='host') selected = 'dram';
+  buildReq(); buildWl(); buildInspector(); buildDiagram(); update();
+}
+document.addEventListener('click', e=>{
+  const u = e.target.closest('[data-dram]');
+  if(u){ S.dev.dram = u.dataset.dram; S.dev.units = +u.dataset.n; selected = 'dram'; buildAll(); toast('Device DRAM → '+u.dataset.n+' × '+DRAMS[u.dataset.dram].name); return; }
+  const l = e.target.closest('[data-link]');
+  if(l){ S.link.id = l.dataset.link; S.link.lanes = +l.dataset.lanes; S.link.count = +l.dataset.count; S.link.rtt = LINKS[S.link.id].rtt; selected = 'link'; buildAll(); toast('Link → '+LINKS[S.link.id].name); return; }
+  const t = e.target.closest('[data-tab]');
+  if(t){ e.preventDefault(); tab = t.dataset.tab; buildTabs(); update(); document.getElementById('tabbar').scrollIntoView({behavior:'smooth'}); }
+});
+
+/* presets, share, theme */
+function applyPreset(id){
+  const p = PRESETS.find(x=>x.id===id); if(!p) return;
+  S = merge(clone(BASE), clone(p.p)); buildAll();
+}
+function saveHash(){ try{ history.replaceState(null, '', '#s='+btoa(unescape(encodeURIComponent(JSON.stringify(S))))); }catch(e){} }
+function loadHash(){
+  const h = location.hash.match(/#s=(.+)/); if(!h) return false;
+  try{ S = merge(clone(BASE), JSON.parse(decodeURIComponent(escape(atob(h[1]))))); if(!DRAMS[S.dev.dram]||!LINKS[S.link.id]) throw 0; return true; }catch(e){ S = clone(BASE); return false; }
+}
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('on'), 1800); }
+document.getElementById('preset').innerHTML = `<option value="">Presets…</option>`+PRESETS.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+document.getElementById('preset').addEventListener('change', e=>{ if(e.target.value) applyPreset(e.target.value); toast(e.target.selectedOptions[0].text); e.target.value=''; });
+document.getElementById('share').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(location.href); toast('Link copied'); }catch(e){ toast('Copy the address bar to share'); } });
+document.getElementById('theme').addEventListener('click', ()=>{
+  const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme==='dark' : !matchMedia('(prefers-color-scheme: light)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark'; try{ localStorage.setItem('bx-theme', root.dataset.theme); }catch(e){}
+});
+try{ const t = localStorage.getItem('bx-theme'); if(t) document.documentElement.dataset.theme = t; }catch(e){}
+
+loadHash();
+buildTabs(); buildAll();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
