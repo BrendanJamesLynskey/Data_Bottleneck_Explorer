@@ -337,6 +337,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
     <span><i class="sw warn"></i>above the ceiling</span>
     <span><i class="sw bad"></i>over capacity</span>
     <span><i class="sw bott"></i>the bottleneck</span>
+    <span>% in a block = its load: traffic needed at peak ÷ usable capacity. Over 100 % it can't keep up, and the system runs at target ÷ load.</span>
     <span>moving dashes show traffic · hover a block for figures · click it to configure</span>
   </div></details>
 </section>
@@ -430,11 +431,11 @@ const LINKS = {
 };
 /* scale-up fabric, per accelerator per direction. w = switch/retimer power per accelerator; maxDom = largest domain */
 const FABRICS = {
-  pcie_p2p: {name:'PCIe 5.0 x16 peer-to-peer (via switch)', bw:64e9,  eff:0.80, pj:6,  w:8,  lat:1.5e-6, maxDom:8,    shore:6.4, phy:9},
-  nvl4:     {name:'NVLink 4 (18 links, 450 GB/s/dir)',        bw:450e9, eff:0.90, pj:5,  w:25, lat:1.0e-6, maxDom:256,  shore:10, phy:18},
-  nvl5:     {name:'NVLink 5 (18 links, 900 GB/s/dir)',        bw:900e9, eff:0.90, pj:5,  w:40, lat:1.0e-6, maxDom:576,  shore:12, phy:24},
-  ualink:   {name:'UALink 200G (16 lanes, 400 GB/s/dir)',     bw:400e9, eff:0.90, pj:5,  w:30, lat:1.0e-6, maxDom:1024, shore:9,  phy:16},
-  eth_up:   {name:'Ethernet scale-up (8 × 800G)',              bw:800e9, eff:0.88, pj:7,  w:45, lat:2.0e-6, maxDom:1024, shore:14, phy:26},
+  pcie_p2p: {short:'PCIe P2P', name:'PCIe 5.0 x16 peer-to-peer (via switch)', bw:64e9,  eff:0.80, pj:6,  w:8,  lat:1.5e-6, maxDom:8,    shore:6.4, phy:9},
+  nvl4:     {short:'NVLink 4', name:'NVLink 4 (18 links, 450 GB/s/dir)',        bw:450e9, eff:0.90, pj:5,  w:25, lat:1.0e-6, maxDom:256,  shore:10, phy:18},
+  nvl5:     {short:'NVLink 5', name:'NVLink 5 (18 links, 900 GB/s/dir)',        bw:900e9, eff:0.90, pj:5,  w:40, lat:1.0e-6, maxDom:576,  shore:12, phy:24},
+  ualink:   {short:'UALink', name:'UALink 200G (16 lanes, 400 GB/s/dir)',     bw:400e9, eff:0.90, pj:5,  w:30, lat:1.0e-6, maxDom:1024, shore:9,  phy:16},
+  eth_up:   {short:'Ethernet scale-up', name:'Ethernet scale-up (8 × 800G)',              bw:800e9, eff:0.88, pj:7,  w:45, lat:2.0e-6, maxDom:1024, shore:14, phy:26},
 };
 /* scale-out NIC per port: w = NIC + optics + switch-port share */
 const NICS = {
@@ -1508,6 +1509,21 @@ function buildDiagram(){
   }
 }
 const txt = (id, s) => { const e = document.getElementById(id); if(e) e.textContent = s; };
+// keep block text inside its block: shrink down to 85 %, then truncate with an ellipsis (the block's hover title has the full figures)
+function fitText(el, maxW){
+  el.style.fontSize = ''; const full = el.textContent; if(!full) return;
+  let w = el.getComputedTextLength(); if(w<=maxW) return;
+  const base = parseFloat(getComputedStyle(el).fontSize);
+  el.style.fontSize = Math.max(base*0.85, base*maxW/w)+'px'; if(el.getComputedTextLength()<=maxW) return;
+  let lo = 0, hi = full.length;
+  while(lo<hi){ const mid = (lo+hi+1)>>1; el.textContent = full.slice(0, mid).trimEnd()+'…'; if(el.getComputedTextLength()<=maxW) lo = mid; else hi = mid-1; }
+  el.textContent = full.slice(0, lo).trimEnd()+'…';
+}
+function loadNote(u){ return !isFinite(u) ? 'load ∞' : `load ${fmtPct(u)} (needed ÷ usable)${u>1 ? ': over capacity, so the system manages only '+fmtPct(1/u)+' of the target' : ''}`; }
+function fitDiagram(){
+  for(const [k,b] of Object.entries(G)){ const g = document.getElementById('n_'+k); if(!g) continue;
+    g.querySelectorAll('.t1,.t2,.t3').forEach(el=>fitText(el, b.w-28 - (el.classList.contains('t1') ? 0 : 0))); }
+}
 function paintDiagram(m){
   const U = m.U, nodeU = {cpu:U.cpu, host:U.host, link:U.link, acc:U.accSys, dram:U.dram, src:U.src, fabric:U.up, net:U.out};
   const comp2node = {cpu:'cpu', host:'host', link:'link', compute:'acc', noc:'acc', sram:'acc', dram:'dram', src:'src', up:'fabric', out:'net'};
@@ -1524,23 +1540,23 @@ function paintDiagram(m){
   }
   const tp = m.tp, L = m.lk.L, nh = (a,b)=>`need ${a} · have ${b}`;
   txt('t1_cpu','Host CPU'); txt('t2_cpu', `${S.host.cores} I/O cores${tp.nN>1?' per node':''}`);
-  txt('tt_cpu', `Host CPU: ${fmtIOPS(m.Tbn/S.block)} blocks/s × ${sig(S.host.cpuUs)} µs = ${sig(m.dem.cpu)} cores busy of ${S.host.cores}`);
+  txt('tt_cpu', `${loadNote(U.cpu)}. Host CPU: ${fmtIOPS(m.Tbn/S.block)} blocks/s × ${sig(S.host.cpuUs)} µs = ${sig(m.dem.cpu)} cores busy of ${S.host.cores}`);
   txt('t1_host','Host DRAM'); txt('t2_host', `${S.host.units} × ${m.hd.name}`);
-  txt('tt_host', `Host DRAM: ${nh(fmtBps(m.dem.host), fmtBps(m.cap.host))}; ${sig(m.hR+m.hW)} B per byte processed`);
+  txt('tt_host', `${loadNote(U.host)}. Host DRAM: ${nh(fmtBps(m.dem.host), fmtBps(m.cap.host))}; ${sig(m.hR+m.hW)} B per byte processed`);
   txt('t1_link', L.kind==='pcie' ? L.name : 'UCIe'); txt('t2_link', L.kind==='pcie' ? `${S.link.count>1?S.link.count+' × ':''}x${S.link.lanes}` : `${S.link.count} × x64`);
-  txt('tt_link', `Host link, per direction: ${nh(fmtBps(Math.max(m.dem.h2d, m.dem.d2h)), fmtBps(Math.min(m.cap.h2d, m.cap.d2h)))}`);
+  txt('tt_link', `${loadNote(U.link)}. Host link, per direction: ${nh(fmtBps(Math.max(m.dem.h2d, m.dem.d2h)), fmtBps(Math.min(m.cap.h2d, m.cap.d2h)))}`);
   txt('t1_acc', tp.nA>1 ? `Accelerator × ${S.scale.perNode}` : 'Accelerator');
   txt('t2_acc', tp.nA>1 ? `${fmtN(tp.nA)} in total` : `${sig(S.acc.tops)} TOPS`);
   txt('t3_acc', `compute ${fmtPct(U.compute)}`); txt('t4_acc', `interconnect ${fmtPct(U.noc)}`); txt('t5_acc', `SRAM ${fmtPct(U.sram)}`);
-  txt('tt_acc', `Accelerator: compute ${nh(fmtOps(m.dem.compute), fmtOps(m.cap.compute))}; ${NOC_TOPO[S.noc.topo].name} ${fmtPct(U.noc)}; SRAM ${fmtPct(U.sram)}; ${fmtW(m.pAcc)}, die ${fmtA(m.die)}`);
+  txt('tt_acc', `${loadNote(U.accSys)}. Accelerator: compute ${nh(fmtOps(m.dem.compute), fmtOps(m.cap.compute))}; ${NOC_TOPO[S.noc.topo].name} ${fmtPct(U.noc)}; SRAM ${fmtPct(U.sram)}; ${fmtW(m.pAcc)}, die ${fmtA(m.die)}`);
   txt('t1_dram','DRAM'); txt('t2_dram', `${S.dev.units} × ${m.dev.name.split(' ')[0]}`); txt('t3_dram', `${fmtBps(m.cap.dram)} usable`);
-  txt('tt_dram', `Device DRAM: ${nh(fmtBps(m.dem.dram), fmtBps(m.cap.dram))}; ${fmtN(S.dev.units*m.dev.width)}-bit, ${fmtB(m.devCap*1e9)}`);
+  txt('tt_dram', `${loadNote(U.dram)}. Device DRAM: ${nh(fmtBps(m.dem.dram), fmtBps(m.cap.dram))}; ${fmtN(S.dev.units*m.dev.width)}-bit, ${fmtB(m.devCap*1e9)}`);
   if(shown.src){ txt('t1_src', S.src.startsWith('net')?'Network':'Storage'); txt('t2_src', m.srcName.replace('NVMe PCIe ','Gen').replace(' x4 SSD',''));
-    txt('tt_src', `${S.src.startsWith('net')?'Network':'Storage'}: ${nh(fmtBps(m.dem.src), fmtBps(m.cap.src))}`); }
-  if(shown.fabric){ txt('t1_fabric','Scale-up fabric'); txt('t2_fabric', `${m.fab.name.split(' (')[0]} · ${tp.dom} per domain`);
-    txt('tt_fabric', `Scale-up fabric: ${nh(fmtBps(m.dem.up||0), fmtBps(m.fab.bw*m.fab.eff))} per accelerator`); }
+    txt('tt_src', `${loadNote(U.src)}. ${S.src.startsWith('net')?'Network':'Storage'}: ${nh(fmtBps(m.dem.src), fmtBps(m.cap.src))}`); }
+  if(shown.fabric){ txt('t1_fabric','Scale-up fabric'); txt('t2_fabric', `${m.fab.short} · ${tp.dom} per domain`);
+    txt('tt_fabric', `${loadNote(U.up)}. Scale-up fabric: ${nh(fmtBps(m.dem.up||0), fmtBps(m.fab.bw*m.fab.eff))} per accelerator`); }
   if(shown.net){ txt('t1_net','Scale-out'); txt('t2_net', `${S.scale.nics} × ${m.nic.name.split(' ')[0]}`);
-    txt('tt_net', `Scale-out network: ${nh(fmtBps(m.dem.out||0), fmtBps(m.nic.gbps*1e9/8*0.95*S.scale.nics))} per accelerator`); }
+    txt('tt_net', `${loadNote(U.out)}. Scale-out network: ${nh(fmtBps(m.dem.out||0), fmtBps(m.nic.gbps*1e9/8*0.95*S.scale.nics))} per accelerator`); }
   const traffic = {cpuW:m.Tn*m.hW, cpuR:m.Tn*m.hR, h2dA:m.Ta*S.inR, h2dB:m.Ta*S.inR, d2hA:m.Ta*S.outR, d2hB:m.Ta*S.outR,
     ddW:m.Ta*m.dW, ddR:m.Ta*m.dR, srcE:m.Tn*S.inR, upE:m.Ta*m.xUp, outE:m.Ta*m.xOut};
   const C = {ok:'#6b6b6b', warn:'#cfcfcf', bad:'#ffffff'};
@@ -1557,6 +1573,7 @@ function paintDiagram(m){
   txt('l_cpuW', fmtBps(m.Tn*(m.hR+m.hW))); txt('l_srcE', fmtBps(m.Tn*S.inR));
   txt('l_h2dB', `→ ${fmtBps(m.Ta*S.inR)}`); txt('l_d2hA', `← ${fmtBps(m.Ta*S.outR)}`);
   txt('l_ddW', fmtBps(m.Ta*(m.dR+m.dW))); txt('l_upE', fmtBps(m.Ta*m.xUp)); txt('l_outE', fmtBps(m.Ta*m.xOut));
+  fitDiagram();
 }
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let lastTs = 0;
@@ -2509,6 +2526,7 @@ paintKeyBox(); newChat(); if(prov.key) ensureModel().then(paintKeyBox);
 
 if(!loadHash()){ S = merge(clone(BASE), clone(PRESETS[0].p)); S.preset = PRESETS[0].id; }
 buildTabs(); buildAll();
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>fitDiagram());   // refit once the web fonts have loaded
 requestAnimationFrame(tick);
 </script>
 </body>

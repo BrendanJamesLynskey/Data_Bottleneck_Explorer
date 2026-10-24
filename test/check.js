@@ -25,7 +25,7 @@ const update = process.argv.includes('--update');
   const demo = await page.evaluate(() => ({kind: DEMO.kind, msgs: document.querySelectorAll('#chatLog .msg').length, tools: [...document.querySelectorAll('#chatLog .msg.act')].length, design: designLine(S)}));
 
   const result = await page.evaluate(() => {
-    const out = {refs: runChecks().map(r => ({id: r.id, name: r.name, err: r.err, tol: r.tol, pass: r.pass, fitted: !!r.fitted})), presets: {}, overhead: [], optimiser: {}};
+    const out = {refs: runChecks().map(r => ({id: r.id, name: r.name, err: r.err, tol: r.tol, pass: r.pass, fitted: !!r.fitted})), presets: {}, overhead: [], optimiser: {}, overflow: []};
     for (const p of PRESETS) {
       applyPreset(p.id);
       const m = M, ls = latencyStats(m), fp = fullPower(S);
@@ -34,6 +34,10 @@ const update = process.argv.includes('--update');
       const prod = o => o.steps.reduce((a, x) => a * x.f, o.raw);
       for (const [k, c] of [['h2d', m.cap.h2d], ['d2h', m.cap.d2h], ['dram', m.devBW], ['noc', m.cap.noc]])
         out.overhead.push({preset: p.id, kind: k, err: prod(overheads(k, m)) / c - 1});
+      // every line of block text stays inside its block
+      for (const [k, b] of Object.entries(G)) { const g = document.getElementById('n_' + k); if (!g) continue;
+        g.querySelectorAll('text').forEach(t => { if (!t.textContent || t.classList.contains('tagline')) return; const bb = t.getBBox();
+          if (bb.x + bb.width > b.x + b.w + 0.5 || bb.x < b.x - 0.5) out.overflow.push(`${p.id}/${k}: "${t.textContent}"`); }); }
       const r = optimise(S, {goal: 'balanced', practical: true, reticle: false, scale: true});
       out.optimiser[p.id] = r.best ? {found: true, worst: r.best.worst.U <= S.ceil, broken: p.name.includes('✗')} : {found: false, broken: p.name.includes('✗')};
     }
@@ -50,6 +54,8 @@ const update = process.argv.includes('--update');
     const line = `${r.fitted ? 'calibration' : 'reference  '} ${r.name}: ${(r.err * 100).toFixed(1)} % (±${r.tol * 100} %)`;
     if (r.pass) console.log('ok   ' + line); else fail(line);
   }
+  if (result.overflow.length) fail('text outside its block: ' + result.overflow.join('; '));
+  else console.log('ok   every diagram label fits inside its block, in all 28 examples');
   for (const o of result.overhead) if (Math.abs(o.err) > 1e-9) fail(`overhead breakdown ${o.preset}/${o.kind} off by ${o.err}`);
   console.log(`ok   overhead breakdowns multiply out to the model's capacities (${result.overhead.length} checked)`);
   // deliberately broken examples (marked ✗) may have no fix in hardware, e.g. a hard deadline the host round trip alone exceeds
