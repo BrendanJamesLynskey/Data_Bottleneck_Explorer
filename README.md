@@ -41,15 +41,22 @@ too big for them.
 Type what the system has to do in plain language, for example *"serve a 70B model at 3,000 tokens/s,
 under 50 ms per token"*, and the assistant turns it into the model's inputs. It asks up to three short
 follow-up questions with clickable answers when something that would change the design is missing, and
-assumes typical values (and says so) when you can't say. It then picks DRAM, links, fabric, NICs and
-the on-chip network until every component sits under the utilisation ceiling, and the page redraws
-as it goes.
+assumes typical values (and says so) when you can't say. It then picks the hardware itself, or runs the
+optimiser, until every component sits under the utilisation ceiling, and the page redraws as it goes.
 
-It runs Claude (`claude-opus-5-5`) in your browser through the official Anthropic SDK, with **your own
-API key**. The key goes only to `api.anthropic.com` and is stored only if you tick *remember*. Claude
-works through five tools that drive the page's model: `set_requirements`, `set_hardware`, `evaluate`,
-`load_example` and `ask_user`. Without a key, a small rule-based parser reads rates, latencies and the
-kind of workload, and starts from the nearest example.
+It runs in your browser with **your own API key** from **OpenAI, Google (Gemini) or OpenRouter**
+(Anthropic works too). Pick the provider, paste the key, and choose a model from the provider's own live
+list; a sensible default is preselected. The key goes only to that provider's API, and it is kept only in
+your browser: for the session, or longer if you tick *remember*. Under the hood:
+
+- **OpenAI:** the Responses API, with `store: false`.
+- **Gemini:** `generateContent` with function declarations.
+- **OpenRouter:** its OpenAI-compatible chat API, which also reaches Claude, Gemini and many open models.
+- **Anthropic:** the official SDK.
+
+Six tools drive the page: `set_requirements`, `set_hardware`, `evaluate`, `optimise`, `load_example` and
+`ask_user`. Without a key, a small rule-based parser reads rates, latencies and the kind of workload, and
+starts from the nearest example.
 
 ![Design assistant](assistant.png)
 
@@ -60,9 +67,10 @@ run for real, so the page changes as you watch: requirements set, two follow-up 
 optimiser run. At the moment it is a scripted walkthrough. Its wording is written for the demo and labelled
 as such, and its closing summary is generated from the model's own results.
 
-`ANTHROPIC_API_KEY=… node tools/record_demo.js` records a real session with `claude-opus-5-5` through the
-same page and embeds it between the `DEMO-START` / `DEMO-END` markers. The demo then says it is a recorded
-session, with the date. The key stays in your environment and goes only to `api.anthropic.com`.
+`OPENAI_API_KEY=… node tools/record_demo.js` (or `GEMINI_API_KEY`, `OPENROUTER_API_KEY`,
+`ANTHROPIC_API_KEY`) records a real session through the same page and embeds it between the
+`DEMO-START` / `DEMO-END` markers. The demo then says it is a recorded session, naming the model and the
+date. The key stays in your environment and goes only to that provider's API.
 
 Shared links show a social-preview card (`og.png`, rendered by `tools/og.js`).
 
@@ -260,4 +268,4 @@ and by roughly how much, not for sign-off. The *Model* tab in the app lists ever
 
 ## Running locally
 
-It is one self-contained `index.html` file with no build step: open it in any modern browser. `npm install && npm test` runs the checks.
+It is one self-contained `index.html` file with no build step: open it in any modern browser. `npm install && npm test` runs the checks, including mocked runs of the assistant against each provider's API.

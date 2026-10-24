@@ -274,6 +274,8 @@ details.legend-d{margin-top:4px}
 .keybox p{margin:0 0 8px} .keybox .sub{margin:8px 0 0; color:var(--t3)}
 .keybox input{background:var(--bg)}
 .keyline{color:var(--t3)}
+.provrow{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 8px; font-size:12.5px; color:var(--t2)}
+.provrow select{flex:1; max-width:260px}
 .chatin{display:flex; gap:8px; padding:12px 18px 16px; border-top:1px solid var(--l1)}
 .chatin textarea{flex:1; resize:none; background:var(--bg); border:1px solid var(--l2); border-radius:8px; padding:8px 10px; font:inherit; font-size:13.5px; color:var(--t1)}
 .chatin textarea:focus{outline:none; border-color:var(--t2)}
@@ -2045,10 +2047,51 @@ document.getElementById('share').addEventListener('click', async ()=>{ try{ awai
    Natural-language requirements → model inputs → a configured system. With the visitor's own Anthropic API key
    it runs Claude in the browser (the key goes only to api.anthropic.com); without one, a small rule-based parser.
    ===================================================================== */
-const AGENT_MODEL = 'claude-opus-5-5';
+/* Providers. The visitor brings a key for one of them; it is kept in this browser only (sessionStorage, or
+   localStorage if they tick "remember") and sent only to that provider's API, which all accept browser requests.
+   Models are listed live from each provider; prefer = patterns tried in order to pick a sensible default. */
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.133.0/+esm';
-let apiKey = '';
-try{ apiKey = localStorage.getItem('bx-key') || sessionStorage.getItem('bx-key') || ''; }catch(e){}
+const PROVIDERS = {
+  openai:     {name:'OpenAI', hint:'sk-…', host:'api.openai.com', fallback:'gpt-6-luna',
+               keep:id=>/^(gpt-|o\d)/.test(id) && !/(audio|realtime|tts|transcribe|image|search|embedding|instruct|moderation|codex|-mini-tts)/.test(id),
+               prefer:[/^gpt-6-sol/, /^gpt-6(?!-luna)/, /^gpt-6-luna/, /^gpt-5\.\d/, /^gpt-5(-mini)?$/, /^gpt-/]},
+  google:     {name:'Google Gemini', hint:'AIza…', host:'generativelanguage.googleapis.com', fallback:'gemini-2.5-flash',
+               keep:id=>/^gemini/.test(id) && !/(tts|image|embedding|live|audio|vision)/.test(id),
+               prefer:[/^gemini-3.*pro/, /^gemini-2\.5-pro/, /^gemini-3.*flash(?!-lite)/, /^gemini-2\.5-flash(?!-lite)/, /^gemini/]},
+  openrouter: {name:'OpenRouter', hint:'sk-or-…', host:'openrouter.ai', fallback:'openai/gpt-6-luna',
+               keep:()=>true,
+               prefer:[/^anthropic\/claude-(opus|sonnet)/, /^openai\/gpt-6/, /^google\/gemini-(3|2\.5-pro)/, /^openai\/gpt-5/, /./]},
+  anthropic:  {name:'Anthropic', hint:'sk-ant-…', host:'api.anthropic.com', fallback:'claude-opus-5-5',
+               keep:id=>/^claude-(opus|sonnet|haiku)-[5-9]/.test(id), prefer:[/^claude-opus-5-5$/, /^claude-sonnet-5-5$/, /^claude-opus/, /^claude/]},
+};
+const store = {get:k=>{ try{ return localStorage.getItem(k) ?? sessionStorage.getItem(k); }catch(e){ return null; } },
+  set:(k,v,remember)=>{ try{ (remember ? localStorage : sessionStorage).setItem(k, v); }catch(e){} },
+  del:k=>{ try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch(e){} }};
+const prov = {id: store.get('bx-prov') || 'openai', key:'', model:'', models:null};
+function loadProv(){ prov.key = store.get('bx-key-'+prov.id) || (prov.id==='anthropic' ? store.get('bx-key')||'' : ''); prov.model = store.get('bx-model-'+prov.id) || ''; prov.models = null; }
+loadProv();
+const modelLabel = () => `${PROVIDERS[prov.id].name} ${prov.model}`;
+async function fetchJSON(url, headers, body){
+  const r = await fetch(url, {method: body ? 'POST' : 'GET', headers: body ? {'content-type':'application/json', ...headers} : headers, body: body ? JSON.stringify(body) : undefined});
+  let j = null; try{ j = await r.json(); }catch(e){}
+  if(!r.ok){ const msg = (j && (j.error && (j.error.message || j.error) || j.message)) || r.statusText; const e = new Error(typeof msg==='string' ? msg : JSON.stringify(msg)); e.status = r.status; throw e; }
+  return j;
+}
+async function listModels(){
+  const P = PROVIDERS[prov.id]; let ids = [];
+  if(prov.id==='openai') ids = (await fetchJSON('https://api.openai.com/v1/models', {authorization:'Bearer '+prov.key})).data.map(m=>m.id);
+  else if(prov.id==='google') ids = (await fetchJSON('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {'x-goog-api-key':prov.key})).models
+      .filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,''));
+  else if(prov.id==='openrouter') ids = (await fetchJSON('https://openrouter.ai/api/v1/models', {})).data.filter(m=>(m.supported_parameters||[]).includes('tools')).map(m=>m.id);
+  else ids = (await fetchJSON('https://api.anthropic.com/v1/models?limit=100', {'x-api-key':prov.key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'})).data.map(m=>m.id);
+  ids = ids.filter(P.keep);
+  const rank = id => { const i = P.prefer.findIndex(re=>re.test(id)); return i<0 ? 99 : i; };
+  return ids.sort((a,b)=>rank(a)-rank(b) || a.localeCompare(b));
+}
+async function ensureModel(){
+  if(prov.models===null){ try{ prov.models = await listModels(); }catch(e){ prov.models = []; prov.listError = e.message; } }
+  if(!prov.model) prov.model = prov.models[0] || PROVIDERS[prov.id].fallback;
+}
 const chat = {history:[], pending:null, busy:false, waitingPrompt:null, basic:false, log:[]};
 
 /* tool argument → state path. kind: num | int | bool | enum (with values) */
@@ -2171,22 +2214,31 @@ function chatAdd(cls, html){ const d = document.createElement('div'); d.classNam
 const mdLite = t => esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').split('\n')
   .map(l=>/^\s*[-•] /.test(l) ? `<span class="li">${l.replace(/^\s*[-•] /,'')}</span>` : l+'<br>').join('').replace(/(<br>)+$/,'');
 function paintKeyBox(){
-  const kb = document.getElementById('keyBox');
-  kb.innerHTML = apiKey ? `<div class="keyline">Using your Anthropic API key with ${AGENT_MODEL} · <button class="link" id="forgetKey">forget key</button></div>`
-    : `<p>The assistant runs Claude in your browser with <b>your own Anthropic API key</b>. The key is sent only to api.anthropic.com and is never stored unless you tick the box. Each design conversation costs a few cents on your account.</p>
-       <div class="tput"><input id="keyInput" type="password" placeholder="sk-ant-…" autocomplete="off" aria-label="Anthropic API key"><button class="btn" id="saveKey">Use key</button></div>
+  const kb = document.getElementById('keyBox'), P = PROVIDERS[prov.id];
+  const provSel = `<label class="provrow">Provider <select id="provSel" aria-label="Model provider">${Object.entries(PROVIDERS).map(([k,v])=>`<option value="${k}"${k===prov.id?' selected':''}>${v.name}</option>`).join('')}</select></label>`;
+  if(chat.basic){ kb.innerHTML = `<div class="keyline">Basic parser (no key) · <button class="link" id="addKey">add a key</button></div>`;
+    document.getElementById('addKey').onclick = ()=>{ chat.basic = false; paintKeyBox(); }; return; }
+  if(prov.key){
+    const opts = (prov.models && prov.models.length ? prov.models : [prov.model]).map(m=>`<option${m===prov.model?' selected':''}>${esc(m)}</option>`).join('');
+    kb.innerHTML = `${provSel}<label class="provrow">Model <select id="modelSel" aria-label="Model">${opts}</select></label>
+      <div class="keyline">Using your ${P.name} key${prov.listError?' (model list unavailable: '+esc(prov.listError)+')':''} · <button class="link" id="forgetKey">forget key</button></div>`;
+  } else {
+    kb.innerHTML = `${provSel}<p>The assistant runs a model in your browser with <b>your own API key</b> from OpenAI, Google (Gemini) or OpenRouter (Anthropic works too). The key is sent only to ${P.host} and stays in this browser: for this session, or longer if you tick the box. A design conversation usually costs a few cents.</p>
+       <div class="tput"><input id="keyInput" type="password" placeholder="${P.name} key, ${P.hint}" autocomplete="off" aria-label="${P.name} API key"><button class="btn" id="saveKey">Use key</button></div>
        <label class="tog" style="margin-top:8px"><span>Remember on this device</span><input type="checkbox" id="keyRemember"><span class="k"></span></label>
        <p class="sub">No key? <button class="link" id="kbDemo">Watch a demo</button>, or <button class="link" id="useBasic">continue with the basic parser</button>, which reads rates, latencies and the kind of workload and picks the nearest example.</p>`;
+  }
+  document.getElementById('provSel').onchange = e=>{ prov.id = e.target.value; store.set('bx-prov', prov.id, true); loadProv(); newChat(); paintKeyBox(); if(prov.key) ensureModel().then(paintKeyBox); };
+  const ms = document.getElementById('modelSel'); if(ms) ms.onchange = e=>{ prov.model = e.target.value; store.set('bx-model-'+prov.id, prov.model, true); newChat(); };
   const fk = document.getElementById('forgetKey');
-  if(fk) fk.onclick = ()=>{ apiKey = ''; try{ localStorage.removeItem('bx-key'); sessionStorage.removeItem('bx-key'); }catch(e){} paintKeyBox(); };
+  if(fk) fk.onclick = ()=>{ store.del('bx-key-'+prov.id); if(prov.id==='anthropic') store.del('bx-key'); prov.key = ''; prov.models = null; paintKeyBox(); };
   const sk = document.getElementById('saveKey');
-  if(sk) sk.onclick = ()=>{ const v = document.getElementById('keyInput').value.trim(); if(!v) return;
-    apiKey = v; try{ (document.getElementById('keyRemember').checked ? localStorage : sessionStorage).setItem('bx-key', v); }catch(e){}
-    chat.basic = false; paintKeyBox(); if(chat.waitingPrompt){ const t = chat.waitingPrompt; chat.waitingPrompt = null; userSays(t); } };
-  const ub = document.getElementById('useBasic');
-  if(ub) ub.onclick = ()=>{ chat.basic = true; kb.innerHTML = `<div class="keyline">Basic parser (no key) · <button class="link" id="addKey">add a key</button></div>`;
-    document.getElementById('addKey').onclick = ()=>{ chat.basic = false; paintKeyBox(); };
+  if(sk) sk.onclick = async ()=>{ const v = document.getElementById('keyInput').value.trim(); if(!v) return;
+    prov.key = v; store.set('bx-key-'+prov.id, v, document.getElementById('keyRemember').checked); store.set('bx-prov', prov.id, true);
+    chat.basic = false; sk.textContent = 'Checking…'; await ensureModel(); paintKeyBox();
     if(chat.waitingPrompt){ const t = chat.waitingPrompt; chat.waitingPrompt = null; userSays(t); } };
+  const ub = document.getElementById('useBasic');
+  if(ub) ub.onclick = ()=>{ chat.basic = true; paintKeyBox(); if(chat.waitingPrompt){ const t = chat.waitingPrompt; chat.waitingPrompt = null; userSays(t); } };
 }
 function setBusy(b){ chat.busy = b; const el = document.getElementById('chatBusy'); if(el) el.remove();
   if(b) chatAdd('busy', '<span class="dots"><i></i><i></i><i></i></span>').id = 'chatBusy';
@@ -2196,13 +2248,13 @@ function newChat(){ chat.history = []; chat.pending = null; chat.log = []; chatL
 function userSays(text){
   text = text.trim(); if(!text || chat.busy || replay) return;
   chatAdd('user', mdLite(text)); chat.log.push({t: chat.pending ? 'answer' : 'user', text});
-  if(!apiKey && !chat.basic){ chat.waitingPrompt = text; chatAdd('sys', 'Add an API key below, or continue with the basic parser.'); document.getElementById('keyBox').scrollIntoView({block:'nearest'}); return; }
+  if(!prov.key && !chat.basic){ chat.waitingPrompt = text; chatAdd('sys', 'Add an API key below, or continue with the basic parser.'); document.getElementById('keyBox').scrollIntoView({block:'nearest'}); return; }
   if(chat.basic) return basicAgent(text);
-  if(chat.pending){ // answers to ask_user: every pending tool call gets a tool_result
-    const content = [...chat.pending.results, ...chat.pending.asks.map(b=>({type:'tool_result', tool_use_id:b.id, content:text}))];
+  const A = ADAPTERS[prov.id];
+  if(chat.pending){ // answers to ask_user: every pending tool call gets its result
+    A.pushResults([...chat.pending.results, ...chat.pending.asks.map(c=>({id:c.id, name:c.name, output:text}))]);
     chat.pending = null; document.querySelectorAll('.qcard').forEach(q=>q.classList.add('done'));
-    chat.history.push({role:'user', content});
-  } else chat.history.push({role:'user', content:text});
+  } else A.pushUser(text);
   runAgent();
 }
 function questionCard(q){
@@ -2224,46 +2276,107 @@ function renderQuestions(asks){
   const skip = chatAdd('qcard skip', `<button class="link">Not sure: use your best assumptions</button>`);
   skip.querySelector('button').onclick = ()=>{ if(!skip.classList.contains('done')) userSays("I don't know; use typical values and tell me what you assumed."); };
 }
-let sdkPromise = null;
+/* Adapters: each keeps chat.history in its provider's own format and returns {texts, calls:[{id,name,input}], stop}. */
+const parseArgs = a => { if(a && typeof a==='object') return a; try{ return JSON.parse(a||'{}'); }catch(e){ return {}; } };
+// Gemini accepts an OpenAPI subset: no additionalProperties/minItems/maxItems, string-only enums, no empty objects
+function gemSchema(x){
+  if(Array.isArray(x)) return x.map(gemSchema);
+  if(!x || typeof x!=='object') return x;
+  const o = {};
+  for(const [k,v] of Object.entries(x)){
+    if(['additionalProperties','minItems','maxItems'].includes(k)) continue;
+    if(k==='enum' && v.some(e=>typeof e!=='string')) continue;
+    o[k] = gemSchema(v);
+  }
+  return o;
+}
+const toolDefs = () => AGENT_TOOLS.map(t=>({name:t.name, description:t.description, parameters:t.input_schema}));
+const ADAPTERS = {
+  openai: {   // Responses API; store:false keeps conversations out of OpenAI's stored responses, so reasoning comes back encrypted
+    pushUser:t=>chat.history.push({role:'user', content:t}),
+    pushResults:rs=>rs.forEach(r=>chat.history.push({type:'function_call_output', call_id:r.id, output:r.output})),
+    async call(){
+      const r = await fetchJSON('https://api.openai.com/v1/responses', {authorization:'Bearer '+prov.key}, {model:prov.model, instructions:AGENT_SYSTEM,
+        input:chat.history, tools:toolDefs().map(t=>({type:'function', ...t})), store:false, include:['reasoning.encrypted_content']});
+      chat.history.push(...r.output);
+      const texts = r.output.filter(o=>o.type==='message').flatMap(o=>(o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text));
+      const refused = r.output.some(o=>o.type==='message' && (o.content||[]).some(c=>c.type==='refusal'));
+      const calls = r.output.filter(o=>o.type==='function_call').map(o=>({id:o.call_id, name:o.name, input:parseArgs(o.arguments)}));
+      return {texts, calls, stop: calls.length ? 'tool' : refused ? 'refusal' : r.status==='incomplete' ? 'max' : 'end'};
+    }},
+  google: {   // generateContent with function declarations; model turns go back verbatim (they carry thought signatures)
+    pushUser:t=>chat.history.push({role:'user', parts:[{text:t}]}),
+    pushResults:rs=>chat.history.push({role:'user', parts:rs.map(r=>({functionResponse:{name:r.name, ...(r.id && !r.id.startsWith('g:') ? {id:r.id} : {}), response:{result:parseArgs(r.output)}}}))}),
+    async call(){
+      const fns = toolDefs().map(t=>{ const p = gemSchema(t.parameters); return Object.keys(p.properties||{}).length ? {name:t.name, description:t.description, parameters:p} : {name:t.name, description:t.description}; });
+      const r = await fetchJSON(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(prov.model)}:generateContent`, {'x-goog-api-key':prov.key},
+        {systemInstruction:{parts:[{text:AGENT_SYSTEM}]}, contents:chat.history, tools:[{functionDeclarations:fns}]});
+      const cand = (r.candidates||[])[0];
+      if(!cand || !cand.content){ return {texts:[], calls:[], stop: (r.promptFeedback && r.promptFeedback.blockReason) || (cand && cand.finishReason==='SAFETY') ? 'refusal' : 'end'}; }
+      chat.history.push({role:'model', parts:cand.content.parts||[]});
+      const parts = cand.content.parts||[];
+      const texts = parts.filter(p=>p.text && !p.thought).map(p=>p.text);
+      const calls = parts.filter(p=>p.functionCall).map((p,i)=>({id:p.functionCall.id || 'g:'+i, name:p.functionCall.name, input:p.functionCall.args||{}}));
+      return {texts, calls, stop: calls.length ? 'tool' : cand.finishReason==='MAX_TOKENS' ? 'max' : cand.finishReason==='SAFETY' ? 'refusal' : 'end'};
+    }},
+  openrouter: {   // OpenAI-compatible chat completions; reaches Claude, GPT, Gemini and many open models
+    pushUser:t=>chat.history.push({role:'user', content:t}),
+    pushResults:rs=>rs.forEach(r=>chat.history.push({role:'tool', tool_call_id:r.id, content:r.output})),
+    async call(){
+      const r = await fetchJSON('https://openrouter.ai/api/v1/chat/completions', {authorization:'Bearer '+prov.key,
+          'HTTP-Referer': location.protocol.startsWith('http') ? location.origin : 'https://data-bottleneck-explorer.vercel.app', 'X-Title':'System Design Explorer'},
+        {model:prov.model, messages:[{role:'system', content:AGENT_SYSTEM}, ...chat.history], tools:toolDefs().map(t=>({type:'function', function:t}))});
+      const ch = (r.choices||[])[0] || {}, msg = ch.message || {role:'assistant', content:''};
+      chat.history.push(msg);
+      const calls = (msg.tool_calls||[]).map(c=>({id:c.id, name:c.function.name, input:parseArgs(c.function.arguments)}));
+      return {texts: msg.content ? [msg.content] : [], calls, stop: calls.length ? 'tool' : ch.finish_reason==='length' ? 'max' : msg.refusal ? 'refusal' : 'end'};
+    }},
+  anthropic: {   // official SDK in browser mode; Claude Opus 5.5 with server-side refusal fallbacks
+    pushUser:t=>chat.history.push({role:'user', content:t}),
+    pushResults:rs=>chat.history.push({role:'user', content:rs.map(r=>({type:'tool_result', tool_use_id:r.id, content:r.output}))}),
+    async call(){
+      if(!this.sdk) this.sdk = import(SDK_URL);
+      const Anthropic = (await this.sdk).default, client = new Anthropic({apiKey:prov.key, dangerouslyAllowBrowser:true});
+      const fb = /^claude-(opus-5-5|opus-5|sonnet-5-5|fable)/.test(prov.model) ? {betas:['server-side-fallback-2026-07-01'], fallbacks:'default'} : {};
+      const resp = await client.beta.messages.create({model:prov.model, max_tokens:16000, ...fb, output_config:{effort:'medium'}, cache_control:{type:'ephemeral'},
+        system:AGENT_SYSTEM, tools:AGENT_TOOLS, messages:chat.history});
+      chat.history.push({role:'assistant', content:resp.content});
+      const calls = resp.content.filter(b=>b.type==='tool_use').map(b=>({id:b.id, name:b.name, input:b.input}));
+      return {texts:resp.content.filter(b=>b.type==='text').map(b=>b.text), calls,
+        stop: resp.stop_reason==='tool_use' ? 'tool' : resp.stop_reason==='refusal' ? 'refusal' : resp.stop_reason==='max_tokens' ? 'max' : 'end'};
+    }},
+};
 async function runAgent(){
   setBusy(true);
   try{
-    if(!sdkPromise) sdkPromise = import(SDK_URL);
-    const Anthropic = (await sdkPromise).default;
-    const client = new Anthropic({apiKey, dangerouslyAllowBrowser:true});
-    for(let turn=0; turn<14; turn++){
-      let resp;
-      try{
-        resp = await client.beta.messages.create({
-          model:AGENT_MODEL, max_tokens:16000, betas:['server-side-fallback-2026-07-01'], fallbacks:'default',
-          output_config:{effort:'medium'}, cache_control:{type:'ephemeral'},
-          system:AGENT_SYSTEM, tools:AGENT_TOOLS, messages:chat.history,
-        });
-      } catch(err){
-        const msg = err instanceof Anthropic.AuthenticationError ? 'The API key was rejected. Check it, or forget it and enter another.'
-          : err instanceof Anthropic.PermissionDeniedError ? 'This key is not allowed to use '+AGENT_MODEL+'.'
-          : err instanceof Anthropic.RateLimitError ? 'Rate limited by the API. Wait a moment and send again.'
-          : err instanceof Anthropic.APIError ? `API error ${err.status ?? ''}: ${err.message}` : 'Could not reach the API: '+(err.message||err);
+    await ensureModel();
+    const A = ADAPTERS[prov.id];
+    for(let turn=0; turn<16; turn++){
+      let r;
+      try{ r = await A.call(); }
+      catch(err){
+        const st = err.status;
+        const msg = st===401 || st===403 ? `The ${PROVIDERS[prov.id].name} key was rejected (${st}). Check it, or forget it and enter another.`
+          : st===404 ? `${PROVIDERS[prov.id].name} doesn't know the model "${prov.model}". Pick another in the list below.`
+          : st===429 ? 'Rate limited or out of credit. Wait a moment, or check your account.'
+          : st ? `API error ${st}: ${err.message}` : 'Could not reach the API: '+(err.message||err);
         chatAdd('err', esc(msg)+' Send a message to try again.'); return;
       }
-      chat.history.push({role:'assistant', content:resp.content});
-      for(const blk of resp.content) if(blk.type==='text' && blk.text.trim()){ chatAdd('bot', mdLite(blk.text)); chat.log.push({t:'bot', text:blk.text}); }
-      if(resp.stop_reason==='refusal'){ chatAdd('err', 'The model declined this request.'); return; }
-      if(resp.stop_reason==='max_tokens'){ chatAdd('err', 'The reply was cut off; send "continue".'); return; }
-      if(resp.stop_reason!=='tool_use') return;
+      for(const t of r.texts) if(t && t.trim()){ chatAdd('bot', mdLite(t)); chat.log.push({t:'bot', text:t}); }
+      if(r.stop==='refusal'){ chatAdd('err', 'The model declined this request.'); return; }
+      if(r.stop==='max'){ chatAdd('err', 'The reply was cut off; send "continue".'); return; }
+      if(r.stop!=='tool') return;
       const results = [], asks = [];
-      for(const blk of resp.content){
-        if(blk.type!=='tool_use') continue;
-        if(blk.name==='ask_user'){ asks.push(blk); chat.log.push({t:'ask', input:blk.input}); continue; }
-        chat.log.push({t:'tool', name:blk.name, input:blk.input});
-        results.push({type:'tool_result', tool_use_id:blk.id, content:JSON.stringify(runTool(blk.name, blk.input))});
+      for(const c of r.calls){
+        if(c.name==='ask_user'){ asks.push(c); chat.log.push({t:'ask', input:c.input}); continue; }
+        chat.log.push({t:'tool', name:c.name, input:c.input});
+        results.push({id:c.id, name:c.name, output:JSON.stringify(runTool(c.name, c.input))});
       }
       if(asks.length){ chat.pending = {results, asks}; renderQuestions(asks); return; }
-      chat.history.push({role:'user', content:results});
+      A.pushResults(results);
     }
     chatAdd('sys', 'Stopped after many steps; send a message to continue.');
-  } catch(err){ chatAdd('err', 'Could not load the Anthropic SDK: '+esc(err.message||String(err))); }
-  finally{ setBusy(false); }
+  } finally { setBusy(false); }
 }
 function runTool(name, input){
   if(name==='set_requirements'){
@@ -2367,7 +2480,7 @@ async function playDemo(){
   replay = {stop:false};
   document.getElementById('demoBar').hidden = false;
   chatAdd('sys', DEMO.events ? `Replay of a recorded session with ${esc(DEMO.model)} (${esc(DEMO.date)}). The tool calls run for real, so the page changes as you watch.`
-    : `Scripted walkthrough of what the assistant does. Its wording here is written for the demo, but every tool call runs for real and the summary comes from the model's own results. Add your API key to run the real assistant.`);
+    : `Scripted walkthrough of what the assistant does. Its wording here is written for the demo, but every tool call runs for real and the summary comes from the model's own results. Add an OpenAI, Google or OpenRouter key to run the real assistant.`);
   try{
     for(const ev of events){
       if(replay.stop) break;
@@ -2392,7 +2505,7 @@ document.getElementById('asNew').onclick = ()=>{ if(replay) replay.stop = true; 
 document.getElementById('demoBtn').onclick = playDemo;
 document.getElementById('demoStop').onclick = ()=>{ if(replay) replay.stop = true; };
 document.addEventListener('click', e=>{ if(e.target.id==='kbDemo') playDemo(); });
-paintKeyBox(); newChat();
+paintKeyBox(); newChat(); if(prov.key) ensureModel().then(paintKeyBox);
 
 if(!loadHash()){ S = merge(clone(BASE), clone(PRESETS[0].p)); S.preset = PRESETS[0].id; }
 buildTabs(); buildAll();

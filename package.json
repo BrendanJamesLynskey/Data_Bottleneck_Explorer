@@ -2,6 +2,6 @@
   "name": "system-design-explorer",
   "private": true,
   "description": "Regression and reference checks for System Design Explorer (the app itself is the single index.html).",
-  "scripts": { "test": "node test/check.js" },
+  "scripts": { "test": "node test/check.js && node test/providers.js" },
   "devDependencies": { "puppeteer": "24.43.0" }
 }
