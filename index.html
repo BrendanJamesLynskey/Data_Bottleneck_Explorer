@@ -52,7 +52,7 @@ select option, select optgroup{background:var(--s1); color:var(--t1)}
 
 /* ---------- summary ---------- */
 .summary{max-width:1240px; margin:0 auto; padding:22px 28px 6px}
-.verdict{display:grid; grid-template-columns:1.7fr repeat(4,1fr); border:1px solid var(--l1); border-radius:8px; overflow:hidden}
+.verdict{display:grid; grid-template-columns:1.8fr repeat(3,1fr); border:1px solid var(--l1); border-radius:8px; overflow:hidden}
 .kpi{padding:12px 16px; border-right:1px solid var(--l1); min-width:0}
 .kpi:last-child{border-right:none}
 .kpi .l{font-size:11px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em}
@@ -62,11 +62,10 @@ select option, select optgroup{background:var(--s1); color:var(--t1)}
 .kpi.hero.bad{background:var(--t1); color:var(--bg)}
 .kpi.hero.bad .l,.kpi.hero.bad .s{color:#333}
 .kpi.hero.warn{background:var(--s2)}
-.req-line{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:14px}
-.rchip{background:none; border:1px solid var(--l2); border-radius:20px; padding:4px 11px; font-size:12.5px; cursor:pointer; color:var(--t2)}
-.rchip b{color:var(--t1); font-family:var(--mono); font-weight:500}
-.rchip:hover{border-color:var(--l3); color:var(--t1)}
-.scen{margin-top:10px; font-size:13px; color:var(--t2); max-width:900px}
+.req-line{display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; margin-top:12px; font-size:13px; color:var(--t2)}
+.req-line .sep{color:var(--t3)} .req-line i{font-style:normal; color:var(--t3)}
+.scen{margin-top:6px; font-size:13px; color:var(--t3); max-width:900px}
+.scen:empty{display:none}
 .scen b{color:var(--t1); font-weight:500}
 .scen i{font-style:normal; color:var(--t3)}
 
@@ -217,6 +216,13 @@ input[type=range]::-moz-range-thumb{width:13px; height:13px; border-radius:50%; 
 .tput input{flex:1; min-width:0; background:var(--bg); border:1px solid var(--l2); border-radius:6px; padding:5px 8px; font-family:var(--mono)}
 .tput select{width:auto; margin:0}
 
+details.more{margin-top:14px} details.more > summary, details.legend-d > summary{cursor:pointer; font-size:12.5px; color:var(--t3); list-style:none}
+details.more > summary::-webkit-details-marker, details.legend-d > summary::-webkit-details-marker{display:none}
+details.more > summary::before, details.legend-d > summary::before{content:"+ "; font-family:var(--mono)}
+details.more[open] > summary::before, details.legend-d[open] > summary::before{content:"− "}
+details.more[open] > summary{margin-bottom:8px}
+details.legend-d{margin-top:4px}
+.tab.moretog{color:var(--t3)}
 /* ask box + assistant */
 .ask{display:flex; gap:8px; margin-bottom:16px}
 .ask input{flex:1; min-width:0; background:var(--s1); border:1px solid var(--l2); border-radius:8px; padding:10px 14px; font-size:14px}
@@ -278,7 +284,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 <body>
 <div id="page">
 <header class="top">
-  <div class="brand"><h1>Bottleneck Explorer</h1><span>System sizing from requirements: bandwidth, latency, power, area, racks</span></div>
+  <div class="brand"><h1>Bottleneck Explorer</h1></div>
   <div class="ctrl">
     <select id="preset" aria-label="Example application"></select>
     <button class="btn" id="openAssist"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12v8H7l-3 3v-3H2z"/></svg>Assistant</button>
@@ -297,13 +303,13 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 
 <section class="stage">
   <div class="dwrap"><svg id="diagram" viewBox="0 0 1000 460" role="img" aria-label="System block diagram with data flow"></svg></div>
-  <div class="legend">
+  <details class="legend-d"><summary>Legend</summary><div class="legend">
     <span><i class="sw"></i>within the utilisation ceiling</span>
     <span><i class="sw warn"></i>above the ceiling</span>
     <span><i class="sw bad"></i>over capacity</span>
     <span><i class="sw bott"></i>the bottleneck</span>
-    <span>click any block to configure it</span>
-  </div>
+    <span>moving dashes show traffic · hover a block for figures · click it to configure</span>
+  </div></details>
 </section>
 
 <section class="tabs">
@@ -322,8 +328,8 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   <div class="dhead"><h2>Inputs</h2><button class="x" data-close aria-label="Close">×</button></div>
   <div class="dbody">
     <details class="sec" open><summary>Requirements</summary><div id="req"></div></details>
-    <details class="sec" open><summary>Workload</summary><div id="wl"></div></details>
-    <details class="sec" open><summary>Scale: accelerators &amp; racks</summary><div id="sc"></div></details>
+    <details class="sec"><summary>Workload</summary><div id="wl"></div></details>
+    <details class="sec"><summary>Scale: accelerators &amp; racks</summary><div id="sc"></div></details>
   </div>
 </aside>
 <aside class="drawer right" id="dComp" aria-label="Component">
@@ -418,20 +424,37 @@ const SOURCES = {
   nvme_p2p: 'NVMe SSDs → accelerator (peer-to-peer DMA)',
 };
 const NODE_OVERHEAD = 0.12;   // fans, VRM and PSU losses on top of component power
-/* on-chip network. hopsUni = mean hops for uniform traffic, bis = channels crossing the bisection per direction,
-   edge = channels from the die edge into the array, rA = router area factor (mm² per bit of width per tile) */
+/* on-chip interconnect, networks-on-chip and AMBA. kind: grid (router per tile), axi (crossbar of masters and
+   memory-side slave ports, separate read and write channels), stream (point-to-point pipelines), bus (shared,
+   one transfer at a time). eff = usable share of each link after headers, snoops, arbitration and turnaround;
+   typ = typical [width bits, clock GHz] applied when the type is chosen; rA = area factor */
 const NOC_TOPO = {
-  mesh:  {name:'2-D mesh',  hopsUni:k=>2*k/3,   bis:k=>k,     edge:k=>4*k, rA:0.0002},
-  torus: {name:'2-D torus', hopsUni:k=>k/2,     bis:k=>2*k,   edge:k=>4*k, rA:0.00026},
-  ring:  {name:'Ring',      hopsUni:k=>k*k/4,   bis:k=>2,     edge:k=>2,   rA:0.00012},
-  xbar:  {name:'Crossbar',  hopsUni:k=>1,       bis:k=>k*k/2, edge:k=>k*k, rA:0},
+  mesh:  {name:'2-D mesh NoC',             kind:'grid',   hopsUni:k=>2*k/3, bis:k=>k,     edge:k=>4*k, rA:0.0002,    eff:0.8,  typ:[512,2],
+          use:'Scalable tile arrays; the usual choice for large accelerators'},
+  torus: {name:'2-D torus NoC',            kind:'grid',   hopsUni:k=>k/2,   bis:k=>2*k,   edge:k=>4*k, rA:0.00026,   eff:0.8,  typ:[512,2],
+          use:'Twice a mesh\'s bisection for all-to-all traffic, at the cost of long wrap-around wires'},
+  ring:  {name:'Ring NoC',                 kind:'grid',   hopsUni:k=>k*k/4, bis:k=>2,     edge:k=>2,   rA:0.00012,   eff:0.8,  typ:[512,2],
+          use:'Cheap for a handful of agents, such as CPU clusters and cache slices'},
+  xbar:  {name:'Full crossbar NoC',        kind:'grid',   hopsUni:k=>1,     bis:k=>k*k/2, edge:k=>k*k, rA:0,         eff:0.8,  typ:[512,2],
+          use:'One hop between any pair; area grows as the square of the port count'},
+  chi:   {name:'AMBA CHI coherent mesh (CMN-style)', kind:'grid', hopsUni:k=>2*k/3, bis:k=>k, edge:k=>4*k, rA:0.00025, eff:0.7, typ:[256,2],
+          use:'Coherent mesh for many CPU cores and cache slices; snoops and responses share every link'},
+  axi:   {name:'AMBA AXI5 crossbar',       kind:'axi',    rA:0.000004,  eff:0.85, typ:[512,1.5],
+          use:'The common SoC fabric: separate read and write channels, bursts, many outstanding transactions'},
+  ace:   {name:'AMBA ACE5 coherent crossbar', kind:'axi', rA:0.0000056, eff:0.72, typ:[256,1.5],
+          use:'AXI plus snoop channels for cache-coherent masters'},
+  axis:  {name:'AMBA AXI4-Stream pipelines', kind:'stream', rA:0.00001, eff:0.95, typ:[512,1.5],
+          use:'Point-to-point streaming between dataflow stages, with no addresses'},
+  ahb:   {name:'AMBA AHB5 shared bus',     kind:'bus',    rA:0.00002,   eff:0.7,  typ:[128,0.5],
+          use:'One transfer at a time: microcontrollers and modest DMA'},
+  apb:   {name:'AMBA APB (registers only)', kind:'bus',   rA:0.00001,   eff:0.35, typ:[32,0.2],
+          use:'Configuration and status registers; no bursts, not a data path'},
 };
 const NOC_PAT = {
   uniform:   {name:'All-to-all (expert routing, transposes)', cross:k=>0.25,       hops:t=>t},
   neighbour: {name:'Nearest neighbour (systolic, stencil)',   cross:k=>1/(2*k),    hops:t=>1},
   local:     {name:'Mostly local (tiles reuse their own data)', cross:k=>0,        hops:t=>0},
 };
-const NOC_EFF = 0.8;          // flit headers, credits and arbitration
 const SRAM_PJ = 0.08;         // pJ per bit for an SRAM bank access
 
 /* =====================================================================
@@ -448,7 +471,7 @@ const BASE = {
   net:{id:'e400', count:2, mtu:9000},
   nvme:{id:'g5', count:4},
   scale:{perNode:1, nodes:1, racks:1, domain:'node', xUp:0, xOut:0, fabric:'nvl5', nic:'e800', nics:1, rackKW:40},
-  noc:{topo:'mesh', tiles:64, width:512, ghz:2, hopNs:1.5, pattern:'local', xNoc:1, banks:64, bankB:64, pj:0.15},
+  noc:{topo:'mesh', tiles:64, width:512, ghz:2, hopNs:1.5, pattern:'local', xNoc:1, banks:64, bankB:64, pj:0.15, ports:8},
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const merge = (a,b) => { for(const k in b){ if(b[k] && typeof b[k]==='object' && !Array.isArray(b[k])) { a[k]=merge(a[k]||{}, b[k]); } else a[k]=b[k]; } return a; };
@@ -516,7 +539,7 @@ const PRESETS = [
    d:'Four NV12 camera streams through a CNN on a small NPU with LPDDR5. Frames are staged in DRAM and read twice; a PCIe 4.0 x4 link is comfortably enough.', p:{
     T:4*3840*2160*1.5*60, lat:16e-3, block:3840*2160*1.5, burst:1.2, resident:1, inR:1, outR:0.01, xR:2, xW:1, stageIn:true, ops:150,
     pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:4, count:1},
-    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:8, wCore:3}, acc:{tops:40, util:0.5, pj:0.8, topsMm2:2.5, sram:8}}},
+    host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:8, wCore:3}, acc:{tops:40, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}}},
   {g:'Imaging & video', id:'8k', name:'8K60 broadcast encoder card',
    d:'10-bit 4:2:0 8K at 60 fps. Motion search re-reads about four reference frames per input byte, so DRAM traffic is 7× the input rate while the compressed output is tiny.', p:{
     T:7680*4320*1.875*60, lat:33e-3, block:7680*4320*1.875, burst:1.1, resident:2, inR:1, outR:0.01, xR:4, xW:1, stageIn:true, ops:500,
@@ -526,22 +549,22 @@ const PRESETS = [
    d:'A 16k-pixel line camera at 200 kHz (3.3 GB/s) arrives over 100 GbE straight into the accelerator. The 1 ms decision deadline, not bandwidth, sets the block size.', p:{
     T:16384*200e3, lat:1e-3, block:16384*256, burst:1.2, resident:0.5, src:'net_p2p', inR:1, outR:0.001, xR:0.5, xW:0.2, ops:100,
     pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:8, count:1},
-    host:{dram:'ddr5_5600', units:2, cores:8, cpuUs:3}, acc:{tops:20, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, net:{id:'e100', count:1, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:2, cores:8, cpuUs:3}, acc:{tops:20, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}, net:{id:'e100', count:1, mtu:9000}}},
   {g:'Imaging & video', id:'isp', name:'Smartphone camera ISP + NPU',
    d:'A 50 MP RAW10 sensor at 30 fps through the ISP and a portrait-mode network, on a shared 64-bit LPDDR5X. Power is the real budget: watch the pJ per byte.', p:{
     T:50e6*1.25*30, lat:33e-3, block:50e6*1.25, burst:1.3, resident:1, inR:1, outR:0.4, xR:3, xW:2, stageIn:true, stageOut:true, ops:300,
     pattern:'block', dev:{dram:'lp5x_8533', units:4}, link:{id:'ucie', count:1, rtt:0.05},
-    host:{dram:'lp5x_8533', units:4, cores:4, cpuUs:20, wCore:1.5}, acc:{tops:40, util:0.4, pj:0.3, topsMm2:4, sram:8, leak:0.01}}},
+    host:{dram:'lp5x_8533', units:4, cores:4, cpuUs:20, wCore:1.5}, acc:{tops:40, util:0.4, pj:0.3, topsMm2:4, sram:8, leak:0.01}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}}},
   {g:'Imaging & video', id:'ultrasound', name:'Ultrasound beamformer (128 channels)',
    d:'128 channels × 40 MS/s × 16 bit = 10 GB/s from the front end over two 100 GbE links, delay-and-sum beamforming, 5 ms frame latency.', p:{
     T:128*40e6*2, lat:5e-3, block:4e6, burst:1, resident:0.5, src:'net_p2p', inR:1, outR:0.02, xR:0.2, xW:0, ops:200,
     pattern:'stream', dev:{dram:'lp5x_8533', units:4}, link:{id:'pcie4', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:3}, acc:{tops:15, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, net:{id:'e100', count:2, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:3}, acc:{tops:15, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, noc:{topo:'axi', tiles:16, width:256, ghz:1, ports:4, banks:32}, net:{id:'e100', count:2, mtu:9000}}},
   {g:'Imaging & video', id:'adas', name:'Autonomous-driving perception SoC',
    d:'Eight 8 MP cameras at 30 fps through a perception stack on a 256-bit LPDDR5 SoC: a compute-heavy, DRAM-shared design with a 50 ms budget.', p:{
     T:8*8e6*1.5*30, lat:50e-3, block:8*8e6*1.5, burst:1.2, resident:16, inR:1, outR:0.05, xR:6, xW:3, stageIn:true, ops:2000,
     pattern:'block', dev:{dram:'lp5_6400', units:16}, link:{id:'ucie', count:2, rtt:0.05},
-    host:{dram:'lp5_6400', units:4, cores:12, cpuUs:10, wCore:2}, acc:{tops:500, util:0.4, pj:0.5, topsMm2:3, sram:32}}},
+    host:{dram:'lp5_6400', units:4, cores:12, cpuUs:10, wCore:2}, acc:{tops:500, util:0.4, pj:0.5, topsMm2:3, sram:32}, noc:{topo:'axi', tiles:16, width:512, ghz:1.2, ports:8, banks:64}}},
 
   // ---------------------------------------------------------------- signal processing and comms
   {g:'Signal processing & comms', id:'radar', name:'Radar / SDR front end over 400 GbE',
@@ -563,12 +586,12 @@ const PRESETS = [
    d:'Deliberately broken: a 5 µs tick-to-trade target with a host in the loop. Bandwidth is trivial, but the PCIe round trip and driver time alone exceed the budget, which is why these run on FPGA NICs.', p:{
     T:3e9, lat:5e-6, block:1024, burst:3, resident:0.1, src:'net_p2p', inR:1, outR:0.05, xR:0.1, xW:0, ops:20,
     pattern:'random', dev:{dram:'ddr4_3200', units:2}, link:{id:'pcie4', lanes:8, count:1},
-    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:1}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:16}, net:{id:'e25', count:1, mtu:1500}}},
+    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:1}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:16}, noc:{topo:'axi', tiles:8, width:512, ghz:0.4, ports:4, banks:32, hopNs:5}, net:{id:'e25', count:1, mtu:1500}}},
   {g:'Signal processing & comms', id:'trigger', name:'Particle-detector trigger board ✗',
    d:'Deliberately broken: 150 GB/s from twelve optical links with a 10 µs decision budget. The host cannot be in the loop; a trigger runs as self-contained logic next to the links.', p:{
     T:150e9, lat:10e-6, block:4096, burst:1, resident:0.5, src:'net_p2p', inR:1, outR:0.001, xR:0, xW:0, ops:20,
     pattern:'stream', dev:{dram:'ddr4_3200', units:2}, link:{id:'pcie5', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:0.5}, acc:{tops:10, util:0.5, pj:0.5, topsMm2:3, sram:32}, net:{id:'e100', count:12, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:0.5}, acc:{tops:10, util:0.5, pj:0.5, topsMm2:3, sram:32}, noc:{topo:'axis', tiles:16, width:512, ghz:0.5, ports:16, banks:32, hopNs:5}, net:{id:'e100', count:12, mtu:9000}}},
 
   // ---------------------------------------------------------------- data, storage and networking
   {g:'Data, storage & networking', id:'scan', name:'NVMe scan / filter offload',
@@ -585,12 +608,12 @@ const PRESETS = [
    d:'40 GB/s decrypted on a SmartNIC-style accelerator and delivered to host memory. No device DRAM traffic at all; the work is per-packet, so CPU time per block matters.', p:{
     T:40e9, lat:20e-6, block:9000, burst:1.1, resident:0.1, src:'net_p2p', inR:1, outR:1, xR:0, xW:0, ops:4,
     pattern:'stream', dev:{dram:'ddr4_3200', units:1}, link:{id:'pcie5', lanes:16, count:1, mps:512},
-    host:{dram:'ddr5_5600', units:8, cores:32, cpuUs:0.4}, acc:{tops:2, util:0.6, pj:0.5, topsMm2:3, sram:16}, net:{id:'e400', count:1, mtu:9000}}},
+    host:{dram:'ddr5_5600', units:8, cores:32, cpuUs:0.4}, acc:{tops:2, util:0.6, pj:0.5, topsMm2:3, sram:16}, noc:{topo:'axi', tiles:8, width:512, ghz:0.4, ports:4, banks:32, hopNs:5}, net:{id:'e400', count:1, mtu:9000}}},
   {g:'Data, storage & networking', id:'compress', name:'Storage compression offload (zstd)',
    d:'Writes compressed 3:1 before they hit the SSDs. Data comes from host memory over PCIe 4.0 x16 and goes back compressed; staged in a small LPDDR4X buffer.', p:{
     T:12e9, lat:2e-3, block:1e6, burst:1.2, resident:2, inR:1, outR:0.33, xR:0.5, xW:0.3, stageIn:true, ops:30,
     pattern:'block', dev:{dram:'lp4x_4266', units:8}, link:{id:'pcie4', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:3}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:8}}},
+    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:3}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:8}, noc:{topo:'axi', tiles:8, width:512, ghz:0.4, ports:4, banks:32, hopNs:5}}},
 
   // ---------------------------------------------------------------- science, HPC and crypto
   {g:'Science, HPC & crypto', id:'stencil', name:'CFD stencil on a GPU-class part',
@@ -602,7 +625,7 @@ const PRESETS = [
    d:'2 GB/s of reads seeded against a 30 GB index with random lookups (10 DRAM bytes per input byte) on an FPGA card with four DDR4 channels.', p:{
     T:2e9, lat:1, block:64e6, burst:1, resident:30, inR:1, outR:0.3, xR:10, xW:0.5, ops:200,
     pattern:'random', dev:{dram:'ddr4_3200', units:4}, link:{id:'pcie3', lanes:16, count:1},
-    host:{dram:'ddr4_3200', units:8, cores:32, cpuUs:10}, acc:{tops:2, util:0.5, pj:2, topsMm2:0.5, sram:40}}},
+    host:{dram:'ddr4_3200', units:8, cores:32, cpuUs:10}, acc:{tops:2, util:0.5, pj:2, topsMm2:0.5, sram:40}, noc:{topo:'axi', tiles:8, width:512, ghz:0.4, ports:4, banks:32, hopNs:5}}},
   {g:'Science, HPC & crypto', id:'fhe', name:'FHE bootstrapping accelerator (CKKS)',
    d:'Key-switching keys are re-read about 40 times per ciphertext byte, so a 20 GB/s ciphertext stream needs 800 GB/s of HBM. The memory-bound case behind FHE accelerator design.', p:{
     T:20e9, lat:50e-3, block:32e6, burst:1, resident:30, inR:1, outR:1, xR:40, xW:2, ops:50,
@@ -668,6 +691,38 @@ function topo(s){
   const nA = s.scale.perNode*s.scale.nodes*s.scale.racks, nN = s.scale.nodes*s.scale.racks;
   const dom = nA===1 ? 1 : s.scale.domain==='rack' ? s.scale.perNode*s.scale.nodes : s.scale.perNode;
   return {nA, nN, dom, perRack:s.scale.perNode*s.scale.nodes};
+}
+
+/* on-chip limits for one accelerator: traffic in from the die edge (inT), out to it (outT), and between tiles (localT) */
+function nocCalc(nc, inT, outT, localT, burst){
+  const N = Math.max(4, Math.round(nc.tiles)), k = Math.sqrt(N), t = NOC_TOPO[nc.topo], pat = NOC_PAT[nc.pattern];
+  const link = nc.width/8*nc.ghz*1e9, e = t.eff, S = Math.max(1, nc.ports), io = Math.max(inT, outT);
+  let dem, cap, hopsEdge, hopsLocal, area;
+  if(t.kind==='grid'){
+    hopsEdge = nc.topo==='xbar' ? 1 : nc.topo==='ring' ? N/4 : k/4+1; hopsLocal = pat.hops(t.hopsUni(k));
+    dem = {bis:(inT+outT)*0.0625 + localT*pat.cross(k), edge:io, inj:(io+localT)/N};   // 1/16 of edge traffic crosses (locality-interleaved controllers)
+    cap = {bis:t.bis(k)*link*e, edge:t.edge(k)*link*e, inj:link*e};
+    area = nc.topo==='xbar' ? 0.00002*nc.width*N*N : N*t.rA*nc.width;
+  } else if(t.kind==='axi'){                     // masters = tiles, slaves = memory-side ports; read and write channels are independent
+    hopsEdge = 2; hopsLocal = localT>0 ? 2 : 0;
+    dem = {bis:localT, edge:io, inj:(io+localT/2)/N};
+    cap = {bis:N*link*e, edge:S*link*e, inj:link*e};
+    area = t.rA*nc.width*N*(S + (localT>0 ? N/4 : 0));
+  } else if(t.kind==='stream'){                  // S parallel pipelines of N/S stages; all-to-all traffic must ripple along them
+    const depth = N/S; hopsEdge = depth/2; hopsLocal = nc.pattern==='uniform' ? depth/2 : 1;
+    const lane = io/S + localT/N*hopsLocal;
+    dem = {bis:lane, edge:io, inj:lane}; cap = {bis:link*e, edge:S*link*e, inj:link*e};
+    area = t.rA*nc.width*N;
+  } else {                                       // shared bus: every transfer, either direction, takes the one bus
+    hopsEdge = 1; hopsLocal = 1; const tot = inT+outT+localT;
+    dem = {bis:tot, edge:tot, inj:tot}; cap = {bis:link*e, edge:link*e, inj:link*e};
+    area = t.rA*nc.width*N;
+  }
+  for(const key in dem) dem[key] *= burst;
+  const U = {bis:dem.bis/cap.bis, edge:dem.edge/cap.edge, inj:dem.inj/cap.inj};
+  const worst = Object.keys(U).sort((a,b)=>U[b]-U[a])[0];
+  const hops = (inT+outT+localT)>0 ? ((inT+outT)*hopsEdge + localT*hopsLocal)/(inT+outT+localT) : 0;
+  return {N, k, S, link, kind:t.kind, dem, cap, U, worst, hops, hopsEdge, hopsLocal, area};
 }
 
 function model(s){
@@ -759,32 +814,27 @@ function model(s){
   const devCap = s.dev.units*dramCapPerUnit(dev, s.ecc);
   const sramNeed = 2*(inflightPcie + inflightDram);
 
-  // on-chip network and SRAM banks (per accelerator)
-  const nc = s.noc, N = Math.max(4, Math.round(nc.tiles)), kk = Math.sqrt(N), topoN = NOC_TOPO[nc.topo], patN = NOC_PAT[nc.pattern];
-  const nocLink = nc.width/8*nc.ghz*1e9;                                   // B/s per link per direction
+  // on-chip interconnect and SRAM banks (per accelerator)
+  const nc = s.noc;
   const inT = Ta*(dR + s.inR + xUp + xOut), outT = Ta*(dW + s.outR + xUp + xOut), localT = Ta*nc.xNoc;
-  const hopsEdge = nc.topo==='xbar' ? 1 : nc.topo==='ring' ? N/4 : kk/4+1, hopsLocal = patN.hops(topoN.hopsUni(kk));
-  const nocDem = {bis: Tba/Ta*((inT+outT)*0.0625 + localT*patN.cross(kk)),  // controllers interleaved by locality: 1/16 of edge traffic crosses per direction
-    edge: Tba/Ta*Math.max(inT, outT), inj: Tba/Ta*(Math.max(inT, outT)+localT)/N};
-  const nocCap = {bis: topoN.bis(kk)*nocLink*NOC_EFF, edge: topoN.edge(kk)*nocLink*NOC_EFF, inj: nocLink*NOC_EFF};
-  const nocU = {bis: nocDem.bis/nocCap.bis, edge: nocDem.edge/nocCap.edge, inj: nocDem.inj/nocCap.inj};
-  const nocWorst = Object.keys(nocU).sort((a,b)=>nocU[b]-nocU[a])[0];
+  const nq = nocCalc(nc, inT, outT, localT, s.burst);
+  const N = nq.N, kk = nq.k, nocLink = nq.link, hopsEdge = nq.hopsEdge, hopsLocal = nq.hopsLocal, nocDem = nq.dem, nocCap = nq.cap, nocU = nq.U, nocWorst = nq.worst;
   dem.noc = nocDem[nocWorst]; cap.noc = nocCap[nocWorst]; U.noc = nocU[nocWorst];
   dem.sram = Tba*(dR + dW + nc.xNoc + s.inR + s.outR); cap.sram = nc.banks*nc.bankB*nc.ghz*1e9*0.85; U.sram = dem.sram/cap.sram;
   U.accSys = Math.max(U.compute, U.noc, U.sram);
   const nocHops = (inT+outT+localT)>0 ? ((inT+outT)*hopsEdge + localT*hopsLocal)/(inT+outT+localT) : 0;
-  comps.push({k:'noc', name:'On-chip network', U:U.noc, need:dem.noc, have:cap.noc, f:fmtBps},
+  comps.push({k:'noc', name:'On-chip interconnect', U:U.noc, need:dem.noc, have:cap.noc, f:fmtBps},
              {k:'sram', name:'SRAM bandwidth', U:U.sram, need:dem.sram, have:cap.sram, f:fmtBps});
   comps.sort((a,b)=>b.U-a.U);
   worst = comps[0]; maxT = T/worst.U; maxTceil = maxT*s.ceil;
   { const fixed = 2*nocHops*nc.hopNs*1e-9 + 64/nocLink, u = U.noc/s.burst;
-    stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip network', fixed, svc:0, q:u>=1?Infinity:fixed*u/(1-u)});
+    stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip interconnect', fixed, svc:0, q:u>=1?Infinity:fixed*u/(1-u)});
     stages.forEach(st=>st.t = st.fixed+st.svc+st.q); latency = stages.reduce((a,st)=>a+st.t,0); }
 
   // area of one accelerator die
   const area = {compute:s.acc.tops/s.acc.topsMm2, sram:s.acc.sram*0.45, dramPhy:s.dev.units*dev.phy, linkPhy:lk.totalLanes*lk.L.phy,
     fabPhy: multi && tp.dom>1 ? fab.phy : 0,
-    noc: nc.topo==='xbar' ? 0.00002*nc.width*N*N : N*topoN.rA*nc.width};
+    noc: nq.area};
   area.misc = 0.15*(area.compute+area.sram+area.dramPhy+area.linkPhy+area.fabPhy+area.noc);
   const coreArea = area.compute+area.sram+area.dramPhy+area.linkPhy+area.fabPhy+area.noc+area.misc;
   const shoreNeed = s.dev.units*dev.shore + lk.totalLanes*lk.L.shore + (multi && tp.dom>1 ? fab.shore : 0);
@@ -810,7 +860,7 @@ function model(s){
   return {T, Tb, Ta, Tba, Tn, Tbn, tp, dev, hd, lk, fab, nic, multi, xUp, xOut, dR, dW, hR, hW, hIn, ledger, devE, hostE, devBW, hostBW, ops,
     dem, cap, U, comps, worst, maxT, maxTceil, stages, latency, inflightPcie, tags, inflightDram, dramReqs, devCap, sramNeed,
     A, pAcc, H, pNodeHost, Ptot, Prack, Pmove, area, coreArea, padArea, die, shoreNeed, shoreHave, srcBW, srcName, viaHost,
-    noc:{N, k:kk, link:nocLink, inT, outT, localT, hopsEdge, hopsLocal, hops:nocHops, dem:nocDem, cap:nocCap, U:nocU, worst:nocWorst}};
+    noc:{N, k:kk, S:nq.S, kind:nq.kind, link:nocLink, inT, outT, localT, hopsEdge, hopsLocal, hops:nocHops, dem:nocDem, cap:nocCap, U:nocU, worst:nocWorst}};
 }
 
 /* sizing: minimum spec of each component for the current requirement (per accelerator) */
@@ -973,20 +1023,22 @@ function buildInspector(){
     ctl(el, {k:'acc.tops', label:'Peak compute', type:'log', min:0.1, max:20000, snap:snapLog, fmt:v=>sig(v)+' TOPS'});
     ctl(el, {k:'acc.util', label:'Achieved compute utilisation', type:'range', min:0.05, max:1, step:0.01, fmt:v=>(v*100).toFixed(0)+' %'});
     ctl(el, {k:'acc.sram', label:'On-chip SRAM', type:'log', min:0.25, max:1024, snap:snapLog, fmt:v=>sig(v)+' MB'});
-    el.insertAdjacentHTML('beforeend', `<div class="dsub">Technology assumptions</div>`);
-    ctl(el, {k:'acc.pj', label:'Energy per operation', type:'log', min:0.05, max:20, snap:snapLog, fmt:v=>sig(v)+' pJ/op'});
-    ctl(el, {k:'acc.topsMm2', label:'Compute density', type:'log', min:0.1, max:20, snap:snapLog, fmt:v=>sig(v)+' TOPS/mm²'});
-    ctl(el, {k:'acc.leak', label:'Leakage power density', type:'range', min:0, max:0.1, step:0.005, fmt:v=>v.toFixed(3)+' W/mm²'});
-    el.insertAdjacentHTML('beforeend', `<div class="dsub">On-chip network &amp; SRAM</div>`);
-    ctl(el, {k:'noc.topo', label:'Topology', type:'select', options:Object.fromEntries(Object.entries(NOC_TOPO).map(([k,t])=>[k,t.name]))});
-    ctl(el, {k:'noc.tiles', label:'Tiles', type:'select', num:true, options:{16:'16 (4 × 4)',36:'36 (6 × 6)',64:'64 (8 × 8)',100:'100 (10 × 10)',144:'144 (12 × 12)',256:'256 (16 × 16)'}});
-    ctl(el, {k:'noc.width', label:'Link width', type:'select', num:true, options:{128:'128 bit',256:'256 bit',512:'512 bit',1024:'1024 bit',2048:'2048 bit'}});
-    ctl(el, {k:'noc.ghz', label:'NoC clock', type:'range', min:0.5, max:4, step:0.1, fmt:v=>v.toFixed(1)+' GHz'});
-    ctl(el, {k:'noc.hopNs', label:'Latency per hop', type:'range', min:0.3, max:5, step:0.1, fmt:v=>v.toFixed(1)+' ns'});
-    ctl(el, {k:'noc.pattern', label:'Tile-to-tile traffic', type:'select', options:Object.fromEntries(Object.entries(NOC_PAT).map(([k,t])=>[k,t.name]))});
-    ctl(el, {k:'noc.xNoc', label:'Tile-to-tile bytes per byte processed', type:'range', min:0, max:20, step:0.1, fmt:v=>v.toFixed(1)+' B', hint:'Operands and partial sums passed between tiles.'});
-    ctl(el, {k:'noc.banks', label:'SRAM banks', type:'select', num:true, options:{16:'16',32:'32',64:'64',128:'128',288:'288',576:'576',1024:'1024'}});
-    ctl(el, {k:'noc.bankB', label:'Bytes per bank per cycle', type:'select', num:true, options:{16:'16 B',32:'32 B',64:'64 B',128:'128 B'}});
+    const det = (title) => { const d = document.createElement('details'); d.className = 'sec'; d.innerHTML = `<summary>${title}</summary><div></div>`; el.appendChild(d); return d.querySelector('div'); };
+    const ic = det('On-chip interconnect &amp; SRAM'), te = det('Technology assumptions');
+    ctl(ic, {k:'noc.topo', label:'Interconnect', type:'select', options:Object.fromEntries(Object.entries(NOC_TOPO).map(([k,t])=>[k,t.name])),
+      after:v=>{ S.noc.width = NOC_TOPO[v].typ[0]; S.noc.ghz = NOC_TOPO[v].typ[1]; }, rebuild:true, hint:'Choosing one sets its typical width and clock.'});
+    ctl(ic, {k:'noc.tiles', label:NOC_TOPO[S.noc.topo].kind==='axi'?'Masters':NOC_TOPO[S.noc.topo].kind==='stream'?'Pipeline stages':'Tiles', type:'select', num:true, options:{4:'4',8:'8',16:'16 (4 × 4)',36:'36 (6 × 6)',64:'64 (8 × 8)',100:'100 (10 × 10)',144:'144 (12 × 12)',256:'256 (16 × 16)'}});
+    if(['axi','stream'].includes(NOC_TOPO[S.noc.topo].kind)) ctl(ic, {k:'noc.ports', label:NOC_TOPO[S.noc.topo].kind==='axi'?'Memory-side slave ports':'Parallel pipelines', type:'select', num:true, options:{1:'1',2:'2',4:'4',8:'8',16:'16',32:'32'}});
+    ctl(ic, {k:'noc.width', label:'Data width', type:'select', num:true, options:{32:'32 bit',64:'64 bit',128:'128 bit',256:'256 bit',512:'512 bit',1024:'1024 bit',2048:'2048 bit'}});
+    ctl(ic, {k:'noc.ghz', label:'Clock', type:'range', min:0.1, max:4, step:0.1, fmt:v=>v.toFixed(1)+' GHz'});
+    ctl(ic, {k:'noc.hopNs', label:'Latency per hop', type:'range', min:0.3, max:20, step:0.1, fmt:v=>v.toFixed(1)+' ns'});
+    ctl(ic, {k:'noc.pattern', label:'Tile-to-tile traffic', type:'select', options:Object.fromEntries(Object.entries(NOC_PAT).map(([k,t])=>[k,t.name]))});
+    ctl(ic, {k:'noc.xNoc', label:'Tile-to-tile bytes per byte processed', type:'range', min:0, max:20, step:0.1, fmt:v=>v.toFixed(1)+' B'});
+    ctl(ic, {k:'noc.banks', label:'SRAM banks', type:'select', num:true, options:{16:'16',32:'32',64:'64',128:'128',288:'288',576:'576',1024:'1024'}});
+    ctl(ic, {k:'noc.bankB', label:'Bytes per bank per cycle', type:'select', num:true, options:{16:'16 B',32:'32 B',64:'64 B',128:'128 B'}});
+    ctl(te, {k:'acc.pj', label:'Energy per operation', type:'log', min:0.05, max:20, snap:snapLog, fmt:v=>sig(v)+' pJ/op'});
+    ctl(te, {k:'acc.topsMm2', label:'Compute density', type:'log', min:0.1, max:20, snap:snapLog, fmt:v=>sig(v)+' TOPS/mm²'});
+    ctl(te, {k:'acc.leak', label:'Leakage power density', type:'range', min:0, max:0.1, step:0.005, fmt:v=>v.toFixed(3)+' W/mm²'});
     el.insertAdjacentHTML('beforeend', `<div class="dsub">This configuration</div><div id="cstats"></div>`);
   } else if(selected==='host'){
     ctl(el, {k:'host.dram', label:'Host memory', type:'select', options:Object.fromEntries(HOST_DRAMS.map(k=>[k,DRAMS[k].name])), rebuild:true});
@@ -1037,7 +1089,7 @@ function paintInspector(m){
   if(selected==='acc') h = stat('Usable compute', fmtOps(m.cap.compute)) + stat('Demand at peak', fmtOps(m.dem.compute))
       + stat('Intensity vs device DRAM', (m.dR+m.dW>0? sig(S.ops/(m.dR+m.dW)) : '∞')+' op/B') + stat('Machine balance', sig(m.cap.compute/m.devBW)+' op/B')
       + stat('Die area', fmtA(m.die)+(m.padArea>m.coreArea?' (pad-limited)':'')) + stat('Die edge used', sig(m.shoreNeed)+' / '+sig(m.shoreHave)+' mm')
-      + stat('On-chip network ('+({bis:'bisection',edge:'edge injection',inj:'tile port'})[m.noc.worst]+')', fmtPct(m.U.noc)) + stat('SRAM bandwidth', fmtPct(m.U.sram))
+      + stat('On-chip interconnect', fmtPct(m.U.noc)) + stat('SRAM bandwidth', fmtPct(m.U.sram))
       + stat('Power per accelerator', fmtW(m.pAcc));
   if(selected==='host') h = stat('Host DRAM usable · demand', fmtBps(m.cap.host)+' · '+fmtBps(m.dem.host)) + stat('Each byte crosses host DRAM', sig(m.hR+m.hW)+'×')
       + stat('Blocks per second per node', fmtIOPS(m.Tbn/S.block)) + stat('Cores busy on I/O', sig(m.dem.cpu)+' of '+S.host.cores)
@@ -1072,14 +1124,14 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') openDrawer(null);
    ===================================================================== */
 const NS = 'http://www.w3.org/2000/svg';
 const G = {
-  src:    {x:10,  y:175, w:150, h:120, sel:'src'},
-  cpu:    {x:190, y:24,  w:200, h:130, sel:'host'},
-  host:   {x:190, y:300, w:200, h:130, sel:'host'},
-  link:   {x:430, y:165, w:165, h:130, sel:'link'},
-  acc:    {x:640, y:84,  w:180, h:270, sel:'acc'},
-  dram:   {x:860, y:140, w:135, h:150, sel:'dram'},
-  fabric: {x:640, y:410, w:180, h:110, sel:'fabric'},
-  net:    {x:860, y:410, w:135, h:110, sel:'net'},
+  src:    {x:10,  y:135, w:150, h:90,  sel:'src'},
+  cpu:    {x:190, y:30,  w:190, h:90,  sel:'host'},
+  host:   {x:190, y:240, w:190, h:90,  sel:'host'},
+  link:   {x:420, y:135, w:165, h:90,  sel:'link'},
+  acc:    {x:630, y:100, w:180, h:160, sel:'acc'},
+  dram:   {x:850, y:130, w:145, h:100, sel:'dram'},
+  fabric: {x:630, y:325, w:180, h:90,  sel:'fabric'},
+  net:    {x:850, y:325, w:145, h:90,  sel:'net'},
 };
 let edges = [], shown = {};
 function buildDiagram(){
@@ -1087,25 +1139,25 @@ function buildDiagram(){
   const tp = topo(S);
   shown = {src:S.src!=='host', cpu:true, host:true, link:true, acc:true, dram:true, fabric:compVisible('fabric'), net:compVisible('net')};
   const tall = shown.fabric || shown.net;
-  svg.setAttribute('viewBox', `${S.src==='host'?178:0} 0 ${S.src==='host'?822:1000} ${tall?540:450}`);
+  svg.setAttribute('viewBox', `${S.src==='host'?178:0} 0 ${S.src==='host'?822:1000} ${tall?430:350}`);
   const mk = (id, col) => `<marker id="ar_${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" style="fill:${col}"/></marker>`;
   svg.innerHTML = `<defs>${mk('ok','#6b6b6b')}${mk('warn','#cfcfcf')}${mk('bad','#ffffff')}</defs><g id="eg"></g><g id="ng"></g>`;
   const p = (a,b)=>`M${a[0]},${a[1]} L${b[0]},${b[1]}`;
   const c = (a,b,c1,c2)=>`M${a[0]},${a[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${b[0]},${b[1]}`;
   edges = [
-    {id:'cpuW', d:p([276,154],[276,300]), res:'host', end:true, lbl:[266,232,'end']},
-    {id:'cpuR', d:p([304,300],[304,154]), res:'host', end:true},
-    {id:'h2dA', d:c([390,345],[430,215],[414,345],[408,215]), res:'h2d'},
-    {id:'h2dB', d:p([595,215],[640,215]), res:'h2d', end:true, lbl:[512,316]},
-    {id:'d2hB', d:p([640,245],[595,245]), res:'d2h'},
-    {id:'d2hA', d:c([430,245],[390,395],[404,245],[414,395]), res:'d2h', end:true, lbl:[512,332]},
-    {id:'ddW',  d:p([820,205],[860,205]), res:'dram', end:true, lbl:[927,312]},
-    {id:'ddR',  d:p([860,245],[820,245]), res:'dram', end:true},
+    {id:'cpuW', d:p([276,120],[276,240]), res:'host', end:true, lbl:[266,184,'end']},
+    {id:'cpuR', d:p([304,240],[304,120]), res:'host', end:true},
+    {id:'h2dA', d:c([380,270],[420,170],[402,270],[398,170]), res:'h2d'},
+    {id:'h2dB', d:p([585,170],[630,170]), res:'h2d', end:true, lbl:[502,246]},
+    {id:'d2hB', d:p([630,195],[585,195]), res:'d2h'},
+    {id:'d2hA', d:c([420,195],[380,300],[398,195],[402,300]), res:'d2h', end:true, lbl:[502,261]},
+    {id:'ddW',  d:p([810,170],[850,170]), res:'dram', end:true, lbl:[922,250]},
+    {id:'ddR',  d:p([850,195],[810,195]), res:'dram', end:true},
   ];
-  if(shown.src) edges.push(S.src.endsWith('p2p') ? {id:'srcE', d:p([160,240],[430,231]), res:'src', end:true, lbl:[85,316]}
-    : {id:'srcE', d:c([160,240],[190,368],[178,240],[172,368]), res:'src', end:true, lbl:[85,316]});
-  if(shown.fabric) edges.push({id:'upE', d:p([716,354],[716,410]), res:'up', end:true, both:true, lbl:[724,386,'start']});
-  if(shown.net) edges.push({id:'outE', d:c([800,354],[880,410],[800,390],[880,380]), res:'out', end:true, both:true, lbl:[850,372,'start']});
+  if(shown.src) edges.push(S.src.endsWith('p2p') ? {id:'srcE', d:p([160,180],[420,182]), res:'src', end:true, lbl:[85,246]}
+    : {id:'srcE', d:c([160,180],[190,285],[176,180],[172,285]), res:'src', end:true, lbl:[85,246]});
+  if(shown.fabric) edges.push({id:'upE', d:p([716,260],[716,325]), res:'up', end:true, both:true, lbl:[724,296,'start']});
+  if(shown.net) edges.push({id:'outE', d:c([792,260],[880,325],[792,295],[880,295]), res:'out', end:true, both:true, lbl:[846,284,'start']});
   const eg = svg.querySelector('#eg');
   for(const e of edges){
     const base = document.createElementNS(NS,'path'); base.setAttribute('d', e.d); base.setAttribute('class','edge-base');
@@ -1119,24 +1171,15 @@ function buildDiagram(){
     if(!shown[k]) continue;
     const g = document.createElementNS(NS,'g'); g.setAttribute('class','node'); g.id = 'n_'+k;
     g.setAttribute('tabindex','0'); g.setAttribute('role','button'); g.setAttribute('aria-label', COMPS[b.sel]);
-    let inner = '';
+    let inner = `<title id="tt_${k}"></title>`;
     if(k==='acc' && tp.nA>1){ for(const o of [8,4]) inner += `<rect class="ghost" x="${b.x+o}" y="${b.y-o}" width="${b.w}" height="${b.h}" rx="4"/>`; }
     inner += `<rect class="box" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="4"/>
       <text class="tagline" x="${b.x}" y="${b.y-(k==='acc'&&tp.nA>1?14:8)}" id="tg_${k}"></text>
-      <text class="t1" x="${b.x+14}" y="${b.y+24}" id="t1_${k}"></text>
-      <text class="t2" x="${b.x+14}" y="${b.y+42}" id="t2_${k}"></text>`;
-    if(k==='acc'){
-      inner += `<rect class="sub" x="${b.x+12}" y="${b.y+56}" width="${b.w-24}" height="64" rx="3"/>
-        <text class="t2" x="${b.x+22}" y="${b.y+74}">compute</text><text class="t3" x="${b.x+22}" y="${b.y+92}" id="t3_acc"></text><text class="t3" x="${b.x+22}" y="${b.y+109}" id="t4_acc"></text>
-        <rect class="sub" x="${b.x+12}" y="${b.y+130}" width="${b.w-24}" height="52" rx="3"/>
-        <text class="t2" x="${b.x+22}" y="${b.y+148}">on-chip SRAM</text><text class="t3" x="${b.x+22}" y="${b.y+168}" id="t5_acc"></text>
-        <text class="t2" x="${b.x+14}" y="${b.y+206}" id="t6_acc"></text><text class="t2" x="${b.x+14}" y="${b.y+224}" id="t7_acc"></text>`;
-    } else {
-      inner += `<text class="t3" x="${b.x+14}" y="${b.y+66}" id="t3_${k}"></text><text class="t3" x="${b.x+14}" y="${b.y+84}" id="t4_${k}"></text>
-        <text class="t2" x="${b.x+14}" y="${b.y+102}" id="t5_${k}"></text>`;
-    }
-    // utilisation bar along the foot of the block, with the ceiling marked
-    const by = b.y+b.h-16, bx = b.x+14, bw = b.w-72;
+      <text class="t1" x="${b.x+14}" y="${b.y+26}" id="t1_${k}"></text>
+      <text class="t2" x="${b.x+14}" y="${b.y+46}" id="t2_${k}"></text>`;
+    if(k==='acc') inner += `<text class="t2" x="${b.x+14}" y="${b.y+76}" id="t3_acc"></text><text class="t2" x="${b.x+14}" y="${b.y+96}" id="t4_acc"></text><text class="t2" x="${b.x+14}" y="${b.y+116}" id="t5_acc"></text>`;
+    if(k==='dram') inner += `<text class="t2" x="${b.x+14}" y="${b.y+64}" id="t3_dram"></text>`;
+    const by = b.y+b.h-18, bx = b.x+14, bw = b.w-72;
     inner += `<rect class="ut-tr" x="${bx}" y="${by}" width="${bw}" height="4"/><rect class="ut-fi" id="uf_${k}" x="${bx}" y="${by}" width="0" height="4"/>
       <line class="ut-cl" id="uc_${k}" x1="${bx}" x2="${bx}" y1="${by-3}" y2="${by+7}"/><text class="ut-tx" x="${b.x+b.w-12}" y="${by+5}" id="ut_${k}"></text>`;
     g.innerHTML = inner;
@@ -1160,29 +1203,25 @@ function paintDiagram(m){
     txt('ut_'+k, !isFinite(u) ? '∞' : u>=10 ? '>999 %' : fmtPct(u));
     txt('tg_'+k, k===bottK ? (st==='bad' ? 'BOTTLENECK' : 'LIMITING') : '');
   }
-  const tp = m.tp;
-  txt('t1_cpu','Host CPU'); txt('t2_cpu', `${S.host.cores} I/O cores${tp.nN>1?' · per node':''}`);
-  txt('t3_cpu', `${fmtIOPS(m.Tbn/S.block)} blocks/s`); txt('t4_cpu', `need ${sig(m.dem.cpu)} cores`); txt('t5_cpu', `${sig(S.host.cpuUs)} µs per block`);
+  const tp = m.tp, L = m.lk.L, nh = (a,b)=>`need ${a} · have ${b}`;
+  txt('t1_cpu','Host CPU'); txt('t2_cpu', `${S.host.cores} I/O cores${tp.nN>1?' per node':''}`);
+  txt('tt_cpu', `Host CPU: ${fmtIOPS(m.Tbn/S.block)} blocks/s × ${sig(S.host.cpuUs)} µs = ${sig(m.dem.cpu)} cores busy of ${S.host.cores}`);
   txt('t1_host','Host DRAM'); txt('t2_host', `${S.host.units} × ${m.hd.name}`);
-  txt('t3_host', `need ${fmtBps(m.dem.host)}`); txt('t4_host', `have ${fmtBps(m.cap.host)}`); txt('t5_host', `${sig(m.hR+m.hW)} B per byte`);
-  const L = m.lk.L;
-  txt('t1_link', L.kind==='pcie' ? L.name : 'UCIe'); txt('t2_link', L.kind==='pcie' ? `${S.link.count>1?S.link.count+' × ':''}x${S.link.lanes}${tp.nA>1?' per accelerator':''}` : `${S.link.count} × x64`);
-  txt('t3_link', `need ${fmtBps(Math.max(m.dem.h2d, m.dem.d2h))}`); txt('t4_link', `have ${fmtBps(Math.min(m.cap.h2d, m.cap.d2h))}`);
-  txt('t5_link', `per direction`);
+  txt('tt_host', `Host DRAM: ${nh(fmtBps(m.dem.host), fmtBps(m.cap.host))}; ${sig(m.hR+m.hW)} B per byte processed`);
+  txt('t1_link', L.kind==='pcie' ? L.name : 'UCIe'); txt('t2_link', L.kind==='pcie' ? `${S.link.count>1?S.link.count+' × ':''}x${S.link.lanes}` : `${S.link.count} × x64`);
+  txt('tt_link', `Host link, per direction: ${nh(fmtBps(Math.max(m.dem.h2d, m.dem.d2h)), fmtBps(Math.min(m.cap.h2d, m.cap.d2h)))}`);
   txt('t1_acc', tp.nA>1 ? `Accelerator × ${S.scale.perNode}` : 'Accelerator');
-  txt('t2_acc', tp.nA>1 ? `${fmtN(tp.nA)} in total · ${S.scale.racks} rack${S.scale.racks>1?'s':''}` : `${sig(S.acc.tops)} TOPS · ${fmtA(m.die)}`);
-  txt('t3_acc', `need ${fmtOps(m.dem.compute)}`); txt('t4_acc', `have ${fmtOps(m.cap.compute)}`);
-  txt('t5_acc', `${sig(S.acc.sram)} MB`);
-  txt('t6_acc', `${fmtW(m.pAcc)} · die ${fmtA(m.die)}`); txt('t7_acc', `NoC ${fmtPct(U.noc)} · SRAM ${fmtPct(U.sram)}`);
-  txt('t1_dram','DRAM'); txt('t2_dram', `${S.dev.units} × ${m.dev.name.split(' ')[0]}`);
-  txt('t3_dram', `need ${fmtBps(m.dem.dram)}`); txt('t4_dram', `have ${fmtBps(m.cap.dram)}`);
-  txt('t5_dram', `${fmtN(S.dev.units*m.dev.width)}-bit · ${fmtB(m.devCap*1e9)}`);
+  txt('t2_acc', tp.nA>1 ? `${fmtN(tp.nA)} in total` : `${sig(S.acc.tops)} TOPS`);
+  txt('t3_acc', `compute ${fmtPct(U.compute)}`); txt('t4_acc', `interconnect ${fmtPct(U.noc)}`); txt('t5_acc', `SRAM ${fmtPct(U.sram)}`);
+  txt('tt_acc', `Accelerator: compute ${nh(fmtOps(m.dem.compute), fmtOps(m.cap.compute))}; ${NOC_TOPO[S.noc.topo].name} ${fmtPct(U.noc)}; SRAM ${fmtPct(U.sram)}; ${fmtW(m.pAcc)}, die ${fmtA(m.die)}`);
+  txt('t1_dram','DRAM'); txt('t2_dram', `${S.dev.units} × ${m.dev.name.split(' ')[0]}`); txt('t3_dram', `${fmtBps(m.cap.dram)} usable`);
+  txt('tt_dram', `Device DRAM: ${nh(fmtBps(m.dem.dram), fmtBps(m.cap.dram))}; ${fmtN(S.dev.units*m.dev.width)}-bit, ${fmtB(m.devCap*1e9)}`);
   if(shown.src){ txt('t1_src', S.src.startsWith('net')?'Network':'Storage'); txt('t2_src', m.srcName.replace('NVMe PCIe ','Gen').replace(' x4 SSD',''));
-    txt('t3_src', `need ${fmtBps(m.dem.src)}`); txt('t4_src', `have ${fmtBps(m.cap.src)}`); txt('t5_src', S.src.endsWith('p2p')?'peer-to-peer':'via host memory'); }
+    txt('tt_src', `${S.src.startsWith('net')?'Network':'Storage'}: ${nh(fmtBps(m.dem.src), fmtBps(m.cap.src))}`); }
   if(shown.fabric){ txt('t1_fabric','Scale-up fabric'); txt('t2_fabric', `${m.fab.name.split(' (')[0]} · ${tp.dom} per domain`);
-    txt('t3_fabric', `need ${fmtBps(m.dem.up||0)}`); txt('t4_fabric', `have ${fmtBps(m.fab.bw*m.fab.eff)}`); txt('t5_fabric',''); }
+    txt('tt_fabric', `Scale-up fabric: ${nh(fmtBps(m.dem.up||0), fmtBps(m.fab.bw*m.fab.eff))} per accelerator`); }
   if(shown.net){ txt('t1_net','Scale-out'); txt('t2_net', `${S.scale.nics} × ${m.nic.name.split(' ')[0]}`);
-    txt('t3_net', `need ${fmtBps(m.dem.out||0)}`); txt('t4_net', `have ${fmtBps(m.nic.gbps*1e9/8*0.95*S.scale.nics)}`); txt('t5_net',''); }
+    txt('tt_net', `Scale-out network: ${nh(fmtBps(m.dem.out||0), fmtBps(m.nic.gbps*1e9/8*0.95*S.scale.nics))} per accelerator`); }
   const traffic = {cpuW:m.Tn*m.hW, cpuR:m.Tn*m.hR, h2dA:m.Ta*S.inR, h2dB:m.Ta*S.inR, d2hA:m.Ta*S.outR, d2hB:m.Ta*S.outR,
     ddW:m.Ta*m.dW, ddR:m.Ta*m.dR, srcE:m.Tn*S.inR, upE:m.Ta*m.xUp, outE:m.Ta*m.xOut};
   const C = {ok:'#6b6b6b', warn:'#cfcfcf', bad:'#ffffff'};
@@ -1197,8 +1236,8 @@ function paintDiagram(m){
     e.el.style.opacity = bps>0 ? 1 : 0;
   }
   txt('l_cpuW', fmtBps(m.Tn*(m.hR+m.hW))); txt('l_srcE', fmtBps(m.Tn*S.inR));
-  txt('l_h2dB', `H→D ${fmtBps(m.Ta*S.inR)}`); txt('l_d2hA', `D→H ${fmtBps(m.Ta*S.outR)}`);
-  txt('l_ddW', `bus ${fmtBps(m.Ta*(m.dR+m.dW))}`); txt('l_upE', fmtBps(m.Ta*m.xUp)); txt('l_outE', fmtBps(m.Ta*m.xOut));
+  txt('l_h2dB', `→ ${fmtBps(m.Ta*S.inR)}`); txt('l_d2hA', `← ${fmtBps(m.Ta*S.outR)}`);
+  txt('l_ddW', fmtBps(m.Ta*(m.dR+m.dW))); txt('l_upE', fmtBps(m.Ta*m.xUp)); txt('l_outE', fmtBps(m.Ta*m.xOut));
 }
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let lastTs = 0;
@@ -1215,39 +1254,42 @@ function tick(ts){
 /* =====================================================================
    SUMMARY
    ===================================================================== */
+let scenOpen = false;
 function paintSummary(m){
-  const w = m.worst, st = state(w.U);
+  const w = m.worst, st = state(w.U), tp = m.tp;
   const latSt = !isFinite(m.latency) || m.latency>S.lat ? 'bad' : 'ok';
-  const tp = m.tp;
+  const scope = ['cpu','host','src'].includes(w.k) ? (tp.nN>1?' per node':'') : (tp.nA>1?' per accelerator':'');
   document.getElementById('verdict').innerHTML = `
     <div class="kpi hero ${st}"><div class="l">${st==='ok'?'Most loaded':st==='warn'?'Limiting (above ceiling)':'Bottleneck'}</div>
-      <div class="v">${w.name} · ${fmtPct(w.U)}</div><div class="s">needs ${w.f(w.need)}, has ${w.f(w.have)}${['cpu','host','src'].includes(w.k)&&tp.nN>1?' per node':tp.nA>1&&!['cpu','host','src'].includes(w.k)?' per accelerator':''}</div></div>
+      <div class="v">${w.name} · ${fmtPct(w.U)}</div><div class="s">needs ${w.f(w.need)}, has ${w.f(w.have)}${scope}</div></div>
     <div class="kpi ${m.maxT>=m.T?'ok':'bad'}"><div class="l">Max sustainable</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target</div></div>
     <div class="kpi ${latSt}"><div class="l">Latency per block</div><div class="v">${fmtT(m.latency)}</div><div class="s">budget ${fmtT(S.lat)}</div></div>
-    <div class="kpi ${m.Prack>S.scale.rackKW*1000&&tp.nA>1?'bad':'ok'}"><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${tp.nA>1?fmtW(m.Prack)+' per rack':sig(m.Ptot/m.T*1e12)+' pJ per byte'}</div></div>
-    <div class="kpi"><div class="l">Accelerators</div><div class="v">${fmtN(tp.nA)}</div><div class="s">${tp.nA>1?`${S.scale.perNode}/node · ${S.scale.nodes} nodes/rack · ${S.scale.racks} rack${S.scale.racks>1?'s':''}`:'die '+fmtA(m.die)}</div></div>`;
-  document.getElementById('reqLine').innerHTML = [
-    `<b>${fmtBps(S.T)}</b> processed`, `latency ≤ <b>${fmtT(S.lat)}</b>`, `<b>${fmtB(S.block)}</b> blocks`,
-    `<b>${sig(S.ops)}</b> op/B`, `<b>${sig(m.dR+m.dW)}</b> DRAM B/B`, `link <b>${sig(S.inR)}</b> in / <b>${sig(S.outR)}</b> out`,
-    tp.nA>1 ? `<b>${fmtN(tp.nA)}</b> accelerators` : `<b>1</b> accelerator`,
-  ].map(s=>`<button class="rchip" data-open="left">${s}</button>`).join('') + `<button class="rchip" data-open="left">edit inputs →</button>`;
+    <div class="kpi ${m.Prack>S.scale.rackKW*1000&&tp.nA>1?'bad':'ok'}"><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${tp.nA>1?fmtN(tp.nA)+' accelerators · '+fmtW(m.Prack)+'/rack':sig(m.Ptot/m.T*1e12)+' pJ per byte'}</div></div>`;
   const p = PRESETS.find(x=>x.id===S.preset);
-  document.getElementById('scen').innerHTML = p ? `<b>${esc(p.name)}</b>${S.mod?' <i>(modified)</i>':''}: ${esc(p.d)}` : '';
+  document.getElementById('reqLine').innerHTML = `<span>${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
+    <button class="link" data-open="left">Edit inputs</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
+  document.getElementById('scen').innerHTML = p && scenOpen ? esc(p.d) : '';
+  const sm = document.getElementById('scenMore'); if(sm) sm.onclick = ()=>{ scenOpen = !scenOpen; paintSummary(M); };
 }
 
 /* =====================================================================
    TABS
    ===================================================================== */
-const TABS = [{id:'sizing', name:'Minimum specs'}, {id:'onchip', name:'On-chip'}, {id:'rack', name:'Racks'}, {id:'ppa', name:'Power & area'}, {id:'latency', name:'Latency'},
-  {id:'headroom', name:'Headroom'}, {id:'roofline', name:'Roofline'}, {id:'cons', name:'Notes'}, {id:'model', name:'Model'}];
+const TABS = [{id:'sizing', name:'Minimum specs'}, {id:'onchip', name:'On-chip'}, {id:'rack', name:'Racks'}, {id:'ppa', name:'Power & area'}, {id:'cons', name:'Notes'},
+  {id:'latency', name:'Latency', more:true}, {id:'headroom', name:'Headroom', more:true}, {id:'roofline', name:'Roofline', more:true}, {id:'model', name:'Model', more:true}];
+let moreOpen = false;
 let tab = 'sizing';
 function buildTabs(){
-  document.getElementById('tabbar').innerHTML = TABS.map(t=>`<button class="tab${t.id===tab?' on':''}" role="tab" data-t="${t.id}">${t.name}<span class="n" id="n_${t.id}" hidden></span></button>`).join('');
+  if(TABS.find(t=>t.id===tab).more) moreOpen = true;
+  document.getElementById('tabbar').innerHTML = TABS.map(t=>`<button class="tab${t.id===tab?' on':''}${t.more?' more':''}" role="tab" data-t="${t.id}" ${t.more&&!moreOpen?'hidden':''}>${t.name}<span class="n" id="n_${t.id}" hidden></span></button>`).join('')
+    + `<button class="tab moretog" id="moreTog">${moreOpen?'Less':'More'} <span aria-hidden="true">${moreOpen?'‹':'›'}</span></button>`;
   document.getElementById('panes').innerHTML = TABS.map(t=>`<div class="pane${t.id===tab?' on':''}" id="p_${t.id}"></div>`).join('');
-  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ tab=b.dataset.t; document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab[data-t]').forEach(b=>b.onclick=()=>{ tab=b.dataset.t; document.querySelectorAll('.tab[data-t]').forEach(x=>x.classList.toggle('on',x===b));
     document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on', p.id==='p_'+tab)); update(); });
+  document.getElementById('moreTog').onclick = ()=>{ moreOpen = !moreOpen; if(!moreOpen && TABS.find(t=>t.id===tab).more) tab = 'sizing'; buildTabs(); update(); };
 }
 
+let showAllDram = false, showAllNotes = false;
 function paneSizing(m){
   const rows = sizeDram(S, m), need = m.Tba*(m.dR+m.dW)/S.ceil;
   const lp4 = rows.find(r=>r.id==='lp4_3200'), lp4x = rows.find(r=>r.id==='lp4x_4266');
@@ -1264,11 +1306,12 @@ function paneSizing(m){
       : firstOK ? `The lowest-power practical option is <b>${firstOK.n} × ${firstOK.d.name}</b> (${fmtW(firstOK.power)}).` : ''}
     On the host link, ${pcieOK.length ? `the narrowest PCIe that fits is <b>${pcieOK.map(l=>l.L.name+' x'+l.lanes).slice(0,2).join(' or ')}</b>.`
       : `<b>no single PCIe x16 is enough</b>: ${links.filter(l=>l.L.kind==='pcie').map(l=>l.L.name+' needs '+l.count+' × x16').slice(-2).join(', ')}. Move less data across it, or put the accelerator on the package (UCIe: ${links.find(l=>l.id==='ucie').count} modules).`}${accLine}</div>`;
+  const shownRows = showAllDram ? rows : rows.filter(r=>r.feas!=='bad' || r.id===S.dev.dram);
   const dramT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>DRAM</th><th class="n">Units</th><th class="n">Bus width</th><th class="n">Peak</th><th class="n">Capacity</th><th class="n">Power</th><th class="n">PHY area</th><th class="n">Die edge</th><th class="n">Pins</th><th></th><th></th></tr></thead><tbody>${
-    rows.map(r=>`<tr class="${r.id===S.dev.dram?'cur':''}"><td>${r.d.name}</td><td class="n">${r.n} × ${r.d.unit}${r.capLimited?' ᶜ':''}</td><td class="n">${fmtN(r.width)}</td>
+    shownRows.map(r=>`<tr class="${r.id===S.dev.dram?'cur':''}"><td>${r.d.name}</td><td class="n">${r.n} × ${r.d.unit}${r.capLimited?' ᶜ':''}</td><td class="n">${fmtN(r.width)}</td>
       <td class="n">${fmtBps(r.peak)}</td><td class="n">${fmtB(r.cap*1e9)}</td><td class="n">${fmtW(r.power)}</td><td class="n">${fmtA(r.phy)}</td><td class="n">${sig(r.shore)} mm</td><td class="n">${fmtN(Math.round(r.pins))}</td>
       <td>${tag(r.feas)}</td><td><button class="use" data-dram="${r.id}" data-n="${r.n}">use</button></td></tr>`).join('')}</tbody></table></div>
-    <p class="note">ᶜ sized by capacity rather than bandwidth. Practical / extreme limits: DDR 8 / 12 channels, LPDDR 256-bit / 1024-bit, GDDR 384-bit / 512-bit, HBM about 6–8 / 12 stacks.</p>`;
+    <p class="note"><button class="link" id="dramAll">${showAllDram?'Show only workable options':'Show all '+rows.length+' technologies'}</button>${shownRows.length<rows.length?' · '+(rows.length-shownRows.length)+' impractical hidden':''}. ᶜ sized by capacity. Practical / extreme limits: DDR 8 / 12 channels, LPDDR 256 / 1024-bit, GDDR 384 / 512-bit, HBM 6–8 / 12 stacks.</p>`;
   const linkT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Config</th><th class="n">Usable H→D</th><th class="n">Power</th><th class="n">PHY area</th><th></th><th></th></tr></thead><tbody>${
     links.map(l=>`<tr class="${l.id===S.link.id?'cur':''}"><td>${l.L.name}</td><td class="n">${l.L.kind==='pcie' ? (l.count>1?l.count+' × ':'')+'x'+l.lanes : l.count+' × x64'}</td>
       <td class="n">${fmtBps(l.perDir)}</td><td class="n">${fmtW(l.power)}</td><td class="n">${fmtA(l.phy)}</td><td>${tag(l.feas, l.feas==='ok'?'one link':l.feas==='warn'?'several':'impractical')}</td>
@@ -1292,41 +1335,66 @@ function paneSizing(m){
 }
 
 function paneOnchip(m){
-  const nc = S.noc, n = m.noc, k = Math.round(n.k), W = 560, pad = 56, cell = (W-2*pad)/k;
+  const nc = S.noc, n = m.noc, t = NOC_TOPO[nc.topo], W = 560, pad = 56;
+  const wt = u => (0.6 + 4*Math.min(1, Math.max(0.12, u))).toFixed(2);           // line weight follows load
   let g = '';
-  const lw = (i) => { const load = (i+1)*(k-i-1)/((k/2)*(k/2)); return 0.5 + 5*Math.min(1, load*Math.min(1.5, Math.max(0.15, m.U.noc))); };  // XY channel load ∝ tiles on each side
-  if(nc.topo==='mesh' || nc.topo==='torus'){
+  if(nc.topo==='ring'){
+    const cx = W/2, cy = W/2, Rr = W/2-pad;
+    g += `<circle cx="${cx}" cy="${cy}" r="${Rr}" fill="none" stroke="#8a8a8a" stroke-width="${wt(m.U.noc)}"/>`;
+    for(let i=0;i<n.N;i++){ const a = i/n.N*2*Math.PI; g += `<rect x="${cx+Rr*Math.cos(a)-4}" y="${cy+Rr*Math.sin(a)-4}" width="8" height="8" fill="#1f1f1f" stroke="#6b6b6b"/>`; }
+  } else if(nc.topo==='xbar'){
+    const y0 = pad, h = W-2*pad, sh = Math.min(n.N,32);
+    g += `<rect x="${W/2-40}" y="${y0}" width="80" height="${h}" fill="#171717" stroke="#8a8a8a"/><text x="${W/2}" y="${W/2}" text-anchor="middle" style="fill:#a3a3a3">crossbar</text>`;
+    for(let i=0;i<sh;i++){ const y = y0+(i+0.5)*h/sh; g += `<line x1="${W/2-40}" x2="${W/2-90}" y1="${y}" y2="${y}" stroke="#4a4a4a"/><line x1="${W/2+40}" x2="${W/2+90}" y1="${y}" y2="${y}" stroke="#4a4a4a"/>`; }
+  } else if(n.kind==='grid'){
+    const k = Math.round(n.k), cell = (W-2*pad)/k;
+    const lw = i => (0.5 + 5*Math.min(1, (i+1)*(k-i-1)/((k/2)*(k/2))*Math.min(1.5, Math.max(0.15, m.U.noc)))).toFixed(2);   // XY channel load ∝ tiles each side
     for(let r=0;r<k;r++) for(let c=0;c<k;c++){
       const x = pad+c*cell, y = pad+r*cell;
-      if(c<k-1) g += `<line x1="${x+cell*0.75}" x2="${x+cell*1.25}" y1="${y+cell/2}" y2="${y+cell/2}" stroke="#8a8a8a" stroke-width="${lw(c).toFixed(2)}"/>`;
-      if(r<k-1) g += `<line y1="${y+cell*0.75}" y2="${y+cell*1.25}" x1="${x+cell/2}" x2="${x+cell/2}" stroke="#8a8a8a" stroke-width="${lw(r).toFixed(2)}"/>`;
-      g += `<rect x="${x+cell*0.25}" y="${y+cell*0.25}" width="${cell*0.5}" height="${cell*0.5}" fill="#1f1f1f" stroke="#6b6b6b"/>`;
+      if(c<k-1) g += `<line x1="${x+cell*0.75}" x2="${x+cell*1.25}" y1="${y+cell/2}" y2="${y+cell/2}" stroke="#8a8a8a" stroke-width="${lw(c)}"/>`;
+      if(r<k-1) g += `<line y1="${y+cell*0.75}" y2="${y+cell*1.25}" x1="${x+cell/2}" x2="${x+cell/2}" stroke="#8a8a8a" stroke-width="${lw(r)}"/>`;
+      g += `<rect x="${x+cell*0.25}" y="${y+cell*0.25}" width="${cell*0.5}" height="${cell*0.5}" fill="#1f1f1f" stroke="${nc.topo==='chi'&&(r+c)%3===0?'#a3a3a3':'#6b6b6b'}"/>`;
     }
-    if(nc.topo==='torus') for(let i=0;i<k;i++){ const o = pad+i*cell+cell/2;
-      g += `<path d="M${pad+cell*0.25},${o} C${pad-14},${o} ${pad-14},${o-6} ${pad-14},${o-6}" fill="none" stroke="#4a4a4a" stroke-dasharray="2 2"/>`; }
-  } else if(nc.topo==='ring'){
-    const cx = W/2, cy = W/2, R = W/2-pad, N = n.N;
-    g += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#8a8a8a" stroke-width="${(1+3*Math.min(1,m.U.noc)).toFixed(2)}"/>`;
-    for(let i=0;i<N;i++){ const a = i/N*2*Math.PI; g += `<rect x="${cx+R*Math.cos(a)-4}" y="${cy+R*Math.sin(a)-4}" width="8" height="8" fill="#1f1f1f" stroke="#6b6b6b"/>`; }
+    g += `<line x1="${W/2}" x2="${W/2}" y1="${pad-14}" y2="${W-pad+14}" stroke="#ededed" stroke-dasharray="5 4"/><text x="${W/2+6}" y="${W-pad+10}">bisection</text>`;
+    if(nc.topo==='chi') g += `<text x="${W/2}" y="${pad-22}" text-anchor="middle">light outlines: home nodes / cache slices</text>`;
+  } else if(n.kind==='axi'){
+    const sh = Math.min(n.N,16), ss = Math.min(n.S,16), x0 = 90, x1 = W-90, cx = W/2, h = W-2*pad;
+    g += `<rect x="${cx-55}" y="${pad}" width="110" height="${h}" fill="#171717" stroke="#8a8a8a"/><text x="${cx}" y="${W/2-6}" text-anchor="middle" style="fill:#a3a3a3">AXI</text><text x="${cx}" y="${W/2+10}" text-anchor="middle" style="fill:#6b6b6b">${nc.topo==='ace'?'+ snoop channels':'R and W channels'}</text>`;
+    for(let i=0;i<sh;i++){ const y = pad+(i+0.5)*h/sh; g += `<rect x="${x0-24}" y="${y-6}" width="18" height="12" fill="#1f1f1f" stroke="#6b6b6b"/><line x1="${x0-6}" x2="${cx-55}" y1="${y}" y2="${y}" stroke="#6b6b6b" stroke-width="${wt(n.U.inj)}"/>`; }
+    for(let i=0;i<ss;i++){ const y = pad+(i+0.5)*h/ss; g += `<line x1="${cx+55}" x2="${x1}" y1="${y}" y2="${y}" stroke="#8a8a8a" stroke-width="${wt(n.U.edge)}"/><rect x="${x1}" y="${y-7}" width="26" height="14" fill="#ededed"/>`; }
+    g += `<text x="${x0-15}" y="${pad-12}" text-anchor="middle">masters (${n.N})</text><text x="${x1+13}" y="${pad-12}" text-anchor="middle">memory ports (${n.S})</text>`;
+  } else if(n.kind==='stream'){
+    const lanes = Math.min(n.S,12), depth = Math.max(1, Math.round(n.N/n.S)), sd = Math.min(depth,10), h = W-2*pad, step = (W-2*pad-40)/sd;
+    for(let l=0;l<lanes;l++){ const y = pad+(l+0.5)*h/lanes;
+      g += `<rect x="${pad-36}" y="${y-6}" width="20" height="12" fill="#ededed"/><line x1="${pad-16}" x2="${W-pad+16}" y1="${y}" y2="${y}" stroke="#8a8a8a" stroke-width="${wt(n.U.inj)}" marker-end="url(#oc_ar)"/>`;
+      for(let i=0;i<sd;i++) g += `<rect x="${pad+20+i*step}" y="${y-8}" width="${Math.min(22,step*0.6)}" height="16" fill="#1f1f1f" stroke="#6b6b6b"/>`; }
+    g += `<text x="${W/2}" y="${pad-18}" text-anchor="middle">${n.S} pipelines × ${depth} stages${depth>sd?' (first '+sd+' drawn)':''}</text>`;
   } else {
-    const N = n.N, y0 = pad, h = W-2*pad;
-    g += `<rect x="${W/2-40}" y="${y0}" width="80" height="${h}" fill="#171717" stroke="#8a8a8a"/><text x="${W/2}" y="${W/2}" text-anchor="middle" style="fill:#a3a3a3">crossbar</text>`;
-    for(let i=0;i<Math.min(N,32);i++){ const y = y0 + (i+0.5)*h/Math.min(N,32); g += `<line x1="${W/2-40}" x2="${W/2-90}" y1="${y}" y2="${y}" stroke="#4a4a4a"/><line x1="${W/2+40}" x2="${W/2+90}" y1="${y}" y2="${y}" stroke="#4a4a4a"/>`; }
+    const sh = Math.min(n.N,16), y = W/2-40, x0 = pad, x1 = W-pad;
+    g += `<line x1="${x0}" x2="${x1}" y1="${y}" y2="${y}" stroke="#ededed" stroke-width="${(2+5*Math.min(1,m.U.noc)).toFixed(1)}"/>`;
+    g += `<rect x="${x0-30}" y="${y-60}" width="70" height="30" fill="#171717" stroke="#8a8a8a"/><text x="${x0+5}" y="${y-41}" text-anchor="middle">arbiter</text><line x1="${x0+5}" x2="${x0+5}" y1="${y-30}" y2="${y}" stroke="#6b6b6b"/>`;
+    g += `<rect x="${x1-26}" y="${y-48}" width="40" height="18" fill="#ededed"/><line x1="${x1-6}" x2="${x1-6}" y1="${y-30}" y2="${y}" stroke="#6b6b6b"/>`;
+    for(let i=0;i<sh;i++){ const x = x0+30+i*(x1-x0-60)/Math.max(1,sh-1); g += `<line x1="${x}" x2="${x}" y1="${y}" y2="${y+50}" stroke="#4a4a4a"/><rect x="${x-9}" y="${y+50}" width="18" height="14" fill="#1f1f1f" stroke="#6b6b6b"/>`; }
+    g += `<text x="${W/2}" y="${y+100}" text-anchor="middle">one transfer at a time, reads and writes share the bus</text>`;
   }
-  // memory controllers / PHYs on the die edge
-  const mc = Math.min(S.dev.units, 16);
-  for(let i=0;i<mc;i++){ const side = i%4, t = (Math.floor(i/4)+0.5)/Math.ceil(mc/4), L = W-2*pad;
-    const [x,y,w,h] = side===0 ? [pad+t*L-14, 10, 28, 14] : side===1 ? [W-24, pad+t*L-14, 14, 28] : side===2 ? [pad+t*L-14, W-24, 28, 14] : [10, pad+t*L-14, 14, 28];
-    g += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ededed"/>`; }
-  if(nc.topo==='mesh'||nc.topo==='torus') g += `<line x1="${W/2}" x2="${W/2}" y1="${pad-14}" y2="${W-pad+14}" stroke="#ededed" stroke-dasharray="5 4"/><text x="${W/2+6}" y="${W-pad+10}">bisection</text>`;
-  const svg = `<svg class="chart" viewBox="0 0 ${W} ${W}" role="img" aria-label="On-chip network">${g}</svg>`;
-  const rows = Object.entries(NOC_TOPO).map(([id,t])=>{ const mm = model({...S, noc:{...S.noc, topo:id}}); return `<tr class="${id===nc.topo?'cur':''}"><td>${t.name}</td><td class="n">${fmtPct(mm.U.noc)}</td><td class="n">${sig(mm.noc.hops)}</td><td class="n">${fmtA(mm.area.noc)}</td><td class="n">${fmtW(mm.A.noc)}</td><td>${tag(state(mm.U.noc), state(mm.U.noc)==='ok'?'fits':state(mm.U.noc)==='warn'?'tight':'too slow')}</td></tr>`; }).join('');
-  const lim = (l,u,d,c)=>stat(l, `${fmtPct(u)} · ${fmtBps(d)} of ${fmtBps(c)}`);
-  return `<div class="cols"><div class="card"><h3>${NOC_TOPO[nc.topo].name} · ${n.N} tiles</h3>${svg}<p class="note">Link weight follows the load XY routing puts on it (heaviest across the middle). White blocks on the edge are the memory controllers and PHYs.</p></div>
-    <div class="card"><h3>Limits, per accelerator</h3>${lim('Bisection', n.U.bis, n.dem.bis, n.cap.bis)}${lim('Edge injection', n.U.edge, n.dem.edge, n.cap.edge)}${lim('Tile port', n.U.inj, n.dem.inj, n.cap.inj)}${stat('SRAM banks', fmtPct(m.U.sram)+' · '+fmtBps(m.dem.sram)+' of '+fmtBps(m.cap.sram))}
-      ${stat('Link bandwidth (each way)', fmtBps(n.link))}${stat('Mean hops', sig(n.hops))}${stat('NoC latency, there and back', fmtT(2*n.hops*nc.hopNs*1e-9))}${stat('On-chip movement power', fmtW(m.A.noc))}${stat('Router area', fmtA(m.area.noc))}
-      <h3 style="margin-top:16px">Topologies at these settings</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Topology</th><th class="n">Load</th><th class="n">Hops</th><th class="n">Area</th><th class="n">Power</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-      <p class="note">Edit tiles, link width, clock and traffic pattern from the Accelerator block.</p></div></div>`;
+  if(n.kind==='grid' && nc.topo!=='xbar'){                                       // memory controllers / PHYs on the die edge
+    const mc = Math.min(S.dev.units, 16);
+    for(let i=0;i<mc;i++){ const side = i%4, tt = (Math.floor(i/4)+0.5)/Math.ceil(mc/4), L = W-2*pad;
+      const [x,y,w,h] = side===0 ? [pad+tt*L-14, 10, 28, 14] : side===1 ? [W-24, pad+tt*L-14, 14, 28] : side===2 ? [pad+tt*L-14, W-24, 28, 14] : [10, pad+tt*L-14, 14, 28];
+      g += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ededed"/>`; }
+  }
+  const svg = `<svg class="chart" viewBox="0 0 ${W} ${W}" role="img" aria-label="On-chip interconnect"><defs><marker id="oc_ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L10,5 L0,9 z" fill="#8a8a8a"/></marker></defs>${g}</svg>`;
+  const rows = Object.entries(NOC_TOPO).map(([id,tt])=>{
+    const cfg = id===nc.topo ? {...nc} : {...nc, topo:id, width:tt.typ[0], ghz:tt.typ[1]};
+    const mm = model({...S, noc:cfg}), st = state(mm.U.noc);
+    return `<tr class="${id===nc.topo?'cur':''}"><td>${tt.name}</td><td class="n">${cfg.width}-bit · ${cfg.ghz} GHz</td><td class="n">${fmtPct(mm.U.noc)}</td><td class="n">${fmtA(mm.area.noc)}</td><td>${tag(st, st==='ok'?'fits':st==='warn'?'tight':'too slow')}</td><td><button class="use" data-noc="${id}">use</button></td></tr>`; }).join('');
+  const lim = (l,key)=>stat(l, `${fmtPct(n.U[key])} · ${fmtBps(n.dem[key])} of ${fmtBps(n.cap[key])}`);
+  const names = n.kind==='axi' ? ['Tile-to-tile through the crossbar','Memory-side ports','Master port'] : n.kind==='bus' ? ['The bus','The bus','The bus'] : n.kind==='stream' ? ['Busiest pipeline link','Pipeline entries','Busiest pipeline link'] : ['Bisection','Edge injection','Tile port'];
+  return `<div class="cols"><div class="card"><h3>${t.name} · ${n.N} ${n.kind==='axi'?'masters':n.kind==='stream'?'stages':'tiles'}</h3>${svg}<p class="note">${esc(t.use)}. Line weight follows load.</p></div>
+    <div class="card"><h3>Limits, per accelerator</h3>${n.kind==='bus'?lim(names[0],'bis'):n.kind==='stream'?lim(names[1],'edge')+lim(names[2],'inj'):lim(names[0],'bis')+lim(names[1],'edge')+lim(names[2],'inj')}${stat('SRAM banks', fmtPct(m.U.sram)+' · '+fmtBps(m.dem.sram)+' of '+fmtBps(m.cap.sram))}
+      ${stat('Link bandwidth (each way)', fmtBps(n.link))}${stat('Mean hops', sig(n.hops))}${stat('Latency, there and back', fmtT(2*n.hops*nc.hopNs*1e-9))}${stat('Movement power', fmtW(m.A.noc))}${stat('Interconnect area', fmtA(m.area.noc))}
+      <details class="more"><summary>Compare every interconnect</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>Interconnect</th><th class="n">Config</th><th class="n">Load</th><th class="n">Area</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">Each alternative at its typical width and clock; yours at your settings.</p></details></div></div>`;
 }
 
 function paneRack(m){
@@ -1453,7 +1521,14 @@ function considerations(m){
     if(m.xOut>0) add(state(m.U.out), 'Scale-out network', `<p><b>${fmtBps(m.Ta*m.xOut)}</b> per accelerator crosses the network, on ${S.scale.nics} × ${m.nic.name.split(' ')[0]} each: ${fmtN(tp.nA*S.scale.nics)} ports, ${fmtW(tp.nA*S.scale.nics*m.nic.w)} of NICs and optics. Collective latency grows with log₂ of the number of domains.</p>`);
     add(m.Prack>S.scale.rackKW*1000?'bad':'ok', 'Rack power and cooling', `<p><b>${fmtW(m.Prack)}</b> per rack against a ${S.scale.rackKW} kW limit. Air cooling tops out around 40 kW; dense accelerator racks need direct liquid cooling, and the floor, power feeds and weight follow.</p>`);
   }
-  add(state(m.U.noc), 'On-chip network', `<p>${NOC_TOPO[S.noc.topo].name} of ${m.noc.N} tiles, ${S.noc.width}-bit links at ${S.noc.ghz} GHz (${fmtBps(m.noc.link)} each way). The tightest limit is the ${({bis:'bisection',edge:'edge injection from the memory controllers and links',inj:'tile injection port'})[m.noc.worst]} at <b>${fmtPct(m.U.noc)}</b>. Mean distance ${sig(m.noc.hops)} hops.</p>`);
+  add(state(m.U.noc), 'On-chip interconnect', `<p>${NOC_TOPO[S.noc.topo].name}, ${m.noc.N} ${m.noc.kind==='axi'?'masters':'tiles'}, ${S.noc.width}-bit at ${S.noc.ghz} GHz (${fmtBps(m.noc.link)} per link each way). The tightest point runs at <b>${fmtPct(m.U.noc)}</b>. Mean distance ${sig(m.noc.hops)} hops.</p>`);
+  { const tt = NOC_TOPO[S.noc.topo], n = m.noc;
+    if(tt.kind==='bus') add(S.noc.topo==='apb' || S.noc.width>256 || S.noc.ghz>1 ? 'warn' : state(m.U.noc), S.noc.topo==='apb' ? 'APB is a register bus' : 'AHB is a shared bus',
+      `<p>${S.noc.topo==='apb' ? 'APB has no bursts or pipelining: two cycles per transfer at best. It carries configuration and status registers, normally behind an AXI-to-APB bridge, not data.' : 'Only one master transfers at a time, and reads and writes take turns, so the whole accelerator shares <b>'+fmtBps(n.cap.bis)+'</b>.'}${(S.noc.width>256||S.noc.ghz>1)?' Widths above 256 bits or clocks above 1 GHz are unusual for this bus.':''} Bulk data normally moves over AXI or a NoC.</p>`);
+    if(tt.kind==='axi'){ const out = Math.ceil(Math.max(n.inT,n.outT)/n.S*m.dev.lat*1e-9/64);
+      add(out>64?'warn':'info', 'AXI outstanding transactions', `<p>Each memory-side port must keep about <b>${fmtN(out)}</b> 64 B transactions in flight to cover DRAM latency (bandwidth × latency). That sets the ID width and reorder-buffer depth${out>64?'; this is deep, so use longer bursts or more ports':''}.${S.noc.topo==='ace'?' ACE snoop traffic takes part of each channel.':''}</p>`); }
+    if(tt.kind==='stream' && S.noc.pattern==='uniform') add('warn', 'Streams and all-to-all traffic', `<p>AXI4-Stream links are point to point; all-to-all traffic has to ripple along the pipelines, about ${sig(n.hopsLocal)} hops each.</p>`);
+  }
   add(state(m.U.sram), 'SRAM bank bandwidth', `<p>Every byte lands in SRAM: <b>${fmtBps(m.dem.sram)}</b> against ${S.noc.banks} banks × ${S.noc.bankB} B × ${S.noc.ghz} GHz = <b>${fmtBps(m.cap.sram)}</b> usable.</p>`);
   add('info', 'DRAM is half duplex; links are not', `<p>Reads and writes share one DRAM bus: <b>${sig(m.dR+m.dW)} B</b> per processed byte (${sig(m.dR)} R + ${sig(m.dW)} W). PCIe carries each direction separately. Turnarounds cost up to 10 % at a 50/50 mix.</p>`);
   add(m.devE<0.6?'warn':'info', 'Achievable vs peak DRAM bandwidth', `<p>${PATTERNS[S.pattern].name} reaches about <b>${fmtPct(m.devE)}</b> of peak after refresh, page misses and bank conflicts${S.ecc&&(d.fam==='LPDDR'||d.fam==='GDDR')?' and inline ECC':''}.</p>`);
@@ -1477,10 +1552,13 @@ function considerations(m){
   return C;
 }
 function paneCons(m){
-  const C = considerations(m), order = {bad:0, warn:1, ok:2, info:3};
-  C.sort((a,b)=>order[a.lvl]-order[b.lvl]);
+  const all = considerations(m), order = {bad:0, warn:1, ok:2, info:3};
+  all.sort((a,b)=>order[a.lvl]-order[b.lvl]);
+  const C = showAllNotes ? all : all.filter(c=>c.lvl==='bad'||c.lvl==='warn');
   const lab = {bad:'fails', warn:'tight', ok:'ok', info:'note'};
-  return `<div class="cons">${C.map(c=>`<div class="con ${c.lvl}"><h4>${c.title} <span class="tag ${c.lvl==='info'||c.lvl==='ok'?'':c.lvl}">${lab[c.lvl]}</span></h4>${c.body}</div>`).join('')}</div>`;
+  return (C.length ? '' : `<p class="note" style="margin-top:0">Nothing fails or runs tight.</p>`)
+    + `<div class="cons">${C.map(c=>`<div class="con ${c.lvl}"><h4>${c.title} <span class="tag ${c.lvl==='info'||c.lvl==='ok'?'':c.lvl}">${lab[c.lvl]}</span></h4>${c.body}</div>`).join('')}</div>`
+    + `<p class="note"><button class="link" id="notesAll">${showAllNotes?'Show only problems':'Show all '+all.length+' notes'}</button></p>`;
 }
 function paneModel(){
   const dr = Object.values(DRAMS).map(d=>`<tr><td>${d.name}</td><td class="n">${d.rate}</td><td class="n">${d.width}</td><td class="n">${fmtBps(dramUnitBW(d))}</td><td class="n">${d.cap} GB</td><td class="n">${d.lat} ns</td><td class="n">${d.pj}</td><td class="n">${d.bg}</td><td class="n">${d.phy}</td><td class="n">${d.shore}</td><td class="n">${d.pract} / ${d.ext}</td></tr>`).join('');
@@ -1493,7 +1571,7 @@ function paneModel(){
   <div class="card span"><h3>Host links</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Rate</th><th class="n">Encoding</th><th class="n">pJ/bit</th><th class="n">PHY mm²/lane</th><th class="n">Read RTT</th></tr></thead><tbody>${lk}</tbody></table></div></div>
   <div class="card span"><h3>Scale-up fabrics (per accelerator, per direction)</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Fabric</th><th class="n">Raw</th><th class="n">Efficiency</th><th class="n">pJ/bit</th><th class="n">Switch W/acc.</th><th class="n">Max domain</th></tr></thead><tbody>${fb}</tbody></table></div>
   <p class="note">Scale-out traffic is charged 15 pJ/bit (NIC, optics, switches) plus NIC power per port.</p></div>
-  <div class="card span"><h3>On-chip network</h3><p style="margin:0;color:var(--t2)">Traffic entering or leaving the die (DRAM, host link, peers) enters the tile array at its edge; tile-to-tile traffic follows the chosen pattern. The model checks three limits: the edge channels (4k for a k × k mesh or torus), the bisection (k channels per direction for a mesh, 2k for a torus, 2 for a ring) with 1/16 of edge traffic and a pattern-dependent share of tile traffic crossing it, and each tile's injection port. Links run at ${(NOC_EFF*100).toFixed(0)} % efficiency. Mean hops: k/4+1 from the edge; 2k/3 (mesh), k/2 (torus), N/4 (ring) or 1 (crossbar) for all-to-all. Energy ${BASE.noc.pj} pJ/bit/hop plus ${SRAM_PJ} pJ/bit per SRAM access; router area ${NOC_TOPO.mesh.rA*512} mm² per tile at 512 bits, crossbar area growing as N².</p></div></div>`;
+  <div class="card span"><h3>On-chip interconnect</h3><p style="margin:0;color:var(--t2)">Traffic entering or leaving the die (DRAM, host link, peers) meets the interconnect at the edge; tile-to-tile traffic follows the chosen pattern. Networks-on-chip (mesh, torus, ring, crossbar, and AMBA CHI as a coherent mesh) are checked at the edge channels (4k for a k × k grid), the bisection (k channels per direction for a mesh, 2k for a torus, 2 for a ring, with 1/16 of edge traffic and a pattern-dependent share of tile traffic crossing) and each tile's port. AMBA AXI and ACE are crossbars of masters and memory-side slave ports with independent read and write channels, checked at the memory ports, the master ports and tile-to-tile traffic through the crossbar. AXI4-Stream is a set of parallel pipelines, checked at their entries and busiest link. AHB and APB are shared buses: every transfer in either direction takes the one bus. Usable share of a link: ${Object.values(NOC_TOPO).map(t=>t.name.replace(/ \(.*\)/,'')+' '+(t.eff*100).toFixed(0)+' %').join(', ')}. Energy ${BASE.noc.pj} pJ/bit per hop plus ${SRAM_PJ} pJ/bit per SRAM access.</p></div></div>`;
 }
 
 /* ---- charts (monochrome; series told apart by grey level and dash) */
@@ -1558,7 +1636,7 @@ function update(){
   const el = document.getElementById('p_'+tab); if(el) el.innerHTML = PANES[tab](m);
   const nb = considerations(m).filter(c=>c.lvl==='bad').length;
   const n = document.getElementById('n_cons'); if(n){ n.hidden = !nb; n.className = 'n bad'; n.textContent = nb; }
-  const r = document.getElementById('n_rack'); if(r){ r.hidden = m.tp.nA===1; r.className = 'n'; r.textContent = fmtN(m.tp.nA); }
+  const rt = document.querySelector('.tab[data-t="rack"]'); if(rt){ rt.hidden = m.tp.nA===1; if(m.tp.nA===1 && tab==='rack'){ tab = 'sizing'; buildTabs(); return update(); } }
   saveHash();
 }
 function buildAll(){
@@ -1570,6 +1648,10 @@ document.addEventListener('click', e=>{
   if(u){ S.dev.dram = u.dataset.dram; S.dev.units = +u.dataset.n; selected = 'dram'; buildAll(); toast('Device DRAM: '+u.dataset.n+' × '+DRAMS[u.dataset.dram].name); return; }
   const l = e.target.closest('[data-link]');
   if(l){ S.link.id = l.dataset.link; S.link.lanes = +l.dataset.lanes; S.link.count = +l.dataset.count; S.link.rtt = LINKS[S.link.id].rtt; selected = 'link'; buildAll(); toast('Link: '+LINKS[S.link.id].name); return; }
+  const nb = e.target.closest('[data-noc]');
+  if(nb){ const tt = NOC_TOPO[nb.dataset.noc]; S.noc.topo = nb.dataset.noc; S.noc.width = tt.typ[0]; S.noc.ghz = tt.typ[1]; buildAll(); toast('On-chip: '+tt.name); return; }
+  if(e.target.id==='dramAll'){ showAllDram = !showAllDram; update(); return; }
+  if(e.target.id==='notesAll'){ showAllNotes = !showAllNotes; update(); return; }
   const o = e.target.closest('[data-open]');
   if(o) openDrawer(o.dataset.open);
 });
@@ -1634,8 +1716,9 @@ const HW_MAP = {
   host_io_cores:['host.cores','int',1,512,'host I/O cores',String],
   scaleup_fabric:['scale.fabric','enum',Object.keys(FABRICS),null,'fabric',v=>FABRICS[v].name], nic:['scale.nic','enum',Object.keys(NICS),null,'NIC',v=>NICS[v].name],
   nics_per_accelerator:['scale.nics','int',1,8,'NICs/accelerator',String],
-  noc_topology:['noc.topo','enum',Object.keys(NOC_TOPO),null,'NoC',v=>NOC_TOPO[v].name], noc_tiles:['noc.tiles','enum',[16,36,64,100,144,256],null,'tiles',String],
-  noc_link_bits:['noc.width','enum',[128,256,512,1024,2048],null,'NoC link',v=>v+'-bit'], noc_ghz:['noc.ghz','num',0.5,4,'NoC clock',v=>sig(v)+' GHz'],
+  noc_topology:['noc.topo','enum',Object.keys(NOC_TOPO),null,'NoC',v=>NOC_TOPO[v].name], noc_tiles:['noc.tiles','enum',[4,8,16,36,64,100,144,256],null,'tiles',String],
+  noc_link_bits:['noc.width','enum',[32,64,128,256,512,1024,2048],null,'interconnect width',v=>v+'-bit'], noc_ghz:['noc.ghz','num',0.1,4,'interconnect clock',v=>sig(v)+' GHz'],
+  noc_memory_ports:['noc.ports','int',1,32,'memory-side ports / pipelines',String],
   sram_banks:['noc.banks','enum',[16,32,64,128,288,576,1024],null,'SRAM banks',String],
   network_port:['net.id','enum',Object.keys(ETH),null,'network port',v=>ETH[v].name], network_ports_per_node:['net.count','int',1,32,'ports',String],
   ssd:['nvme.id','enum',Object.keys(NVME),null,'SSD',v=>NVME[v].name], ssds_per_node:['nvme.count','int',1,48,'SSDs',String],
@@ -1691,7 +1774,7 @@ const AGENT_TOOLS = [
    input_schema:{type:'object', properties:{questions:{type:'array', minItems:1, maxItems:3, items:{type:'object', properties:{
      question:{type:'string'}, why:{type:'string', description:'One short clause on why it matters.'}, options:{type:'array', minItems:2, maxItems:4, items:{type:'string'}}}, required:['question','options']}}}, required:['questions']}},
 ];
-const AGENT_SYSTEM = `You are the design assistant inside Bottleneck Explorer, a first-order sizing model of data-processing systems: hosts, host links (PCIe, UCIe), accelerators with an on-chip network and SRAM, device DRAM, scale-up fabrics, scale-out networks and racks. A person describes in plain language what a system has to do. Turn that into the model's inputs, ask for missing details that matter, then choose hardware that meets the requirement with sensible power and area. The page redraws live as you call tools, so the person watches the design take shape.
+const AGENT_SYSTEM = `You are the design assistant inside Bottleneck Explorer, a first-order sizing model of data-processing systems: hosts, host links (PCIe, UCIe), accelerators with an on-chip interconnect (mesh, torus, ring or crossbar NoCs, or AMBA: CHI coherent mesh, AXI and ACE crossbars, AXI4-Stream pipelines, AHB and APB buses) and SRAM, device DRAM, scale-up fabrics, scale-out networks and racks. A person describes in plain language what a system has to do. Turn that into the model's inputs, ask for missing details that matter, then choose hardware that meets the requirement with sensible power and area. The page redraws live as you call tools, so the person watches the design take shape.
 
 How the model reads its inputs:
 - rate_bytes_per_s is bytes of input processed per second by the whole system. Everything else is per byte processed: link bytes in and out (host ↔ accelerator), extra DRAM reads and writes (weights, tables, intermediates, multiple passes), arithmetic in operations per byte, tile-to-tile bytes on the on-chip network, and peer bytes exchanged between accelerators inside the scale-up domain or across the network.

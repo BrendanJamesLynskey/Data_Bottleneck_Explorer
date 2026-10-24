@@ -13,8 +13,11 @@ minimum specification of every component, and the power, performance and area (P
 
 ## Layout
 
-A sober black-and-white page: the verdict, a one-line summary of the requirements and a live block diagram
-up front, with the analysis in tabs below. Status is shown by weight and inversion rather than colour
+A sober black-and-white page with little on screen at once: the verdict, a one-line summary of the
+requirements and a compact live block diagram, with the analysis in tabs below. Detail is hidden until
+you ask for it: hover a block for its figures, click it for its settings, and open the legend, the
+example's description, the less-used tabs (Latency, Headroom, Roofline, Model), the impractical DRAM
+options and the passing checks only when you want them. Status is shown by weight and inversion rather than colour
 (grey within the utilisation ceiling, dashed above it, white over capacity, the bottleneck inverted).
 Inputs live in a drawer that slides in from the left; clicking any block opens its settings in a drawer
 on the right. On wide screens the drawers push the page aside so the diagram stays visible while you drag.
@@ -50,20 +53,28 @@ kind of workload, and starts from the nearest example.
 
 ![Design assistant](assistant.png)
 
-## On-chip network
+## On-chip interconnect
 
-Each accelerator is modelled as a tile array: a 2-D mesh, torus, ring or crossbar, with a tile count,
-link width, clock and hop latency, plus SRAM banks. DRAM, host-link and peer traffic enter at the die
-edge, and tile-to-tile traffic follows a pattern (all-to-all, nearest neighbour, or mostly local). The
-model checks three limits:
+Each accelerator has an on-chip interconnect and SRAM banks. It can be a network-on-chip (2-D mesh,
+torus, ring or full crossbar) or one of the AMBA fabrics:
 
-- the edge channels;
-- the bisection;
-- each tile's injection port.
+- **CHI**: a coherent mesh in the style of Arm's CMN, where snoops and responses share each link.
+- **AXI5** and **ACE5**: crossbars of masters and memory-side slave ports, with independent read and
+  write channels (ACE adds snoop channels).
+- **AXI4-Stream**: parallel point-to-point pipelines.
+- **AHB5**: a shared bus, one transfer at a time, with reads and writes taking turns.
+- **APB**: registers only.
 
-It also checks the SRAM bank bandwidth. The NoC adds hop latency, on-chip movement power and router
-area. The *On-chip* tab draws the array, with link weight following the load that XY routing puts on
-each link, and compares the four topologies at the current settings.
+Choosing a type sets its typical width and clock. DRAM, host-link and peer traffic enter at the die
+edge, and tile-to-tile traffic follows a pattern (all-to-all, nearest neighbour, or mostly local).
+Each kind is checked where it actually saturates: edge channels, bisection and tile ports for a NoC;
+memory ports, master ports and the crossbar for AXI; pipeline entries and the busiest link for
+streams; the single bus for AHB and APB. SRAM bank bandwidth is checked for all of them. The Notes tab
+covers AXI outstanding transactions (bandwidth × DRAM latency) and warns when AHB or APB is asked to
+carry bulk data. The *On-chip* tab draws the chosen fabric and compares all ten at their typical
+settings. Edge-device and FPGA examples use AXI; the detector trigger uses AXI4-Stream.
+
+![AXI crossbar](amba.png)
 
 ![On-chip network](onchip.png)
 
