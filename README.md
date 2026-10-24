@@ -1,4 +1,4 @@
-# Bottleneck Explorer
+# System Design Explorer
 
 An interactive sizing tool for data-processing systems: a host CPU and its memory, a host link
 (PCIe or on-package UCIe), accelerators with on-chip SRAM and device DRAM, scale-up fabrics and
