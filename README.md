@@ -78,6 +78,64 @@ settings. Edge-device and FPGA examples use AXI; the detector trigger uses AXI4-
 
 ![On-chip network](onchip.png)
 
+## How this is checked
+
+The *Checks* tab (under More) compares the model with published figures:
+
+| Reference | What it tests | Result |
+| --- | --- | --- |
+| H100 SXM: 3.35 TB/s HBM3 | DRAM speed-grade arithmetic (5 stacks at 5.2 Gb/s) | −0.7 % |
+| Apple M2 Max: 409.6 GB/s | LPDDR5-6400, 512-bit | 0.0 % |
+| Jetson AGX Orin: 204.8 GB/s | LPDDR5-6400, 256-bit | 0.0 % |
+| EPYC Genoa STREAM Triad: about 376 GB/s per socket | DRAM efficiency model (refresh, row misses, turnaround) | +5.2 % |
+| PCIe 5.0 x16 pinned copies: 56.2 GB/s H→D, 55.1 GB/s D→H | PCIe protocol overheads | −0.2 %, +0.4 % |
+| DGX H100: 10.2 kW maximum | System composition: accelerators, hosts, switches, NICs, overheads | −21 % (a planning maximum) |
+| GB200 NVL72: about 120 kW per rack | Rack composition | −12 % |
+
+Two more are calibration points rather than validations: energy per operation is set from the H100 (700 W)
+and B200 (1,000 W) TDPs. Every reference links its source in the app. Both system-level checks sit low,
+which points at switch trays and fans, and the tab says so.
+
+`npm test` (also run in GitHub Actions on every push) reruns these checks in headless Chrome. It also
+checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
+design for every example that can be fixed, and that all 28 examples match their golden results within 2 %.
+
+## Design optimiser
+
+The *Optimise* tab searches every DRAM type and speed grade, the host link, the on-chip interconnect, the
+scale-up fabric and the NICs. Where they limit, it also raises peak compute and SRAM banks, and (if allowed)
+adds accelerators. It returns the best design for power, die area or a balance of the two, plus the
+trade-off between them, each design one click from being applied.
+
+Practical limits apply unless you switch them off:
+
+- DRAM within its usual width;
+- PCIe x4 to x16, with an on-package UCIe host link only when allowed;
+- AXI and ACE crossbars of at most 32 masters, buses and rings of at most 16;
+- one reticle, optionally.
+
+A search takes about 20 ms. The assistant can call it as a tool.
+
+![Optimiser](optimiser.png)
+
+## Overheads, raw to usable
+
+Every link's drawer breaks its rate down from raw to usable, and the products are exactly the efficiencies
+the model uses:
+
+- **PCIe:** 128b/130b or FLIT FEC/CRC, TLP headers at your payload and completion sizes, DLLPs or replays,
+  and the read requests that ride the opposite direction.
+- **UCIe and fabrics:** flit headers and CRC.
+- **Ethernet:** preamble and inter-packet gap, frame headers, IP/UDP.
+- **DRAM:** refresh, row misses and bank conflicts, read/write turnaround, inline ECC, LPDDR6 metadata.
+- **On-chip:** header, credit, snoop and arbitration overhead.
+
+The Minimum specs link table shows each option's total overhead.
+
+DRAM now comes as **51 speed grades in 16 types**, for example DDR5-4800 to 7200, GDDR6 14–20 Gb/s,
+HBM3 5.2–6.4 Gb/s, HBM3E 8.0–9.8 Gb/s and HBM4 6.4–10 Gb/s. You pick the type, the speed grade and the
+number of channels, devices or stacks.
+
 ## Variability, percentiles and the weakest link
 
 Sizing everything for the same simultaneous peak, and adding up every stage's worst latency, stacks
@@ -189,4 +247,4 @@ and by roughly how much, not for sign-off. The *Model* tab in the app lists ever
 
 ## Running locally
 
-It is one self-contained `index.html` file with no build step: open it in any modern browser.
+It is one self-contained `index.html` file with no build step: open it in any modern browser. `npm install && npm test` runs the checks.
