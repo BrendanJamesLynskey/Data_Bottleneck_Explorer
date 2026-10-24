@@ -33,6 +33,40 @@ too big for them.
 
 ![Racks](racks.png)
 
+## Design assistant
+
+Type what the system has to do in plain language, for example *"serve a 70B model at 3,000 tokens/s,
+under 50 ms per token"*, and the assistant turns it into the model's inputs. It asks up to three short
+follow-up questions with clickable answers when something that would change the design is missing, and
+assumes typical values (and says so) when you can't say. It then picks DRAM, links, fabric, NICs and
+the on-chip network until every component sits under the utilisation ceiling, and the page redraws
+as it goes.
+
+It runs Claude (`claude-opus-5-5`) in your browser through the official Anthropic SDK, with **your own
+API key**. The key goes only to `api.anthropic.com` and is stored only if you tick *remember*. Claude
+works through five tools that drive the page's model: `set_requirements`, `set_hardware`, `evaluate`,
+`load_example` and `ask_user`. Without a key, a small rule-based parser reads rates, latencies and the
+kind of workload, and starts from the nearest example.
+
+![Design assistant](assistant.png)
+
+## On-chip network
+
+Each accelerator is modelled as a tile array: a 2-D mesh, torus, ring or crossbar, with a tile count,
+link width, clock and hop latency, plus SRAM banks. DRAM, host-link and peer traffic enter at the die
+edge, and tile-to-tile traffic follows a pattern (all-to-all, nearest neighbour, or mostly local). The
+model checks three limits:
+
+- the edge channels;
+- the bisection;
+- each tile's injection port.
+
+It also checks the SRAM bank bandwidth. The NoC adds hop latency, on-chip movement power and router
+area. The *On-chip* tab draws the array, with link weight following the load that XY routing puts on
+each link, and compares the four topologies at the current settings.
+
+![On-chip network](onchip.png)
+
 ## The question it was built for
 
 *A system has to process 1 GB of data per millisecond. How wide would a bank of LPDDR4 at full speed
@@ -73,10 +107,11 @@ would have to carry 4 TB/s to feed that link.
   full-duplex links, access-pattern efficiency, capacity, PCIe TLP efficiency, outstanding read tags
   (Little's law), DRAM concurrency, CPU cost per block, host memory on the data path, queueing,
   on-chip buffering, data-movement power, beachfront, HBM packaging and ECC.
-- **27 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
+- **28 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
   deliberately broken designs that illustrate a classic bottleneck:
   - *AI & LLMs*: rack-scale inference on 72 accelerators in one NVLink domain, a 1,024-accelerator
-    training cluster over 32 racks, tensor-parallel prefill on 8 PCIe cards ✗, LLM decode on an
+    training cluster over 32 racks, tensor-parallel prefill on 8 PCIe cards ✗, a mixture-of-experts
+    layer that overloads its mesh ✗, LLM decode on an
     8-accelerator server and at the edge, prefill on one accelerator, DLRM embedding lookups, and a data
     loader starving an accelerator ✗.
   - *Fundamentals*: the 1 TB/s question.
