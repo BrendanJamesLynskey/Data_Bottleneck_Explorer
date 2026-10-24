@@ -11,6 +11,24 @@ minimum specification of every component, and the power, performance and area (P
 
 ![System view](system.png)
 
+## The look: an engineer's blueprint
+
+The whole app is drawn as an old engineering print instead of a dashboard:
+
+- **Paper:** cyanotype blue with grain, uneven exposure and fold creases.
+- **Sheet:** a double-ruled border with zone references, and a third-angle projection symbol as the logo.
+- **Lettering:** stencil titles, draftsman's hand for labels and typewriter figures.
+- **Title block:** drawn by, checked, scale, drawing number and revision. *Checked* reads "passes ✓"
+  or "see notes ✗"; the revision goes to B when you edit a preset.
+- **Status:** ink means within the utilisation ceiling, yellow pencil above it, red pencil over capacity.
+- **Annotations:** the bottleneck is circled by hand in red pencil and every block carries a 0–100 % gauge.
+- **Charts:** hatching instead of colour fills, dash patterns to tell the lines apart, and rubber
+  stamps (*practical*, *stretch*, *impractical*, *fail*, *check*) for verdicts.
+
+A *Whiteprint* button switches to the diazo print: blue ink on cream paper.
+
+![Whiteprint](whiteprint.png)
+
 ## The question it was built for
 
 *A system has to process 1 GB of data per millisecond. How wide would a bank of LPDDR4 at full speed
@@ -50,8 +68,19 @@ would have to carry 4 TB/s to feed that link.
   full-duplex links, access-pattern efficiency, capacity, PCIe TLP efficiency, outstanding read tags
   (Little's law), DRAM concurrency, CPU cost per block, host memory on the data path, queueing,
   on-chip buffering, data-movement power, beachfront, HBM packaging and ECC.
-- **Presets**: the 1 TB/s question, 4K60 video analytics at the edge, a radar/SDR front end over
-  400 GbE, LLM decode on an edge accelerator, an NVMe scan offload, and an HBM-fed datacentre part.
+- **25 example applications** in six groups, each with a one-line note on what it shows. The ones
+  marked ✗ are deliberately broken designs that illustrate a classic bottleneck:
+  - *Start here*: the 1 TB/s question.
+  - *Imaging & video*: 4 × 4K60 edge analytics, an 8K60 broadcast encoder, line-scan machine vision,
+    a smartphone ISP + NPU, a 128-channel ultrasound beamformer, an autonomous-driving perception SoC.
+  - *Signal processing & comms*: a radar/SDR front end over 400 GbE, a 5G O-RAN distributed unit, a
+    radio-telescope correlator, a low-latency trading feed handler ✗, a particle-detector trigger ✗.
+  - *AI & ML*: LLM decode at the edge and in the datacentre, LLM prefill, a training step, DLRM
+    embedding lookups, and a data loader starving a GPU ✗.
+  - *Data, storage & networking*: an NVMe scan offload, a GPU database join over PCIe ✗, 400 GbE TLS
+    offload, storage compression.
+  - *Science, HPC & crypto*: a CFD stencil, genomic read alignment on an FPGA card, an FHE
+    bootstrapping accelerator.
 - **Share links**: the whole configuration lives in the URL.
 
 ![Minimum specs](sizing.png)

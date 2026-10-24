@@ -7,257 +7,307 @@
 <meta name="description" content="Size the host, link, accelerator and DRAM of a data-processing system from its throughput and latency requirements, and see power, performance and area (PPA) for every choice.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2305070d'/%3E%3Cpath d='M8 20h18l6 12-6 12H8M56 20H38l-6 12 6 12h18' fill='none' stroke='%233cf2ff' stroke-width='5' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23ff3cac'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Courier+Prime:wght@400;700&family=Caveat:wght@600;700&family=Saira+Stencil+One&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%231c4580'/%3E%3Cg fill='none' stroke='%23eef4ff' stroke-width='3'%3E%3Cpath d='M8 22v20l18-6V28z'/%3E%3Ccircle cx='45' cy='32' r='12'/%3E%3Ccircle cx='45' cy='32' r='5'/%3E%3C/g%3E%3C/svg%3E">
 <style>
+/* ===== Blueprint (cyanotype) is the default sheet; "whiteprint" (diazo, blue ink on cream) is the alternative. ===== */
 :root{
-  --bg:#05070d; --bg2:#0a1020; --panel:rgba(14,20,38,.78); --panel2:rgba(22,30,56,.7);
-  --line:rgba(120,160,255,.16); --line2:rgba(120,160,255,.32);
-  --text:#e8eeff; --mute:#8d99bd; --faint:#5b6688;
-  --cyan:#3cf2ff; --mag:#ff3cac; --violet:#9b7bff; --amber:#ffb547; --green:#3dffa8; --red:#ff4d6d;
-  --ok:var(--green); --warn:var(--amber); --bad:var(--red);
-  --glow:0 0 24px rgba(60,242,255,.18);
-  --grid:rgba(90,130,255,.06);
-  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
-  --sans:'Space Grotesk',system-ui,-apple-system,Segoe UI,sans-serif;
-}
-@media (prefers-color-scheme: light){
-  :root:not([data-theme="dark"]){
-    --bg:#eef2fb; --bg2:#e2e8f7; --panel:rgba(255,255,255,.86); --panel2:rgba(240,244,255,.9);
-    --line:rgba(40,60,140,.14); --line2:rgba(40,60,140,.3);
-    --text:#121a33; --mute:#4c5878; --faint:#8590ad;
-    --cyan:#0089a8; --mag:#c4127a; --violet:#5b3fd6; --amber:#a86400; --green:#0a8a55; --red:#c8243f;
-    --glow:0 0 0 transparent; --grid:rgba(40,60,140,.06);
-  }
+  --paper:#1d4682; --paper-d:#163a6e; --paper-l:#2a5797;
+  --ink:#eef4ff; --ink2:rgba(238,244,255,.74); --ink3:rgba(238,244,255,.46);
+  --rule:rgba(238,244,255,.22); --rule2:rgba(238,244,255,.55);
+  --grid:rgba(214,230,255,.06); --grid2:rgba(214,230,255,.12);
+  --ok:#b4ecc3; --warn:#ffd877; --bad:#ff9b85;
+  --p1:#eef4ff; --p2:#a9d4ff; --p3:#ffb8cc; --p4:#d6c8ff; --p5:#b4ecc3; --p6:#ffe0a6;
+  --tex-op:.5; --vig:rgba(5,15,40,.45);
+  /* names used by the script */
+  --text:var(--ink); --mute:var(--ink2); --faint:var(--ink3); --line:var(--rule); --line2:var(--rule2);
+  --bg:var(--paper); --panel:transparent; --panel2:rgba(255,255,255,.04);
+  --cyan:var(--p1); --mag:var(--p3); --violet:var(--p4); --amber:var(--warn); --green:var(--ok); --red:var(--bad);
+  --hand:'Architects Daughter','Comic Sans MS',cursive; --mono:'Courier Prime','Courier New',monospace;
+  --pencil:'Caveat','Segoe Print',cursive; --stencil:'Saira Stencil One',Impact,sans-serif; --sans:var(--hand);
+  color-scheme:dark;
 }
 :root[data-theme="light"]{
-  --bg:#eef2fb; --bg2:#e2e8f7; --panel:rgba(255,255,255,.86); --panel2:rgba(240,244,255,.9);
-  --line:rgba(40,60,140,.14); --line2:rgba(40,60,140,.3);
-  --text:#121a33; --mute:#4c5878; --faint:#8590ad;
-  --cyan:#0089a8; --mag:#c4127a; --violet:#5b3fd6; --amber:#a86400; --green:#0a8a55; --red:#c8243f;
-  --glow:0 0 0 transparent; --grid:rgba(40,60,140,.06);
+  --paper:#efe6cf; --paper-d:#e3d8bb; --paper-l:#f6efdc;
+  --ink:#1d3a6c; --ink2:rgba(29,58,108,.78); --ink3:rgba(29,58,108,.5);
+  --rule:rgba(29,58,108,.22); --rule2:rgba(29,58,108,.55);
+  --grid:rgba(29,58,108,.05); --grid2:rgba(29,58,108,.1);
+  --ok:#2e7a47; --warn:#9a6200; --bad:#b8321f;
+  --p1:#1d3a6c; --p2:#2f6fb5; --p3:#a8325f; --p4:#5b45b0; --p5:#2e7a47; --p6:#8a5a00;
+  --tex-op:.55; --vig:rgba(120,90,40,.28);
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
 body{
-  background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.45;
+  background-color:var(--paper); color:var(--ink); font-family:var(--hand); font-size:14px; line-height:1.5;
   background-image:
-    radial-gradient(1200px 600px at 85% -10%, rgba(155,123,255,.16), transparent 60%),
-    radial-gradient(900px 500px at -10% 30%, rgba(60,242,255,.10), transparent 60%),
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-  background-size:auto,auto,32px 32px,32px 32px;
-  background-attachment:fixed;
-  min-height:100vh; overflow-x:hidden;
+    radial-gradient(ellipse 120% 90% at 50% 40%, transparent 55%, var(--vig) 100%),
+    radial-gradient(600px 380px at 18% 22%, rgba(255,255,255,.05), transparent 70%),
+    radial-gradient(700px 420px at 82% 70%, rgba(0,0,0,.08), transparent 70%),
+    linear-gradient(var(--grid2) 1px, transparent 1px), linear-gradient(90deg, var(--grid2) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:auto,auto,auto,120px 120px,120px 120px,24px 24px,24px 24px;
+  background-attachment:fixed; min-height:100vh; overflow-x:hidden;
 }
-a{color:var(--cyan)}
+/* paper grain + fold creases, laid over everything like the print itself */
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:90; opacity:var(--tex-op); mix-blend-mode:overlay;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(90deg, transparent calc(50% - 1px), rgba(0,0,0,.35) 50%, rgba(255,255,255,.25) calc(50% + 1px), transparent calc(50% + 3px)),
+    linear-gradient(0deg, transparent calc(33.3% - 1px), rgba(0,0,0,.3) 33.3%, rgba(255,255,255,.22) calc(33.3% + 1px), transparent calc(33.3% + 3px)),
+    linear-gradient(0deg, transparent calc(66.6% - 1px), rgba(0,0,0,.3) 66.6%, rgba(255,255,255,.22) calc(66.6% + 1px), transparent calc(66.6% + 3px));
+}
+a{color:var(--ink); text-decoration-style:dashed; text-underline-offset:3px}
 button,select,input{font:inherit;color:inherit}
 .mono{font-family:var(--mono)}
+::selection{background:var(--ink); color:var(--paper)}
 
-/* ---------- top bar ---------- */
+/* ---------- the drawing sheet: double border with zone references ---------- */
+.sheet{position:relative; margin:14px; border:2px solid var(--rule2); outline:1px solid var(--rule2); outline-offset:5px; min-height:calc(100vh - 28px)}
+.zones{position:absolute; display:flex; justify-content:space-around; font-family:var(--mono); font-size:10px; color:var(--ink3); pointer-events:none}
+.zones.top{left:0; right:0; top:-17px} .zones.bot{left:0; right:0; bottom:-17px}
+.zones.lft{top:0; bottom:0; left:-15px; flex-direction:column} .zones.rgt{top:0; bottom:0; right:-15px; flex-direction:column}
+
+/* ---------- top title strip ---------- */
 header.top{
-  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
-  padding:14px 22px; border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg, rgba(5,7,13,.6), transparent);
-  position:sticky; top:0; z-index:20; backdrop-filter:blur(10px);
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:12px 20px;
+  border-bottom:2px solid var(--rule2); position:sticky; top:0; z-index:20; background:var(--paper);
 }
-:root[data-theme="light"] header.top{background:rgba(238,242,251,.8)}
-.brand{display:flex; align-items:center; gap:12px; margin-right:auto}
-.brand svg{width:34px;height:34px;filter:drop-shadow(0 0 8px rgba(60,242,255,.5))}
-.brand h1{margin:0; font-size:19px; letter-spacing:.14em; text-transform:uppercase; font-weight:700}
-.brand h1 b{color:var(--cyan); font-weight:700}
-.brand h1 i{color:var(--mag); font-style:normal}
-.brand small{display:block; color:var(--mute); font-size:11.5px; letter-spacing:.04em}
+.brand{display:flex; align-items:center; gap:14px; margin-right:auto}
+.brand svg{width:46px; height:30px; flex:none}
+.brand h1{margin:0; font-family:var(--stencil); font-weight:400; font-size:25px; letter-spacing:.08em; line-height:1}
+.brand small{display:block; color:var(--ink2); font-size:12.5px; margin-top:3px; font-family:var(--mono)}
 .top .ctrl{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
 .btn{
-  background:var(--panel2); border:1px solid var(--line2); border-radius:9px; padding:7px 12px;
-  cursor:pointer; transition:.15s; font-size:13px;
+  background:transparent; border:1.5px solid var(--rule2); border-radius:2px; padding:6px 12px; cursor:pointer;
+  font-family:var(--stencil); letter-spacing:.06em; font-size:13px; transition:background .15s;
 }
-.btn:hover{border-color:var(--cyan); box-shadow:var(--glow)}
-.btn.primary{border-color:var(--cyan); color:var(--cyan)}
+.btn:hover{background:var(--panel2); border-color:var(--ink)}
 select{
-  background:var(--panel2); border:1px solid var(--line2); border-radius:9px; padding:7px 10px; max-width:100%;
+  background:transparent; border:none; border-bottom:1.5px dashed var(--rule2); border-radius:0; padding:5px 4px;
+  font-family:var(--mono); font-size:13px; max-width:100%; cursor:pointer;
 }
-select option{background:var(--bg2); color:var(--text)}
+select:focus-visible,.btn:focus-visible,input:focus-visible{outline:1.5px dashed var(--ink); outline-offset:3px}
+select option, select optgroup{background:var(--paper-d); color:var(--ink); font-family:var(--mono)}
+#preset{border:1.5px solid var(--rule2); padding:6px 8px; max-width:340px}
 
-/* ---------- verdict strip ---------- */
-.verdict{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; padding:16px 22px 4px}
-.kpi{
-  background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; position:relative; overflow:hidden;
-}
-.kpi::before{content:""; position:absolute; inset:0 0 auto 0; height:2px; background:var(--k,var(--cyan)); opacity:.9}
-.kpi .l{font-size:10.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--mute)}
-.kpi .v{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.kpi .s{font-size:12px; color:var(--mute); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.kpi.bad{--k:var(--red)} .kpi.warn{--k:var(--amber)} .kpi.ok{--k:var(--green)}
-.kpi.bad .v{color:var(--red)} .kpi.warn .v{color:var(--amber)} .kpi.ok .v{color:var(--green)}
+/* ---------- verdict: drawn as a schedule row ---------- */
+.verdict{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); margin:16px 20px 4px; border:1.5px solid var(--rule2)}
+.kpi{padding:9px 14px 10px; border-right:1px solid var(--rule); position:relative; min-width:0}
+.kpi:last-child{border-right:none}
+.kpi .l{font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--ink3)}
+.kpi .v{font-family:var(--mono); font-weight:700; font-size:21px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.kpi .s{font-size:12.5px; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.kpi.bad .v{color:var(--bad); text-decoration:underline wavy var(--bad); text-decoration-thickness:1.5px; text-underline-offset:5px}
+.kpi.warn .v{color:var(--warn)}
 .kpi.hero{grid-column:span 2}
-.kpi.hero .v{font-size:22px}
-.kpi.bad.hero{animation:alarm 2.4s ease-in-out infinite}
-@keyframes alarm{50%{box-shadow:0 0 28px rgba(255,77,109,.28)}}
 
 /* ---------- main grid ---------- */
-main{display:grid; grid-template-columns:310px minmax(0,1fr) 330px; grid-template-areas:"left stage insp" "left tabs insp"; gap:14px; padding:14px 22px 30px; align-items:start}
+main{display:grid; grid-template-columns:310px minmax(0,1fr) 330px; grid-template-areas:"left stage insp" "left tabs insp"; gap:16px; padding:14px 20px 28px; align-items:start; counter-reset:sec}
 #left{grid-area:left} .stage{grid-area:stage} #inspector{grid-area:insp} .tabs{grid-area:tabs; min-width:0}
-#left,#inspector{position:sticky; top:84px; max-height:calc(100vh - 96px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line2) transparent}
-.panel{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px 16px; backdrop-filter:blur(6px); min-width:0}
-.panel h2{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan); margin:2px 0 10px; font-weight:600; display:flex; align-items:center; gap:8px}
-.panel h2::after{content:""; flex:1; height:1px; background:var(--line)}
-.panel h3{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--mute); margin:16px 0 6px; font-weight:600}
-.side{display:flex; flex-direction:column; gap:14px; min-width:0}
+#left,#inspector{position:sticky; top:86px; max-height:calc(100vh - 100px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--rule2) transparent}
+.panel{border:1.5px solid var(--rule2); box-shadow:inset 0 0 0 3px var(--paper), inset 0 0 0 4px var(--rule); padding:14px 16px; min-width:0; background:var(--panel)}
+.panel h2{font-family:var(--stencil); font-weight:400; font-size:15px; letter-spacing:.1em; text-transform:uppercase; margin:0 0 10px; display:flex; align-items:center; gap:10px}
+.panel h2::before{counter-increment:sec; content:counter(sec, upper-alpha); flex:none; width:24px; height:24px; border:1.5px solid var(--ink); border-radius:50%;
+  display:grid; place-items:center; font-family:var(--mono); font-weight:700; font-size:12px; letter-spacing:0}
+.panel h2::after{content:""; flex:1; border-bottom:1px solid var(--rule)}
+.panel h3{font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink2); margin:16px 0 6px; font-weight:700}
+.side{display:flex; flex-direction:column; gap:16px; min-width:0}
+.scenario{border-style:dashed}
+.scenario::before{content:"Scenario"; display:block; font-family:var(--stencil); letter-spacing:.12em; font-size:13px; text-transform:uppercase; margin-bottom:2px}
+.sc-g{font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3)}
+.sc-g i{font-family:var(--pencil); font-size:17px; letter-spacing:0; text-transform:none; color:var(--warn); font-style:normal}
+.sc-n{font-size:15px; margin:2px 0 4px; font-weight:700}
+.sc-d{font-size:13px; color:var(--ink2)}
 
-/* controls */
-.c{margin:9px 0 12px}
+/* ---------- controls: drafting scales ---------- */
+.c{margin:9px 0 13px}
 .c .row{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
-.c label{font-size:12.5px; color:var(--text)}
-.c .val{font-family:var(--mono); font-size:12.5px; color:var(--cyan); white-space:nowrap}
-.c .hint{font-size:11px; color:var(--faint); margin-top:2px}
-.c select{width:100%; margin-top:4px}
-input[type=range]{width:100%; -webkit-appearance:none; appearance:none; background:transparent; height:22px; margin:2px 0 0}
-input[type=range]::-webkit-slider-runnable-track{height:4px; border-radius:4px; background:linear-gradient(90deg,var(--cyan) var(--p,50%), var(--line2) var(--p,50%))}
-input[type=range]::-moz-range-track{height:4px; border-radius:4px; background:linear-gradient(90deg,var(--cyan) var(--p,50%), var(--line2) var(--p,50%))}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; margin-top:-6px; border-radius:50%; background:var(--bg); border:2px solid var(--cyan); box-shadow:0 0 10px rgba(60,242,255,.6)}
-input[type=range]::-moz-range-thumb{width:13px; height:13px; border-radius:50%; background:var(--bg); border:2px solid var(--cyan)}
-input[type=range]:focus-visible{outline:1px dashed var(--cyan); outline-offset:2px}
-.tog{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; cursor:pointer; font-size:12.5px}
-.tog input{display:none}
-.tog .sw{width:34px; height:18px; border-radius:18px; background:var(--line2); position:relative; transition:.2s; flex:none}
-.tog .sw::after{content:""; position:absolute; width:14px; height:14px; top:2px; left:2px; border-radius:50%; background:var(--mute); transition:.2s}
-.tog input:checked + .sw{background:rgba(60,242,255,.35)}
-.tog input:checked + .sw::after{left:18px; background:var(--cyan); box-shadow:0 0 8px var(--cyan)}
-.tput{display:flex; gap:6px; margin-top:4px}
-.tput input{flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line2); border-radius:8px; padding:6px 8px; font-family:var(--mono)}
+.c label{font-size:13.5px}
+.c .val{font-family:var(--mono); font-weight:700; font-size:13px; white-space:nowrap}
+.c .hint{font-size:12px; color:var(--ink3); margin-top:1px; line-height:1.35}
+.c select{width:100%; margin-top:2px}
+input[type=range]{width:100%; -webkit-appearance:none; appearance:none; background:transparent; height:24px; margin:2px 0 0; cursor:ew-resize}
+input[type=range]::-webkit-slider-runnable-track{height:12px; border-bottom:1.5px solid var(--ink2);
+  background:repeating-linear-gradient(90deg, var(--ink3) 0 1px, transparent 1px 10%) bottom/100% 9px no-repeat, repeating-linear-gradient(90deg, var(--rule2) 0 1px, transparent 1px 2%) bottom/100% 4px no-repeat}
+input[type=range]::-moz-range-track{height:12px; border-bottom:1.5px solid var(--ink2);
+  background:repeating-linear-gradient(90deg, var(--ink3) 0 1px, transparent 1px 10%) bottom/100% 9px no-repeat, repeating-linear-gradient(90deg, var(--rule2) 0 1px, transparent 1px 2%) bottom/100% 4px no-repeat}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:16px; margin-top:-4px; background:var(--ink); clip-path:polygon(50% 100%, 0 0, 100% 0); border:none}
+input[type=range]::-moz-range-thumb{width:14px; height:14px; background:var(--ink); clip-path:polygon(50% 100%, 0 0, 100% 0); border:none; border-radius:0}
+.tog{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; cursor:pointer; font-size:13.5px}
+.tog input{position:absolute; opacity:0; pointer-events:none}
+.tog .sw{width:18px; height:18px; border:1.5px solid var(--ink); position:relative; flex:none}
+.tog .sw::after{content:"✕"; position:absolute; inset:-6px 0 0 0; text-align:center; font-family:var(--pencil); font-size:24px; line-height:1; color:var(--ink); opacity:0; transition:opacity .15s}
+.tog input:checked + .sw::after{opacity:1}
+.tog input:focus-visible + .sw{outline:1.5px dashed var(--ink); outline-offset:3px}
+.tput{display:flex; gap:8px; margin-top:4px}
+.tput input{flex:1; min-width:0; background:transparent; border:none; border-bottom:1.5px solid var(--ink2); padding:3px 2px; font-family:var(--mono); font-weight:700; font-size:16px}
 .tput select{width:auto; margin:0}
 
-/* diagram */
-.stage{position:relative; padding:10px 10px 6px}
-.stage h2{margin-left:6px}
+/* ---------- diagram ---------- */
+.stage{padding:12px 12px 6px}
+.stage h2{margin-left:4px}
 #diagram{width:100%; height:auto; display:block}
 .dwrap{overflow-x:auto}
-.node rect.box{fill:var(--panel2); stroke:var(--line2); stroke-width:1.2; transition:stroke .3s}
 .node{cursor:pointer}
-.node:hover rect.box{stroke:var(--cyan)}
-.node.sel rect.box{stroke:var(--cyan); stroke-width:2}
-.node.bott rect.box{stroke:var(--red); stroke-width:2.2; animation:pulse 1.6s ease-in-out infinite}
-@keyframes pulse{50%{stroke-opacity:.35}}
-.node text{fill:var(--text); font-family:var(--sans)}
-.node .t1{font-size:13px; font-weight:600; letter-spacing:.06em; text-transform:uppercase}
-.node .t2{font-size:11px; fill:var(--mute)}
-.node .t3{font-size:11.5px; font-family:var(--mono)}
-.node .tag{font-size:9.5px; font-weight:700; letter-spacing:.16em; fill:var(--red)}
-.ring-bg{fill:none; stroke:var(--line2); stroke-width:5}
-.ring{fill:none; stroke-width:5; stroke-linecap:round; transform-origin:center; transition:stroke-dasharray .4s}
-.ringtxt{font-family:var(--mono); font-size:10px; font-weight:600; text-anchor:middle; dominant-baseline:central}
-.edge{fill:none; stroke-linecap:round; opacity:.38; transition:stroke .3s}
-.edgelbl{font-family:var(--mono); font-size:10.5px; fill:var(--mute)}
-.particle{filter:url(#glow)}
-.legend{display:flex; gap:16px; flex-wrap:wrap; font-size:11.5px; color:var(--mute); padding:4px 10px 8px}
-.legend span::before{content:""; display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; background:var(--c)}
+.node rect.box{fill:transparent; stroke:var(--ink); stroke-width:1.6}
+.node rect.box2{fill:none; stroke:var(--rule2); stroke-width:.8}
+.node:hover rect.box{fill:var(--panel2)}
+.node.sel rect.box{stroke-width:2.6}
+.node text{fill:var(--ink)}
+.node .t1{font-family:var(--stencil); font-size:15px; letter-spacing:.08em; text-transform:uppercase}
+.node .t2{font-family:var(--hand); font-size:12px; fill:var(--ink2)}
+.node .t3{font-family:var(--mono); font-size:12px; font-weight:700}
+.dial-arc{fill:none; stroke:var(--ink2); stroke-width:1.2}
+.dial-tick{stroke:var(--ink2); stroke-width:1}
+.dial-red{fill:none; stroke:var(--bad); stroke-width:3}
+.dial-needle{stroke:var(--ink); stroke-width:1.8; stroke-linecap:round; transition:transform .5s cubic-bezier(.3,1.6,.5,1)}
+.dial-txt{font-family:var(--mono); font-size:10.5px; font-weight:700; text-anchor:middle}
+.edge-base{fill:none; stroke-width:1; opacity:.45}
+.edge{fill:none; stroke-linecap:butt}
+.edgelbl{font-family:var(--mono); font-size:11px; fill:var(--ink2)}
+.redmark path{fill:none; stroke-linecap:round}
+.redmark text{font-family:var(--pencil); font-size:25px; font-weight:700}
+.dimline{stroke:var(--ink3); stroke-width:.8; fill:none}
+.legend{display:flex; gap:18px; flex-wrap:wrap; font-size:12.5px; color:var(--ink2); padding:4px 8px 8px}
+.legend span::before{content:""; display:inline-block; width:22px; height:0; border-top:3px solid var(--c); margin-right:7px; vertical-align:middle}
+.legend span.dash::before{border-top-style:dashed}
 
-/* inspector */
-.chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px}
-.chip{font-size:11.5px; padding:4px 9px; border-radius:20px; border:1px solid var(--line2); cursor:pointer; background:transparent; color:var(--mute)}
-.chip.on{border-color:var(--cyan); color:var(--cyan); box-shadow:var(--glow)}
-.chip .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:var(--c,var(--faint))}
-.ledger{width:100%; border-collapse:collapse; font-size:12px; margin-top:4px}
-.ledger td{padding:4px 0; border-bottom:1px dashed var(--line)}
-.ledger td:last-child{text-align:right; font-family:var(--mono); white-space:nowrap; padding-left:10px}
-.ledger tr.tot td{color:var(--cyan); border-bottom:none; font-weight:600}
-.stat{display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0}
-.stat b{font-family:var(--mono); font-weight:600}
+/* ---------- inspector ---------- */
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px}
+.chip{font-family:var(--hand); font-size:12.5px; padding:3px 9px; border:1.5px solid var(--rule2); border-radius:2px; cursor:pointer; background:transparent; color:var(--ink2)}
+.chip.on{border-color:var(--ink); color:var(--ink); background:var(--panel2)}
+.chip .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; border:1.5px solid var(--c,var(--ink3)); background:var(--c,transparent)}
+.ledger{width:100%; border-collapse:collapse; font-size:13px; margin-top:4px}
+.ledger td{padding:4px 0; border-bottom:1px dashed var(--rule)}
+.ledger td:last-child{text-align:right; font-family:var(--mono); font-weight:700; white-space:nowrap; padding-left:10px}
+.ledger tr.tot td{border-bottom:none; border-top:1.5px solid var(--ink2); font-weight:700}
+.stat{display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:3px 0; border-bottom:1px dotted var(--rule)}
+.stat b{font-family:var(--mono); font-weight:700; text-align:right}
 
-/* tabs */
-.tabs{padding:0}
-.tabbar{display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:14px}
-.tab{background:none; border:none; border-bottom:2px solid transparent; padding:10px 12px; cursor:pointer; color:var(--mute); font-size:13px; letter-spacing:.04em}
-.tab:hover{color:var(--text)}
-.tab.on{color:var(--cyan); border-bottom-color:var(--cyan)}
-.tab .n{font-family:var(--mono); font-size:10.5px; margin-left:5px; padding:1px 6px; border-radius:10px; background:var(--line)}
-.tab .n.bad{background:rgba(255,77,109,.2); color:var(--red)}
-.tab .n.warn{background:rgba(255,181,71,.18); color:var(--amber)}
+/* ---------- tabs: drawing-register tabs ---------- */
+.tabbar{display:flex; gap:0; flex-wrap:wrap; border-bottom:1.5px solid var(--rule2); margin-bottom:14px}
+.tab{background:none; border:1.5px solid transparent; border-bottom:none; padding:8px 13px 7px; cursor:pointer; color:var(--ink2); font-family:var(--stencil); letter-spacing:.06em; font-size:13.5px; margin-bottom:-1.5px}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink); border-color:var(--rule2); background:var(--paper)}
+.tab .n{font-family:var(--pencil); font-size:17px; margin-left:6px; letter-spacing:0}
+.tab .n.bad{color:var(--bad)} .tab .n.warn{color:var(--warn)}
 .pane{display:none}
-.pane.on{display:block; animation:fade .25s}
-@keyframes fade{from{opacity:0; transform:translateY(4px)}}
-.cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:14px}
+.pane.on{display:block}
+.cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:16px}
 .tbl-wrap{overflow-x:auto}
-table.t{width:100%; border-collapse:collapse; font-size:12.5px}
-table.t th{text-align:left; font-weight:600; color:var(--mute); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid var(--line2); white-space:nowrap}
-table.t td{padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap}
+table.t{width:100%; border-collapse:collapse; font-size:13px}
+table.t th{text-align:left; font-family:var(--mono); font-weight:700; color:var(--ink2); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; padding:6px 8px; border-bottom:1.5px solid var(--ink2); white-space:nowrap}
+table.t td{padding:6px 8px; border-bottom:1px dashed var(--rule); white-space:nowrap}
 table.t td.n{font-family:var(--mono); text-align:right}
 table.t th.n{text-align:right}
-table.t tr.cur td{background:rgba(60,242,255,.07)}
-table.t tr:hover td{background:rgba(120,160,255,.06)}
-.pill{display:inline-block; font-size:10.5px; font-weight:600; letter-spacing:.06em; padding:2px 8px; border-radius:10px; text-transform:uppercase}
-.pill.ok{background:rgba(61,255,168,.14); color:var(--green)}
-.pill.warn{background:rgba(255,181,71,.16); color:var(--amber)}
-.pill.bad{background:rgba(255,77,109,.16); color:var(--red)}
-.use{font-size:11px; padding:3px 8px; border-radius:7px; border:1px solid var(--line2); background:none; cursor:pointer}
-.use:hover{border-color:var(--cyan); color:var(--cyan)}
-.note{font-size:12px; color:var(--mute); margin:8px 0 0}
-.answer{border-left:3px solid var(--cyan); padding:8px 12px; margin:0 0 12px; background:rgba(60,242,255,.05); border-radius:0 10px 10px 0; font-size:13px}
-.answer b{color:var(--cyan)}
-.cons{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px}
-.con{border:1px solid var(--line); border-radius:12px; padding:12px 14px; background:var(--panel); border-left:3px solid var(--c)}
-.con h4{margin:0 0 6px; font-size:13.5px; display:flex; gap:8px; align-items:center}
-.con p{margin:4px 0; font-size:12.5px; color:var(--mute)}
-.con p b{color:var(--text); font-family:var(--mono); font-weight:600}
-.con.ok{--c:var(--green)} .con.warn{--c:var(--amber)} .con.bad{--c:var(--red)} .con.info{--c:var(--violet)}
+table.t tr.cur td{background:var(--panel2); font-weight:700}
+table.t tr.cur td:first-child::before{content:"▸ "}
+/* rubber stamps */
+.pill{display:inline-block; font-family:var(--stencil); font-size:11px; letter-spacing:.1em; padding:1px 7px; border:2px solid currentColor; border-radius:3px; text-transform:uppercase; transform:rotate(-3deg); opacity:.9}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn); transform:rotate(2deg)} .pill.bad{color:var(--bad); transform:rotate(-5deg)}
+.pill.info{color:var(--ink2)}
+.use{font-family:var(--hand); font-size:12px; padding:1px 8px; border:1.5px solid var(--rule2); border-radius:2px; background:none; cursor:pointer}
+.use:hover{border-color:var(--ink); background:var(--panel2)}
+.note{font-size:13px; color:var(--ink2); margin:8px 0 0}
+.answer{border:1.5px solid var(--rule2); padding:10px 14px 10px 74px; margin:0 0 16px; font-size:14px; position:relative; line-height:1.6}
+.answer::before{content:"NOTE"; position:absolute; left:12px; top:10px; font-family:var(--stencil); letter-spacing:.1em; border-bottom:1.5px solid var(--ink)}
+.answer b{font-family:var(--mono)}
+.cons{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; counter-reset:note}
+.con{border-left:2px solid var(--c); padding:2px 4px 4px 14px}
+.con h4{margin:0 0 4px; font-size:15px; display:flex; gap:10px; align-items:center}
+.con h4::before{counter-increment:note; content:counter(note) "."; font-family:var(--mono); font-weight:700; color:var(--ink3)}
+.con p{margin:4px 0; font-size:13px; color:var(--ink2)}
+.con p b{color:var(--ink); font-family:var(--mono)}
+.con.ok{--c:var(--ok)} .con.warn{--c:var(--warn)} .con.bad{--c:var(--bad)} .con.info{--c:var(--rule2)}
 svg.chart{width:100%; height:auto; display:block}
-svg.chart text{font-family:var(--mono); font-size:10.5px; fill:var(--mute)}
-svg.chart .ax{stroke:var(--line2)}
-svg.chart .gl{stroke:var(--line); stroke-dasharray:2 4}
-.bars{display:flex; flex-direction:column; gap:8px}
-.bar{display:grid; grid-template-columns:130px 1fr 90px; gap:10px; align-items:center; font-size:12px}
-.bar .track{height:12px; border-radius:6px; background:var(--line); overflow:hidden; position:relative}
-.bar .fill{height:100%; border-radius:6px}
-.bar .num{font-family:var(--mono); text-align:right}
-.stack{display:flex; height:30px; border-radius:8px; overflow:hidden; border:1px solid var(--line2)}
-.stack div{height:100%; min-width:2px; position:relative}
-.keys{display:flex; flex-wrap:wrap; gap:10px 18px; margin-top:10px; font-size:12px}
-.keys span::before{content:""; display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px; background:var(--c)}
-.big{font-family:var(--mono); font-size:26px; font-weight:600}
-.cat td,.cat th{font-size:11.5px}
-footer{padding:20px 22px 40px; color:var(--faint); font-size:12px; text-align:center}
-footer a{color:var(--mute)}
-.toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--cyan); padding:9px 16px; border-radius:10px; opacity:0; transition:.3s; pointer-events:none; z-index:50}
+svg.chart text{font-family:var(--mono); font-size:11px; fill:var(--ink2)}
+svg.chart text.pen{font-family:var(--pencil); font-size:17px; font-weight:700}
+svg.chart .ax{stroke:var(--ink2); stroke-width:1.2}
+svg.chart .gl{stroke:var(--rule); stroke-dasharray:1 4}
+.bars{display:flex; flex-direction:column; gap:9px}
+.bar{display:grid; grid-template-columns:150px 1fr 80px; gap:12px; align-items:center; font-size:13px}
+.bar .track{height:14px; border:1.2px solid var(--ink2); position:relative}
+.bar .fill{height:100%}
+.bar .num{font-family:var(--mono); font-weight:700; text-align:right}
+.stack{display:flex; height:30px; border:1.5px solid var(--ink)}
+.stack div{height:100%; min-width:2px; border-right:1.2px solid var(--ink)}
+.stack div:last-child{border-right:none}
+.keys{display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:10px; font-size:12.5px}
+.keys span.ln::before{display:none}
+.keys span::before{content:""; display:inline-block; width:15px; height:12px; margin-right:7px; vertical-align:-1px; border:1.2px solid var(--ink); background:var(--sw)}
+.cat td,.cat th{font-size:12px}
+/* hatch fills, one per series: hatching instead of colour */
+.h0{--sw:repeating-linear-gradient(45deg, var(--ink) 0 1.4px, transparent 1.4px 6px)}
+.h1{--sw:repeating-linear-gradient(-45deg, var(--ink) 0 1.4px, transparent 1.4px 6px)}
+.h2{--sw:repeating-linear-gradient(45deg, var(--ink) 0 1.2px, transparent 1.2px 6px), repeating-linear-gradient(-45deg, var(--ink) 0 1.2px, transparent 1.2px 6px)}
+.h3{--sw:repeating-linear-gradient(0deg, var(--ink) 0 1.3px, transparent 1.3px 5px)}
+.h4{--sw:repeating-linear-gradient(90deg, var(--ink) 0 1.3px, transparent 1.3px 5px)}
+.h5{--sw:radial-gradient(var(--ink) 1.1px, transparent 1.4px) 0 0/6px 6px}
+.h6{--sw:var(--ink2)}
+.h7{--sw:repeating-linear-gradient(45deg, var(--ink) 0 1px, transparent 1px 12px)}
+.hb{--sw:repeating-linear-gradient(45deg, var(--bad) 0 2px, transparent 2px 6px)}
+.stack div,.bar .fill{background:var(--sw)}
+
+/* ---------- title block ---------- */
+footer{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; padding:0 20px 20px; align-items:end}
+footer .disclaim{font-size:12.5px; color:var(--ink3); max-width:620px}
+.tblock{display:grid; grid-template-columns:repeat(4,auto); border:2px solid var(--ink); font-family:var(--mono); font-size:11.5px; min-width:0}
+.tblock > div{border-right:1px solid var(--ink2); border-bottom:1px solid var(--ink2); padding:4px 10px; min-width:0}
+.tblock .k{font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); display:block}
+.tblock .ttl{grid-column:1 / -1; font-family:var(--stencil); font-size:18px; letter-spacing:.08em}
+.tblock .ttl small{display:block; font-family:var(--hand); font-size:12px; letter-spacing:0; color:var(--ink2)}
+.tblock .sig{font-family:var(--pencil); font-size:20px; line-height:1}
+.toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) rotate(-1.5deg); background:var(--paper-l); border:1.5px solid var(--ink); padding:8px 16px; font-family:var(--pencil); font-size:20px; opacity:0; transition:.25s; pointer-events:none; z-index:95}
 .toast.on{opacity:1}
 
 @media (max-width:1280px){
   main{grid-template-columns:300px minmax(0,1fr); grid-template-areas:"left stage" "left insp" "left tabs"}
   #inspector{position:static; max-height:none}
   .verdict{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kpi{border-bottom:1px solid var(--rule)}
 }
 @media (max-width:820px){
-  header.top{padding:12px 16px}
-  main{grid-template-columns:minmax(0,1fr); grid-template-areas:"stage" "insp" "left" "tabs"; padding:12px 16px}
+  .sheet{margin:6px; outline:none}
+  .zones{display:none}
+  header.top{padding:10px 12px; position:static}
+  .brand h1{font-size:20px}
+  main{grid-template-columns:minmax(0,1fr); grid-template-areas:"stage" "insp" "left" "tabs"; padding:12px 12px 20px}
   #left{position:static; max-height:none}
   #diagram{min-width:640px}
-  .verdict{grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 16px 0}
+  .verdict{grid-template-columns:repeat(2,minmax(0,1fr)); margin:12px 12px 0}
   .kpi.hero{grid-column:1 / -1}
-  .cols{grid-template-columns:minmax(0,1fr)}
-  .cons{grid-template-columns:minmax(0,1fr)}
-  .bar{grid-template-columns:96px 1fr 76px}
-  .brand h1{font-size:16px}
+  .cols,.cons{grid-template-columns:minmax(0,1fr)}
+  .bar{grid-template-columns:100px 1fr 70px}
+  footer{grid-template-columns:minmax(0,1fr); padding:0 12px 16px}
+  .tblock{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .top .ctrl{width:100%}
+  #preset{flex:1 1 0; min-width:0; width:0; max-width:none}
 }
-@media (prefers-reduced-motion: reduce){
-  *{animation:none !important; transition:none !important}
-}
+@media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
 </style>
 </head>
 <body>
+<div class="sheet">
+<div class="zones top" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
+<div class="zones bot" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
+<div class="zones lft" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></div>
+<div class="zones rgt" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></div>
 
 <header class="top">
   <div class="brand">
-    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M6 18h18l7 14-7 14H6M58 18H40l-7 14 7 14h18" fill="none" stroke="#3cf2ff" stroke-width="4" stroke-linejoin="round"/><circle cx="32" cy="32" r="5" fill="#ff3cac"/></svg>
+    <svg viewBox="0 0 46 30" aria-label="Third-angle projection symbol"><g fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 9v12l15-5v-2z"/><path d="M0 15h19" stroke-dasharray="3 2" stroke-width=".8"/><circle cx="33" cy="15" r="10"/><circle cx="33" cy="15" r="4"/><path d="M21 15h24M33 3v24" stroke-dasharray="3 2" stroke-width=".8"/></g></svg>
     <div>
-      <h1><b>Bottleneck</b><i>//</i>Explorer</h1>
-      <small>Size a data-processing system from its requirements: bandwidth, latency, power and area</small>
+      <h1>Bottleneck Explorer</h1>
+      <small>System sizing from requirements · bandwidth · latency · power · area</small>
     </div>
   </div>
   <div class="ctrl">
     <select id="preset" aria-label="Preset scenario"></select>
-    <button class="btn" id="share" title="Copy a link to this configuration">⧉ Share</button>
-    <button class="btn" id="theme" title="Toggle light / dark" aria-label="Toggle theme"><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+    <button class="btn" id="share" title="Copy a link to this configuration">Share</button>
+    <button class="btn" id="theme" title="Switch between blueprint and whiteprint">Whiteprint</button>
   </div>
 </header>
 
@@ -265,6 +315,7 @@ footer a{color:var(--mute)}
 
 <main>
   <aside class="side" id="left">
+    <div class="panel scenario" id="scenario" hidden></div>
     <div class="panel" id="reqPanel">
       <h2>Requirements</h2>
       <div id="req"></div>
@@ -276,13 +327,13 @@ footer a{color:var(--mute)}
   </aside>
 
   <section class="panel stage">
-    <h2>System — live data flow</h2>
+    <h2>System · general arrangement</h2>
     <div class="dwrap"><svg id="diagram" viewBox="0 0 1000 460" role="img" aria-label="System block diagram with data flow"></svg></div>
     <div class="legend">
-      <span style="--c:var(--green)">within utilisation ceiling</span>
-      <span style="--c:var(--amber)">above ceiling, below 100 %</span>
-      <span style="--c:var(--red)">over capacity</span>
-      <span style="--c:var(--faint)">click a block to configure it</span>
+      <span style="--c:var(--ink)">ink: within the utilisation ceiling</span>
+      <span style="--c:var(--warn)">yellow pencil: above the ceiling</span>
+      <span style="--c:var(--bad)">red pencil: over capacity</span>
+      <span class="dash" style="--c:var(--ink3)">moving dashes = traffic · click a block to edit it</span>
     </div>
   </section>
 
@@ -299,11 +350,22 @@ footer a{color:var(--mute)}
 </main>
 
 <footer>
-  Bottleneck Explorer · a first-order sizing model — every catalogue number is indicative and editable in spirit; see <a href="#" data-tab="model">Model &amp; assumptions</a>.
-  · <a href="https://github.com/BrendanJamesLynskey/Data_Bottleneck_Explorer">Source on GitHub</a>
-  · Built by <a href="https://brendanjameslynskey.github.io/">Brendan Lynskey</a>
+  <p class="disclaim">A first-order sizing model. Every catalogue number is an indicative figure for a 5 nm-class design; see the <a href="#" data-tab="model">Model</a> tab. Source on <a href="https://github.com/BrendanJamesLynskey/Data_Bottleneck_Explorer">GitHub</a>.</p>
+  <div class="tblock">
+    <div class="ttl">Bottleneck Explorer<small id="tbScenario">Host · link · accelerator · DRAM</small></div>
+    <div><span class="k">Drawn</span><a href="https://brendanjameslynskey.github.io/">B. Lynskey</a></div>
+    <div><span class="k">Checked</span><span class="sig" id="tbCheck">—</span></div>
+    <div><span class="k">Scale</span>N.T.S.</div>
+    <div><span class="k">Units</span>SI, 1 GB = 10⁹ B</div>
+    <div><span class="k">Dwg no.</span>BX-001</div>
+    <div><span class="k">Rev</span><span id="tbRev">A</span></div>
+    <div><span class="k">Sheet</span>1 of 1</div>
+    <div><span class="k">Projection</span>3rd angle</div>
+  </div>
 </footer>
+</div>
 <div class="toast" id="toast"></div>
+
 
 <script>
 'use strict';
@@ -393,28 +455,142 @@ const BASE = {
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const merge = (a,b) => { for(const k in b){ if(b[k] && typeof b[k]==='object' && !Array.isArray(b[k])) { a[k]=merge(a[k]||{}, b[k]); } else a[k]=b[k]; } return a; };
+/* Presets. g = menu group, d = what the scenario shows. Several are deliberately broken designs that
+   illustrate a classic bottleneck; the description says so. */
 const PRESETS = [
-  {id:'gbms', name:'1 GB per ms stream (the 1 TB/s question)', p:{}},
-  {id:'video', name:'4 × 4K60 video analytics at the edge', p:{
+  // ---------------------------------------------------------------- the question
+  {g:'Start here', id:'gbms', name:'1 GB per ms stream (the 1 TB/s question)',
+   d:'1 TB/s processed from device DRAM, 1 B in and 1 B out over the host link per byte. DRAM is fine on 2 HBM3E stacks; no PCIe link comes close, and the host memory cannot feed it either.', p:{}},
+
+  // ---------------------------------------------------------------- imaging and video
+  {g:'Imaging & video', id:'video', name:'4 × 4K60 video analytics at the edge',
+   d:'Four NV12 camera streams through a CNN on a small NPU with LPDDR5. Frames are staged in DRAM and read twice; a PCIe 4.0 x4 link is comfortably enough.', p:{
     T:4*3840*2160*1.5*60, lat:16e-3, block:3840*2160*1.5, burst:1.2, resident:1, inR:1, outR:0.01, xR:2, xW:1, stageIn:true, ops:150,
     pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:4, count:1},
     host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:8, wCore:3}, acc:{tops:40, util:0.5, pj:0.8, topsMm2:2.5, sram:8}}},
-  {id:'radar', name:'Radar / SDR front end over 400 GbE', p:{
+  {g:'Imaging & video', id:'8k', name:'8K60 broadcast encoder card',
+   d:'10-bit 4:2:0 8K at 60 fps. Motion search re-reads about four reference frames per input byte, so DRAM traffic is 7× the input rate while the compressed output is tiny.', p:{
+    T:7680*4320*1.875*60, lat:33e-3, block:7680*4320*1.875, burst:1.1, resident:2, inR:1, outR:0.01, xR:4, xW:1, stageIn:true, ops:500,
+    pattern:'block', dev:{dram:'gddr6_20', units:4}, link:{id:'pcie4', lanes:8, count:1},
+    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:10}, acc:{tops:300, util:0.5, pj:0.6, topsMm2:3, sram:32}}},
+  {g:'Imaging & video', id:'linescan', name:'Line-scan machine-vision inspection',
+   d:'A 16k-pixel line camera at 200 kHz (3.3 GB/s) arrives over 100 GbE straight into the accelerator. The 1 ms decision deadline, not bandwidth, sets the block size.', p:{
+    T:16384*200e3, lat:1e-3, block:16384*256, burst:1.2, resident:0.5, src:'net_p2p', inR:1, outR:0.001, xR:0.5, xW:0.2, ops:100,
+    pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:8, count:1},
+    host:{dram:'ddr5_5600', units:2, cores:8, cpuUs:3}, acc:{tops:20, util:0.5, pj:0.8, topsMm2:2.5, sram:8}, net:{id:'e100', count:1, mtu:9000}}},
+  {g:'Imaging & video', id:'isp', name:'Smartphone camera ISP + NPU',
+   d:'A 50 MP RAW10 sensor at 30 fps through the ISP and a portrait-mode network, on a shared 64-bit LPDDR5X. Power is the real budget: watch the pJ per byte.', p:{
+    T:50e6*1.25*30, lat:33e-3, block:50e6*1.25, burst:1.3, resident:1, inR:1, outR:0.4, xR:3, xW:2, stageIn:true, stageOut:true, ops:300,
+    pattern:'block', dev:{dram:'lp5x_8533', units:4}, link:{id:'ucie', count:1, rtt:0.05},
+    host:{dram:'lp5x_8533', units:4, cores:4, cpuUs:20, wCore:1.5}, acc:{tops:40, util:0.4, pj:0.3, topsMm2:4, sram:8, leak:0.01}}},
+  {g:'Imaging & video', id:'ultrasound', name:'Ultrasound beamformer (128 channels)',
+   d:'128 channels × 40 MS/s × 16 bit = 10 GB/s from the front end over two 100 GbE links, delay-and-sum beamforming, 5 ms frame latency.', p:{
+    T:128*40e6*2, lat:5e-3, block:4e6, burst:1, resident:0.5, src:'net_p2p', inR:1, outR:0.02, xR:0.2, xW:0, ops:200,
+    pattern:'stream', dev:{dram:'lp5x_8533', units:4}, link:{id:'pcie4', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:3}, acc:{tops:15, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, net:{id:'e100', count:2, mtu:9000}}},
+  {g:'Imaging & video', id:'adas', name:'Autonomous-driving perception SoC',
+   d:'Eight 8 MP cameras at 30 fps through a perception stack on a 256-bit LPDDR5 SoC: a compute-heavy, DRAM-shared design with a 50 ms budget.', p:{
+    T:8*8e6*1.5*30, lat:50e-3, block:8*8e6*1.5, burst:1.2, resident:16, inR:1, outR:0.05, xR:6, xW:3, stageIn:true, ops:2000,
+    pattern:'block', dev:{dram:'lp5_6400', units:16}, link:{id:'ucie', count:2, rtt:0.05},
+    host:{dram:'lp5_6400', units:4, cores:12, cpuUs:10, wCore:2}, acc:{tops:500, util:0.4, pj:0.5, topsMm2:3, sram:32}}},
+
+  // ---------------------------------------------------------------- signal processing and comms
+  {g:'Signal processing & comms', id:'radar', name:'Radar / SDR front end over 400 GbE',
+   d:'Two channels at 4 GS/s of 16-bit IQ (32 GB/s) arrive peer-to-peer over 400 GbE. FFTs and filters at 60 op/B on GDDR6, with a 50 µs latency target.', p:{
     T:2*4e9*4, lat:50e-6, block:65536, burst:1.1, resident:2, src:'net_p2p', inR:1, outR:0.05, xR:0.5, xW:0.5, ops:60,
     pattern:'block', dev:{dram:'gddr6_20', units:4}, link:{id:'pcie5', lanes:16, count:1, rtt:1.0},
     host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:2}, acc:{tops:50, util:0.5, pj:0.6, topsMm2:3, sram:32}, net:{id:'e400', count:1, mtu:9000}}},
-  {id:'llm', name:'LLM decode on an edge accelerator (8B, INT4)', p:{
+  {g:'Signal processing & comms', id:'oran', name:'5G O-RAN distributed unit (L1 offload)',
+   d:'Four 25 GbE eCPRI fronthaul links with standard 1500 B frames and a 0.5 ms slot deadline. LDPC and channel estimation are modest; the deadline is what bites. Push the rate up and the network saturates first.', p:{
+    T:6e9, lat:0.5e-3, block:1e6, burst:1.3, resident:1, src:'net_p2p', inR:1, outR:0.1, xR:1, xW:0.5, ops:30,
+    pattern:'block', dev:{dram:'lp5_6400', units:4}, link:{id:'pcie4', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:6, cores:24, cpuUs:2}, acc:{tops:10, util:0.5, pj:0.8, topsMm2:2.5, sram:16}, net:{id:'e25', count:4, mtu:1500}}},
+  {g:'Signal processing & comms', id:'correlator', name:'Radio-telescope correlator (X-engine)',
+   d:'50 GB/s of channelised antenna data over six 100 GbE links into a PCIe 6.0 card, cross-multiplied at 500 op/B. Compute-bound; the output visibilities are tiny. On PCIe 5.0 the link would sit at 96 %.', p:{
+    T:50e9, lat:100e-3, block:64e6, burst:1, resident:8, src:'net_p2p', inR:1, outR:0.01, xR:1, xW:0.1, stageIn:true, ops:500,
+    pattern:'stream', dev:{dram:'hbm2e_36', units:2}, link:{id:'pcie6', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:4}, acc:{tops:60, util:0.6, pj:0.5, topsMm2:3, sram:40}, net:{id:'e100', count:6, mtu:9000}}},
+  {g:'Signal processing & comms', id:'hft', name:'Low-latency trading feed handler ✗',
+   d:'Deliberately broken: a 5 µs tick-to-trade target with a host in the loop. Bandwidth is trivial, but the PCIe round trip and driver time alone exceed the budget, which is why these run on FPGA NICs.', p:{
+    T:3e9, lat:5e-6, block:1024, burst:3, resident:0.1, src:'net_p2p', inR:1, outR:0.05, xR:0.1, xW:0, ops:20,
+    pattern:'random', dev:{dram:'ddr4_3200', units:2}, link:{id:'pcie4', lanes:8, count:1},
+    host:{dram:'ddr5_5600', units:4, cores:8, cpuUs:1}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:16}, net:{id:'e25', count:1, mtu:1500}}},
+  {g:'Signal processing & comms', id:'trigger', name:'Particle-detector trigger board ✗',
+   d:'Deliberately broken: 150 GB/s from twelve optical links with a 10 µs decision budget. The host cannot be in the loop; a trigger runs as self-contained logic next to the links.', p:{
+    T:150e9, lat:10e-6, block:4096, burst:1, resident:0.5, src:'net_p2p', inR:1, outR:0.001, xR:0, xW:0, ops:20,
+    pattern:'stream', dev:{dram:'ddr4_3200', units:2}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:4, cores:16, cpuUs:0.5}, acc:{tops:10, util:0.5, pj:0.5, topsMm2:3, sram:32}, net:{id:'e100', count:12, mtu:9000}}},
+
+  // ---------------------------------------------------------------- AI and ML
+  {g:'AI & ML', id:'llm', name:'LLM decode on an edge accelerator (8B, INT4)',
+   d:'Every generated token streams all 4 GB of weights from DRAM. At 30 tokens/s that is 120 GB/s: decode is memory-bound and the DRAM width sets the token rate.', p:{
     T:4e9*30, lat:50e-3, block:4e9, burst:1, resident:6, inR:0.00001, outR:0.00001, xR:1, xW:0.02, ops:4,
     pattern:'stream', dev:{dram:'lp5x_8533', units:12}, link:{id:'pcie4', lanes:4, count:1},
     host:{dram:'lp5x_8533', units:4, cores:8, cpuUs:20, wCore:3}, acc:{tops:60, util:0.4, pj:0.7, topsMm2:2.5, sram:16}}},
-  {id:'scan', name:'NVMe scan / filter offload', p:{
-    T:40e9, lat:5e-3, block:2e6, burst:1, resident:4, src:'nvme_p2p', inR:1, outR:0.05, xR:0, xW:0, stageIn:true, ops:8,
-    pattern:'stream', dev:{dram:'lp5x_8533', units:8}, link:{id:'pcie5', lanes:16, count:1},
-    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:4}, acc:{tops:8, util:0.6, pj:0.8, topsMm2:3, sram:16}, nvme:{id:'g5', count:4}}},
-  {id:'hbmtrain', name:'Datacentre accelerator, HBM-fed GEMMs', p:{
+  {g:'AI & ML', id:'llmdc', name:'LLM decode in the datacentre (70B FP8, batch 32)',
+   d:'70 GB of weights read per decode step at 50 steps/s (3.5 TB/s), shared by a batch of 32 so intensity is 64 op/B. Six HBM3E stacks carry it; compute is idle-ish. 4500 TOPS needs more than one reticle: a two-die part, as current flagship GPUs are.', p:{
+    T:70e9*50, lat:25e-3, block:70e9, burst:1, resident:140, inR:0.000001, outR:0.000001, xR:1, xW:0.05, ops:64,
+    pattern:'stream', dev:{dram:'hbm3e_96', units:6}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:10}, acc:{tops:4500, util:0.5, pj:0.3, topsMm2:4, sram:50}}},
+  {g:'AI & ML', id:'prefill', name:'LLM prefill (70B FP8, 2k-token prompts)',
+   d:'The same weights, but each byte is reused across 2048 prompt tokens: 4096 op/B. The roofline flips to compute-bound, which is why prefill and decode are often split onto different hardware.', p:{
+    T:0.4e12, lat:0.5, block:70e9, burst:1, resident:140, inR:0.0001, outR:0.0001, xR:1, xW:0.1, ops:4096,
+    pattern:'stream', dev:{dram:'hbm3e_96', units:6}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:10}, acc:{tops:4500, util:0.5, pj:0.3, topsMm2:4, sram:50}}},
+  {g:'AI & ML', id:'hbmtrain', name:'Datacentre training step, HBM-fed GEMMs',
+   d:'Large GEMMs at 200 op/B on a 1500 TOPS part with six HBM3E stacks. The die is big (and pad-limited is close); host traffic is negligible.', p:{
     T:3e12, lat:2e-3, block:64e6, burst:1, resident:120, inR:0.01, outR:0.01, xR:1, xW:0.3, ops:200,
     pattern:'block', dev:{dram:'hbm3e_96', units:6}, link:{id:'pcie5', lanes:16, count:1},
     host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:4}, acc:{tops:1500, util:0.6, pj:0.4, topsMm2:3.5, sram:100, leak:0.02}}},
+  {g:'AI & ML', id:'dlrm', name:'Recommendation embeddings (DLRM lookups)',
+   d:'Random 64 B embedding gathers from a 600 GB table. Capacity, not bandwidth, picks the memory: HBM cannot hold it, so twelve DDR5 channels at random-access efficiency it is.', p:{
+    T:150e9, lat:10e-3, block:1e6, burst:1.3, resident:600, inR:0.05, outR:0.05, xR:1, xW:0, ops:2,
+    pattern:'random', dev:{dram:'ddr5_5600', units:12}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:32, cpuUs:4}, acc:{tops:50, util:0.4, pj:0.6, topsMm2:3, sram:64}}},
+  {g:'AI & ML', id:'gpuhost', name:'Training data loader starving a GPU ✗',
+   d:'Deliberately broken: images decoded on the host and copied over PCIe 4.0 x16 into a fast accelerator. The link and the host CPU, not the accelerator, set the training rate.', p:{
+    T:40e9, lat:50e-3, block:16e6, burst:1, resident:40, inR:1, outR:0.001, xR:3, xW:1, stageIn:true, ops:400,
+    pattern:'block', dev:{dram:'hbm3_64', units:5}, link:{id:'pcie4', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:60}, acc:{tops:1000, util:0.5, pj:0.4, topsMm2:3.5, sram:50}}},
+
+  // ---------------------------------------------------------------- data, storage and networking
+  {g:'Data, storage & networking', id:'scan', name:'NVMe scan / filter offload',
+   d:'Four Gen5 SSDs stream peer-to-peer into a filter accelerator that keeps 5 % of the data. Host memory is bypassed; the x16 link runs near its ceiling.', p:{
+    T:40e9, lat:5e-3, block:2e6, burst:1, resident:4, src:'nvme_p2p', inR:1, outR:0.05, xR:0, xW:0, stageIn:true, ops:8,
+    pattern:'stream', dev:{dram:'lp5x_8533', units:8}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:4}, acc:{tops:8, util:0.6, pj:0.8, topsMm2:3, sram:16}, nvme:{id:'g5', count:4}}},
+  {g:'Data, storage & networking', id:'gpudb', name:'GPU database join over PCIe ✗',
+   d:'Deliberately broken: columns live in host memory and are shipped to an HBM accelerator for every query. A 2-op/B join cannot amortise the link; keep the data resident or filter on the way in.', p:{
+    T:200e9, lat:100e-3, block:256e6, burst:1, resident:20, inR:1, outR:0.1, xR:2, xW:1, stageIn:true, ops:2,
+    pattern:'block', dev:{dram:'hbm3_64', units:2}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:32, cpuUs:4}, acc:{tops:200, util:0.4, pj:0.5, topsMm2:3, sram:40}}},
+  {g:'Data, storage & networking', id:'tls', name:'400 GbE inline TLS / IPsec offload',
+   d:'40 GB/s decrypted on a SmartNIC-style accelerator and delivered to host memory. No device DRAM traffic at all; the work is per-packet, so CPU time per block matters.', p:{
+    T:40e9, lat:20e-6, block:9000, burst:1.1, resident:0.1, src:'net_p2p', inR:1, outR:1, xR:0, xW:0, ops:4,
+    pattern:'stream', dev:{dram:'ddr4_3200', units:1}, link:{id:'pcie5', lanes:16, count:1, mps:512},
+    host:{dram:'ddr5_5600', units:8, cores:32, cpuUs:0.4}, acc:{tops:2, util:0.6, pj:0.5, topsMm2:3, sram:16}, net:{id:'e400', count:1, mtu:9000}}},
+  {g:'Data, storage & networking', id:'compress', name:'Storage compression offload (zstd)',
+   d:'Writes compressed 3:1 before they hit the SSDs. Data comes from host memory over PCIe 4.0 x16 and goes back compressed; staged in a small LPDDR4X buffer.', p:{
+    T:12e9, lat:2e-3, block:1e6, burst:1.2, resident:2, inR:1, outR:0.33, xR:0.5, xW:0.3, stageIn:true, ops:30,
+    pattern:'block', dev:{dram:'lp4x_4266', units:8}, link:{id:'pcie4', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:3}, acc:{tops:2, util:0.5, pj:1, topsMm2:2, sram:8}}},
+
+  // ---------------------------------------------------------------- science, HPC and crypto
+  {g:'Science, HPC & crypto', id:'stencil', name:'CFD stencil on a GPU-class part',
+   d:'A 3-D stencil reads and writes every grid point once per sweep at about 1 op/B: the textbook memory-bound kernel. Compute utilisation is in single digits.', p:{
+    T:0.5e12, lat:10e-3, block:1e9, burst:1, resident:40, inR:0.000001, outR:0.000001, xR:1, xW:1, ops:1,
+    pattern:'stream', dev:{dram:'hbm2e_36', units:4}, link:{id:'pcie4', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:32, cpuUs:10}, acc:{tops:300, util:0.6, pj:0.5, topsMm2:3, sram:40}}},
+  {g:'Science, HPC & crypto', id:'genomics', name:'Genomic read alignment (FPGA card)',
+   d:'2 GB/s of reads seeded against a 30 GB index with random lookups (10 DRAM bytes per input byte) on an FPGA card with four DDR4 channels.', p:{
+    T:2e9, lat:1, block:64e6, burst:1, resident:30, inR:1, outR:0.3, xR:10, xW:0.5, ops:200,
+    pattern:'random', dev:{dram:'ddr4_3200', units:4}, link:{id:'pcie3', lanes:16, count:1},
+    host:{dram:'ddr4_3200', units:8, cores:32, cpuUs:10}, acc:{tops:2, util:0.5, pj:2, topsMm2:0.5, sram:40}}},
+  {g:'Science, HPC & crypto', id:'fhe', name:'FHE bootstrapping accelerator (CKKS)',
+   d:'Key-switching keys are re-read about 40 times per ciphertext byte, so a 20 GB/s ciphertext stream needs 800 GB/s of HBM. The memory-bound case behind FHE accelerator design.', p:{
+    T:20e9, lat:50e-3, block:32e6, burst:1, resident:30, inR:1, outR:1, xR:40, xW:2, ops:50,
+    pattern:'stream', dev:{dram:'hbm3_64', units:2}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:4}, acc:{tops:20, util:0.6, pj:0.5, topsMm2:3, sram:256}}},
 ];
 let S = clone(BASE);
 let selected = 'dram';
@@ -435,7 +611,7 @@ const fmtPct = u => !isFinite(u) ? '∞' : (u>=10 ? (u*100).toFixed(0) : u>=1 ? 
 const fmtA = a => sig(a)+' mm²';
 const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function state(u){ return u>1 ? 'bad' : u>S.ceil ? 'warn' : 'ok'; }
-const COL = {ok:'var(--green)', warn:'var(--amber)', bad:'var(--red)'};
+const COL = {ok:'var(--ok)', warn:'var(--warn)', bad:'var(--bad)'};
 
 /* =====================================================================
    THE MODEL
@@ -783,10 +959,9 @@ const G = {                                                    // node boxes in 
 let edges = [];
 function buildDiagram(){
   const svg = document.getElementById('diagram');
-  svg.innerHTML = `<defs>
-    <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <linearGradient id="accg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="rgba(155,123,255,.20)"/><stop offset="1" stop-color="rgba(60,242,255,.06)"/></linearGradient>
-  </defs><g id="eg"></g><g id="pg"></g><g id="ng"></g>`;
+  const mk = (id, col) => `<marker id="ar_${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" style="fill:${col}"/></marker>`;
+  svg.innerHTML = `<defs>${mk('ok','var(--ink)')}${mk('warn','var(--warn)')}${mk('bad','var(--bad)')}</defs>
+    <g id="eg"></g><g id="ng"></g><g id="redmark" class="redmark"></g>`;
   const p = (a,b)=>`M${a[0]},${a[1]} L${b[0]},${b[1]}`;
   const c = (a,b,c1,c2)=>`M${a[0]},${a[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${b[0]},${b[1]}`;
   edges = [
@@ -806,8 +981,9 @@ function buildDiagram(){
   svg.setAttribute('viewBox', S.src==='host' ? '178 0 822 460' : '0 0 1000 460');
   const eg = svg.querySelector('#eg');
   for(const e of edges){
-    const path = document.createElementNS(NS,'path'); path.setAttribute('d', e.d); path.setAttribute('class','edge'); path.id = 'e_'+e.id;
-    eg.appendChild(path); e.el = path; e.len = path.getTotalLength(); e.parts = []; e.acc = Math.random();
+    const base = document.createElementNS(NS,'path'); base.setAttribute('d', e.d); base.setAttribute('class','edge-base');
+    const flow = document.createElementNS(NS,'path'); flow.setAttribute('d', e.d); flow.setAttribute('class','edge');
+    eg.appendChild(base); eg.appendChild(flow); e.base = base; e.el = flow; e.off = 0;
     if(e.lbl){ const t = document.createElementNS(NS,'text'); t.setAttribute('x',e.lbl[0]); t.setAttribute('y',e.lbl[1]); t.setAttribute('class','edgelbl');
       t.setAttribute('text-anchor',e.lbl[2]||'middle'); t.id = 'l_'+e.id; eg.appendChild(t); }
   }
@@ -816,23 +992,27 @@ function buildDiagram(){
     if(k==='src' && S.src==='host') continue;
     const g = document.createElementNS(NS,'g'); g.setAttribute('class','node'); g.id = 'n_'+k; g.dataset.sel = b.sel;
     g.setAttribute('tabindex','0'); g.setAttribute('role','button');
-    let inner = `<rect class="box" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="14" ${k==='acc'?'style="fill:url(#accg)"':''}/>
-      <text class="tag" x="${b.x+12}" y="${b.y-7}" id="tag_${k}"></text>
-      <text class="t1" x="${b.x+14}" y="${b.y+24}" id="t1_${k}"></text>
+    let inner = `<rect class="box" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="2"/>
+      <rect class="box2" x="${b.x+4}" y="${b.y+4}" width="${b.w-8}" height="${b.h-8}"/>
+      <text class="t1" x="${b.x+14}" y="${b.y+26}" id="t1_${k}"></text>
       <text class="t2" x="${b.x+14}" y="${b.y+46}" id="t2_${k}"></text>`;
     if(k==='acc'){
-      inner += `<rect x="${b.x+14}" y="${b.y+62}" width="${b.w-28}" height="70" rx="8" fill="none" stroke="var(--line2)" stroke-dasharray="3 3"/>
-        <text class="t2" x="${b.x+24}" y="${b.y+80}">COMPUTE</text><text class="t3" x="${b.x+24}" y="${b.y+99}" id="t3_acc"></text><text class="t3" x="${b.x+24}" y="${b.y+118}" id="t4_acc"></text>
-        <rect x="${b.x+14}" y="${b.y+144}" width="${b.w-28}" height="70" rx="8" fill="none" stroke="var(--line2)" stroke-dasharray="3 3"/>
-        <text class="t2" x="${b.x+24}" y="${b.y+162}">SRAM</text><text class="t3" x="${b.x+24}" y="${b.y+181}" id="t5_acc"></text><text class="t2" x="${b.x+24}" y="${b.y+200}" id="t8_acc"></text>
+      inner += `<rect x="${b.x+14}" y="${b.y+62}" width="${b.w-28}" height="70" fill="none" stroke="var(--rule2)" stroke-dasharray="4 3"/>
+        <text class="t2" x="${b.x+24}" y="${b.y+80}">compute</text><text class="t3" x="${b.x+24}" y="${b.y+99}" id="t3_acc"></text><text class="t3" x="${b.x+24}" y="${b.y+118}" id="t4_acc"></text>
+        <rect x="${b.x+14}" y="${b.y+144}" width="${b.w-28}" height="70" fill="none" stroke="var(--rule2)" stroke-dasharray="4 3"/>
+        <text class="t2" x="${b.x+24}" y="${b.y+162}">on-chip SRAM</text><text class="t3" x="${b.x+24}" y="${b.y+181}" id="t5_acc"></text><text class="t2" x="${b.x+24}" y="${b.y+200}" id="t8_acc"></text>
         <text class="t2" x="${b.x+14}" y="${b.y+246}" id="t6_acc"></text><text class="t2" x="${b.x+14}" y="${b.y+264}" id="t7_acc"></text>`;
     } else {
       inner += `<text class="t3" x="${b.x+14}" y="${b.y+72}" id="t3_${k}"></text><text class="t3" x="${b.x+14}" y="${b.y+92}" id="t4_${k}"></text>
         <text class="t2" x="${b.x+14}" y="${b.y+114}" id="t5_${k}"></text>`;
     }
-    const rx = b.x+b.w-24, ry = b.y+24, C = 2*Math.PI*14;
-    inner += `<circle class="ring-bg" cx="${rx}" cy="${ry}" r="14"/><circle class="ring" id="r_${k}" cx="${rx}" cy="${ry}" r="14" stroke-dasharray="0 ${C}" transform="rotate(-90 ${rx} ${ry})"/>
-      <text class="ringtxt" x="${rx}" y="${ry}" id="rt_${k}"></text>`;
+    // utilisation gauge: a 0–100 % dial with the zone above the ceiling marked in red pencil
+    const cx = b.x+b.w-26, cy = b.y+30, r = 15;
+    const at = f => [cx + r*Math.cos(Math.PI*(1-f)), cy - r*Math.sin(Math.PI*(1-f))];
+    let ticks = ''; for(const f of [0,.25,.5,.75,1]){ const a=at(f), i=[cx+(r-4)*Math.cos(Math.PI*(1-f)), cy-(r-4)*Math.sin(Math.PI*(1-f))]; ticks += `<line class="dial-tick" x1="${a[0]}" y1="${a[1]}" x2="${i[0]}" y2="${i[1]}"/>`; }
+    inner += `<path class="dial-arc" d="M${cx-r},${cy} A${r},${r} 0 0 1 ${cx+r},${cy}"/>${ticks}<path class="dial-red" id="dr_${k}"/>
+      <line class="dial-needle" id="dn_${k}" x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy-r+2}" style="transform-origin:${cx}px ${cy}px"/>
+      <circle cx="${cx}" cy="${cy}" r="2" style="fill:var(--ink)"/><text class="dial-txt" x="${cx}" y="${cy+13}" id="dt_${k}"></text>`;
     g.innerHTML = inner;
     const go = ()=>{ selected = b.sel; buildInspector(); update(); };
     g.addEventListener('click', go); g.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } });
@@ -840,22 +1020,47 @@ function buildDiagram(){
   }
 }
 const txt = (id, s) => { const e = document.getElementById(id); if(e) e.textContent = s; };
-function ring(k, u){
-  const e = document.getElementById('r_'+k); if(!e) return; const C = 2*Math.PI*14;
-  e.setAttribute('stroke-dasharray', `${Math.min(u,1)*C} ${C}`); e.style.stroke = COL[state(u)];
-  txt('rt_'+k, !isFinite(u) ? '∞' : u>=10 ? '>999' : Math.round(u*100)); document.getElementById('rt_'+k).style.fill = COL[state(u)];
+function dial(k, u){
+  const b = G[k], n = document.getElementById('dn_'+k); if(!n) return;
+  const cx = b.x+b.w-26, cy = b.y+30, r = 15, st = state(u);
+  const f = Math.min(isFinite(u)?u:2, 1.12);
+  n.style.transform = `rotate(${-90+180*f}deg)`; n.style.stroke = st==='ok' ? 'var(--ink)' : COL[st];
+  const a1 = [cx + r*Math.cos(Math.PI*(1-S.ceil)), cy - r*Math.sin(Math.PI*(1-S.ceil))];
+  document.getElementById('dr_'+k).setAttribute('d', `M${a1[0]},${a1[1]} A${r},${r} 0 0 1 ${cx+r},${cy}`);
+  const t = document.getElementById('dt_'+k);
+  t.textContent = !isFinite(u) ? '∞' : u>=10 ? '>999%' : Math.round(u*100)+'%'; t.style.fill = st==='ok' ? 'var(--ink)' : COL[st];
+}
+// a hand-drawn loop: an ellipse with wobble that overshoots its start, drawn twice like a pencil
+function scribble(cx, cy, rx, ry, seed){
+  const pts = [];
+  for(let t=0; t<=2*Math.PI*1.12; t+=0.12){
+    const j = 1 + 0.035*Math.sin(3*t+seed) + 0.02*Math.sin(7*t+2*seed) + 0.04*t/(2*Math.PI);
+    pts.push(`${(cx + rx*j*Math.cos(t+seed)).toFixed(1)},${(cy + ry*j*Math.sin(t+seed)).toFixed(1)}`);
+  }
+  return 'M'+pts.join(' L');
+}
+function paintRedmark(m){
+  const g = document.getElementById('redmark'); if(!g) return;
+  const map = {cpu:'cpu', host:'host', link:'link', compute:'acc', dram:'dram', src:'src', h2d:'link', d2h:'link'};
+  const k = map[m.worst.k], st = state(m.worst.U);
+  if(!k || st==='ok' || !document.getElementById('n_'+k)){ g.innerHTML = ''; return; }
+  const b = G[k], col = COL[st], cx = b.x+b.w/2, cy = b.y+b.h/2, rx = b.w/2+16, ry = b.h/2+14;
+  const vb = document.getElementById('diagram').viewBox.baseVal;
+  const above = b.y > 70, ty = above ? b.y-24 : b.y+b.h+40;
+  const tx = Math.min(Math.max(cx, vb.x+120), vb.x+vb.width-120);
+  const label = st==='bad' ? `bottleneck! ${fmtPct(m.worst.U)}` : `limiting · ${fmtPct(m.worst.U)}`;
+  g.innerHTML = `<path d="${scribble(cx,cy,rx,ry,0.6)}" style="stroke:${col}" stroke-width="2.2" opacity=".9"/>
+    <path d="${scribble(cx+1.5,cy-1,rx+3,ry+2,2.1)}" style="stroke:${col}" stroke-width="1.2" opacity=".6"/>
+    <text x="${tx}" y="${ty}" text-anchor="middle" transform="rotate(-3 ${tx} ${ty})" style="fill:${col}">${label}</text>`;
 }
 function paintDiagram(m){
-  const U = m.U, botK = m.worst.k;
+  const U = m.U;
   const nodeU = {cpu:U.cpu, host:U.host, link:U.link, acc:U.compute, dram:U.dram, src:U.src};
-  const nodeComp = {cpu:'cpu', host:'host', link:'link', acc:'compute', dram:'dram', src:'src'};
   for(const k in G){
     const g = document.getElementById('n_'+k); if(!g) continue;
-    ring(k, nodeU[k]);
-    const isB = nodeComp[k]===botK && m.worst.U>S.ceil;
-    g.classList.toggle('bott', isB); g.classList.toggle('sel', G[k].sel===selected);
-    txt('tag_'+k, isB ? (m.worst.U>1 ? '▲ BOTTLENECK' : '▲ LIMITING') : '');
+    dial(k, nodeU[k]); g.classList.toggle('sel', G[k].sel===selected);
   }
+  paintRedmark(m);
   txt('t1_cpu','Host CPU'); txt('t2_cpu', `${S.host.cores} cores for I/O`);
   txt('t3_cpu', `${fmtIOPS(m.Tb/S.block)} blocks/s`); txt('t4_cpu', `need ${sig(m.dem.cpu)} cores`); txt('t5_cpu', `${sig(S.host.cpuUs)} µs CPU per block`);
   txt('t1_host','Host DRAM'); txt('t2_host', `${S.host.units} × ${m.hd.name}`);
@@ -873,42 +1078,34 @@ function paintDiagram(m){
   txt('t5_dram', `${(S.dev.units*m.dev.width).toLocaleString()}-bit · ${fmtB(m.devCap*1e9)}`);
   if(S.src!=='host'){ txt('t1_src', S.src.startsWith('net')?'Network':'Storage'); txt('t2_src', m.srcName.replace('NVMe PCIe ','Gen').replace(' x4 SSD',''));
     txt('t3_src', `need ${fmtBps(m.dem.src)}`); txt('t4_src', `have ${fmtBps(m.cap.src)}`); txt('t5_src', S.src.endsWith('p2p')?'peer-to-peer DMA':'via host memory'); }
-  // edges
+  // edges: a thin base line with an arrowhead, and moving dashes whose weight follows the traffic
   const traffic = {cpuW:m.T*m.hW, cpuR:m.T*m.hR, h2dA:m.T*S.inR, h2dB:m.T*S.inR, d2hA:m.T*S.outR, d2hB:m.T*S.outR,
     ddW:m.T*m.dW, ddR:m.T*m.dR, srcE:m.T*S.inR};
+  const ends = {cpuW:true, cpuR:true, h2dB:true, d2hA:true, ddW:true, ddR:true, srcE:true};
   for(const e of edges){
-    const bps = traffic[e.id]||0, u = U[e.res];
-    e.bps = bps; e.u = u; e.col = COL[state(u)];
-    e.el.style.stroke = e.col; e.el.style.strokeWidth = bps>0 ? Math.max(1.5, Math.min(9, 1+Math.log10(bps/1e6))) : 0.8;
-    e.el.style.opacity = bps>0 ? .38 : .12;
+    const bps = traffic[e.id]||0, u = U[e.res], st = state(u);
+    e.bps = bps; e.u = u; e.col = st==='ok' ? 'var(--ink)' : COL[st];
+    const w = bps>0 ? Math.max(1.2, Math.min(6, 0.6+0.7*Math.log10(bps/1e6))) : 0;
+    e.base.style.stroke = e.col; e.base.setAttribute('marker-end', ends[e.id] && bps>0 ? `url(#ar_${st})` : '');
+    e.el.style.stroke = e.col; e.el.style.strokeWidth = w; e.el.style.strokeDasharray = `${(2.2*w+4).toFixed(1)} ${(2.2*w+6).toFixed(1)}`;
+    e.el.style.opacity = bps>0 ? .95 : 0;
   }
   txt('l_cpuW', `${fmtBps(m.T*(m.hR+m.hW))}`); txt('l_srcE', `${fmtBps(m.T*S.inR)}`);
   txt('l_h2dB', `H→D ${fmtBps(m.T*S.inR)}`); txt('l_d2hA', `D→H ${fmtBps(m.T*S.outR)}`);
-  txt('l_ddW', `bus ${fmtBps(m.T*(m.dR+m.dW))}`); txt('l_srcE', `${fmtBps(m.T*S.inR)}`);
+  txt('l_ddW', `bus ${fmtBps(m.T*(m.dR+m.dW))}`);
 }
 const fmtIOPS = x => { for(const [m,p] of SI) if(x>=m) return sig(x/m)+p; return sig(x); };
 
-/* particles */
+/* moving dashes: speed follows the traffic; an over-capacity path crawls */
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let lastTs = 0;
 function tick(ts){
   const dt = Math.min(0.05, (ts-lastTs)/1000||0); lastTs = ts;
-  const pg = document.getElementById('pg');
-  if(pg && !reduceMotion){
+  if(!reduceMotion){
     for(const e of edges){
-      if(!e.el) continue;
-      const rate = e.bps>0 ? Math.max(1.5, Math.min(26, 3*Math.log10(e.bps/1e5))) : 0;   // particles per second
-      const speed = 150/Math.sqrt(Math.max(1, e.u||0));                                   // over-capacity edges crawl
-      e.acc += rate*dt;
-      while(e.acc>=1 && e.parts.length<60){ e.acc -= 1;
-        const c = document.createElementNS(NS,'circle'); c.setAttribute('r', 2.6); c.setAttribute('class','particle'); pg.appendChild(c);
-        e.parts.push({el:c, s:0}); }
-      if(e.acc>1) e.acc = 1;
-      for(let i=e.parts.length-1;i>=0;i--){
-        const pt = e.parts[i]; pt.s += speed*dt;
-        if(pt.s>=e.len){ pt.el.remove(); e.parts.splice(i,1); continue; }
-        const P = e.el.getPointAtLength(pt.s); pt.el.setAttribute('cx',P.x); pt.el.setAttribute('cy',P.y); pt.el.style.fill = e.col;
-      }
+      if(!e.el || !e.bps) continue;
+      const speed = (18 + 9*Math.log10(Math.max(1, e.bps/1e6))) / Math.sqrt(Math.max(1, e.u||0));
+      e.off -= speed*dt; e.el.style.strokeDashoffset = e.off.toFixed(1);
     }
   }
   requestAnimationFrame(tick);
@@ -1037,15 +1234,18 @@ function paneSizing(m){
       ${srcRow?`<h3>${S.src.startsWith('net')?'Network ports':'SSDs'} (any one of)</h3><p class="note">${srcRow}</p>`:''}</div></div>`;
 }
 
-function hbar(label, v, max, col, num){ return `<div class="bar"><span>${label}</span><div class="track"><div class="fill" style="width:${Math.max(0.5,Math.min(100,v/max*100))}%;background:${col}"></div></div><span class="num">${num}</span></div>`; }
+function hbar(label, v, max, st, num){
+  const sw = st==='bad' ? 'hb' : st==='warn' ? 'h2' : 'h0';
+  return `<div class="bar"><span>${label}</span><div class="track"><div class="fill ${sw}" style="width:${Math.max(0.5,Math.min(100,v/max*100))}%"></div>
+    <div style="position:absolute;top:-4px;bottom:-4px;left:50%;border-left:1.5px dashed var(--bad)" title="100 %"></div></div><span class="num" style="color:${st==='ok'?'var(--ink)':COL[st]}">${num}</span></div>`; }
 function paneLatency(m){
-  const cols = ['var(--cyan)','var(--violet)','var(--mag)','var(--amber)','var(--green)','#5ea2ff','#ff7a59','#c08bff'];
+  const hat = i => 'h'+(i%8);
   const tot = m.latency, fin = isFinite(tot);
   const scale = fin ? Math.max(tot, S.lat) : 1;
-  const stack = fin ? `<div style="position:relative"><div class="stack">${m.stages.map((s,i)=>`<div title="${esc(s.name)}: ${fmtT(s.t)}" style="width:${s.t/scale*100}%;background:${cols[i%cols.length]}"></div>`).join('')}</div>
-      <div style="position:absolute;top:-6px;bottom:-6px;left:${S.lat/scale*100}%;border-left:2px dashed var(--red)"></div></div>
-      <div class="keys">${m.stages.map((s,i)=>`<span style="--c:${cols[i%cols.length]}">${s.name} · ${fmtT(s.t)}</span>`).join('')}<span style="--c:var(--red)">budget ${fmtT(S.lat)}</span></div>`
-    : `<div class="answer" style="border-color:var(--red)"><b style="color:var(--red)">Unbounded.</b> At least one stage is above 100 % utilisation on average, so its queue grows without limit.</div>`;
+  const stack = fin ? `<div style="position:relative"><div class="stack">${m.stages.map((s,i)=>`<div class="${hat(i)}" title="${esc(s.name)}: ${fmtT(s.t)}" style="width:${s.t/scale*100}%"></div>`).join('')}</div>
+      <div style="position:absolute;top:-6px;bottom:-6px;left:${S.lat/scale*100}%;border-left:2px dashed var(--bad)"></div></div>
+      <div class="keys">${m.stages.map((s,i)=>`<span class="${hat(i)}">${s.name} · ${fmtT(s.t)}</span>`).join('')}<span style="--sw:var(--bad)">budget ${fmtT(S.lat)} (dashed)</span></div>`
+    : `<div class="answer" style="border-color:var(--bad)"><b style="color:var(--bad)">Unbounded.</b> At least one stage is above 100 % utilisation on average, so its queue grows without limit.</div>`;
   const rows = m.stages.map(s=>`<tr><td>${s.name}</td><td class="n">${fmtT(s.fixed)}</td><td class="n">${fmtT(s.svc)}</td><td class="n">${fmtT(s.q)}</td><td class="n">${fmtT(s.t)}</td></tr>`).join('');
   // latency vs block size sweep
   const xs = [], ys = [];
@@ -1064,14 +1264,14 @@ function paneLatency(m){
 
 function paneHeadroom(m){
   const xs = []; for(let i=0;i<=80;i++) xs.push(m.T*Math.pow(10, -2+i/80*4));
-  const cols = {dram:'var(--cyan)', link:'var(--mag)', compute:'var(--violet)', host:'var(--amber)', cpu:'#5ea2ff', src:'var(--green)'};
-  const series = m.comps.map(c=>({name:c.name, col:cols[c.k], ys:xs.map(x=>c.U*x/m.T)}));
+  const sty = {dram:['var(--p1)',''], link:['var(--p3)','10 5'], compute:['var(--p4)','2 4'], host:['var(--p6)','12 4 2 4'], cpu:['var(--p2)','6 4'], src:['var(--p5)','1 3']};
+  const series = m.comps.map(c=>({name:c.name, col:sty[c.k][0], dash:sty[c.k][1], ys:xs.map(x=>c.U*x/m.T)}));
   const chart = lineChart({xs, series, xlog:true, ylog:true, xfmt:fmtBps, yfmt:v=>fmtPct(v), ymin:0.001, ymax:1000,
     hlines:[{y:1, col:'var(--red)', name:'100 %'}, {y:S.ceil, col:'var(--amber)', name:'ceiling', left:true}],
     vlines:[{x:m.T, col:'var(--text)', name:'target'}, {x:m.maxT, col:'var(--red)', name:'max'}], h:340, legend:true});
   return `<div class="cols"><div class="panel" style="grid-column:1/-1"><h2>Utilisation of every component as the rate scales</h2>${chart}
     <p class="note">Each line is one component's peak utilisation. The first to cross 100 % is the bottleneck, and where it crosses is the maximum sustainable rate (${fmtBps(m.maxT)}). The gap between lines is how much the next fix buys you: after fixing ${m.comps[0].name}, ${m.comps[1]?m.comps[1].name+' limits at '+fmtBps(m.T/m.comps[1].U):'nothing else limits'}.</p></div>
-    <div class="panel" style="grid-column:1/-1"><h2>Ranking</h2><div class="bars">${m.comps.map(c=>hbar(c.name, Math.min(c.U,2), 2, COL[state(c.U)], fmtPct(c.U))).join('')}</div><p class="note">Bars are drawn to 200 %.</p></div></div>`;
+    <div class="panel" style="grid-column:1/-1"><h2>Ranking</h2><div class="bars">${m.comps.map(c=>hbar(c.name, Math.min(c.U,2), 2, state(c.U), fmtPct(c.U))).join('')}</div><p class="note">Bars are drawn to 200 %.</p></div></div>`;
 }
 
 function paneRoofline(m){
@@ -1087,17 +1287,17 @@ function paneRoofline(m){
   const bound = ai < peak/bw ? 'memory-bound' : 'compute-bound';
   return `<div class="cols"><div class="panel" style="grid-column:1/-1"><h2>Roofline · device DRAM vs compute</h2>${chart}
     <p class="note">Arithmetic intensity against device DRAM is <b class="mono">${sig(ai)} op/B</b>; the ridge point (machine balance) is <b class="mono">${sig(peak/bw)} op/B</b>, so this workload is <b>${bound}</b>.
-    The pink point is the throughput you need; it must sit under the roof. The amber line is the compute rate the host link can feed at this workload's link bytes per byte, a second, lower roof that often wins.</p></div></div>`;
+    The cross-hair is the throughput you need; it must sit under the roof. The yellow line is the compute rate the host link can feed at this workload's link bytes per byte, a second, lower roof that often wins.</p></div></div>`;
 }
 
 function panePPA(m){
   const P = m.P;
-  const pItems = [['Device DRAM',P.devDram,'var(--cyan)'],['Host link',P.link,'var(--mag)'],['Compute (dynamic)',P.compute,'var(--violet)'],['Leakage',P.leak,'#8c6cff'],
-    ['Host DRAM',P.hostDram,'var(--amber)'],['Host I/O cores',P.hostCpu,'#5ea2ff'],['Source (NICs / SSDs)',P.src,'var(--green)']].filter(x=>x[1]>0);
-  const aItems = [['Compute',m.area.compute,'var(--violet)'],['SRAM',m.area.sram,'var(--cyan)'],['DRAM PHY',m.area.dramPhy,'var(--amber)'],['Link PHY',m.area.linkPhy,'var(--mag)'],['Other (15 %)',m.area.misc,'var(--faint)']];
-  if(m.padArea>m.coreArea) aItems.push(['Pad-limited filler', m.padArea-m.coreArea, 'rgba(255,77,109,.5)']);
-  const stackOf = (items, f) => { const t = items.reduce((a,x)=>a+x[1],0); return `<div class="stack">${items.map(x=>`<div title="${x[0]}: ${f(x[1])}" style="width:${x[1]/t*100}%;background:${x[2]}"></div>`).join('')}</div>
-    <div class="keys">${items.map(x=>`<span style="--c:${x[2]}">${x[0]} · ${f(x[1])}</span>`).join('')}</div>`; };
+  const pItems = [['Device DRAM',P.devDram,'h0'],['Host link',P.link,'h1'],['Compute (dynamic)',P.compute,'h2'],['Leakage',P.leak,'h5'],
+    ['Host DRAM',P.hostDram,'h3'],['Host I/O cores',P.hostCpu,'h4'],['Source (NICs / SSDs)',P.src,'h7']].filter(x=>x[1]>0);
+  const aItems = [['Compute',m.area.compute,'h2'],['SRAM',m.area.sram,'h0'],['DRAM PHY',m.area.dramPhy,'h3'],['Link PHY',m.area.linkPhy,'h1'],['Other (15 %)',m.area.misc,'h5']];
+  if(m.padArea>m.coreArea) aItems.push(['Pad-limited filler', m.padArea-m.coreArea, 'hb']);
+  const stackOf = (items, f) => { const t = items.reduce((a,x)=>a+x[1],0); return `<div class="stack">${items.map(x=>`<div class="${x[2]}" title="${x[0]}: ${f(x[1])}" style="width:${x[1]/t*100}%"></div>`).join('')}</div>
+    <div class="keys">${items.map(x=>`<span class="${x[2]}">${x[0]} · ${f(x[1])}</span>`).join('')}</div>`; };
   // DRAM PPA plane
   const rows = sizeDram(S, m);
   const scatter = scatterChart(rows.map(r=>({x:r.phy, y:r.power, label:r.d.name.replace(' Gb/s',''), col:COL[r.feas], cur:r.id===S.dev.dram, id:r.id, n:r.n})));
@@ -1110,7 +1310,7 @@ function panePPA(m){
     <div class="panel"><h2>Power · ${fmtW(m.Ptot)}</h2>${stackOf(pItems, fmtW)}<p class="note">Average power at the target rate. Accelerator side (DRAM, link, compute, leakage): <b class="mono">${fmtW(m.Pacc)}</b>. Each moved bit costs its technology's pJ/bit; standby and refresh power is charged per unit whether or not it is busy.</p></div>
     <div class="panel"><h2>Area · ${fmtA(m.die)} die</h2>${stackOf(aItems, fmtA)}
       ${stat('Core-limited area', fmtA(m.coreArea))}${stat('Pad (beachfront)-limited area', fmtA(m.padArea))}${stat('Beachfront needed / available', sig(m.shoreNeed)+' / '+sig(m.shoreHave)+' mm')}
-      <p class="note">${m.padArea>m.coreArea ? '<b style="color:var(--amber)">Pad-limited:</b> the die is sized by the edge length its memory and link PHYs need, not by its logic. ' : ''}${reticle ? '<b style="color:var(--red)">Above the ~830 mm² reticle limit</b>: this needs several dies (chiplets) joined on a package.' : 'Within one reticle (~830 mm²).'}</p></div>
+      <p class="note">${m.padArea>m.coreArea ? '<b style="color:var(--warn)">Pad-limited:</b> the die is sized by the edge length its memory and link PHYs need, not by its logic. ' : ''}${reticle ? '<b style="color:var(--bad)">Above the ~830 mm² reticle limit</b>: this needs several dies (chiplets) joined on a package.' : 'Within one reticle (~830 mm²).'}</p></div>
     <div class="panel" style="grid-column:1/-1"><h2>DRAM design space — power vs PHY area, each sized to meet the requirement</h2>${scatter}
       <p class="note">Every technology sized to the minimum count that meets bandwidth and capacity. Down and left is better. Colour shows feasibility (green practical, amber stretch, red impractical). Click a point to use it.</p></div></div>`;
 }
@@ -1164,8 +1364,8 @@ function paneCons(m){
   const C = considerations(m);
   const order = {bad:0, warn:1, ok:2, info:3};
   C.sort((a,b)=>order[a.lvl]-order[b.lvl]);
-  const icon = {bad:'✗', warn:'!', ok:'✓', info:'i'};
-  return `<div class="cons">${C.map(c=>`<div class="con ${c.lvl}"><h4><span class="pill ${c.lvl==='info'?'':c.lvl}" style="${c.lvl==='info'?'background:rgba(155,123,255,.16);color:var(--violet)':''}">${icon[c.lvl]}</span>${c.title}</h4>${c.body}</div>`).join('')}</div>`;
+  const icon = {bad:'fail', warn:'check', ok:'ok', info:'note'};
+  return `<div class="cons">${C.map(c=>`<div class="con ${c.lvl}"><h4>${c.title} <span class="pill ${c.lvl}">${icon[c.lvl]}</span></h4>${c.body}</div>`).join('')}</div>`;
 }
 
 function paneModel(){
@@ -1195,15 +1395,15 @@ function lineChart(o){
   const x0 = Math.ceil(Math.log10(xmin)), x1 = Math.floor(Math.log10(xmax)), xs = Math.max(1, Math.ceil((x1-x0+1)/7));
   for(let e=x0; e<=x1; e+=xs){ const x = X(Math.pow(10,e)); g += `<line class="gl" y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}"/><text x="${x}" y="${H-mb+16}" text-anchor="middle">${o.xfmt(Math.pow(10,e))}</text>`; }
   g += `<line class="ax" x1="${ml}" x2="${ml}" y1="${mt}" y2="${H-mb}"/><line class="ax" x1="${ml}" x2="${W-mr}" y1="${H-mb}" y2="${H-mb}"/>`;
-  for(const h of o.hlines||[]){ if(!isFinite(h.y)||h.y<=0) continue; const y = Y(h.y); g += `<line x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}" stroke="${h.col}" stroke-dasharray="6 4" stroke-width="1.4"/><text x="${h.left?ml+6:W-mr-4}" y="${h.left?y+13:y-5}" text-anchor="${h.left?'start':'end'}" style="fill:${h.col}">${h.name}</text>`; }
-  for(const v of o.vlines||[]){ if(!isFinite(v.x)||v.x<xmin||v.x>xmax) continue; const x = X(v.x); g += `<line y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}" stroke="${v.col}" stroke-dasharray="3 4" stroke-width="1.2" opacity=".8"/><text x="${x+4}" y="${mt+10}" style="fill:${v.col}">${v.name}</text>`; }
+  for(const h of o.hlines||[]){ if(!isFinite(h.y)||h.y<=0) continue; const y = Y(h.y); g += `<line x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}" stroke="${h.col}" stroke-dasharray="6 4" stroke-width="1.4"/><text x="${h.left?ml+6:W-mr-4}" y="${h.left?y+13:y-5}" text-anchor="${h.left?'start':'end'}" class="pen" style="fill:${h.col}">${h.name}</text>`; }
+  for(const v of o.vlines||[]){ if(!isFinite(v.x)||v.x<xmin||v.x>xmax) continue; const x = X(v.x); g += `<line y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}" stroke="${v.col}" stroke-dasharray="3 4" stroke-width="1.2" opacity=".8"/><text x="${x+4}" y="${mt+14}" class="pen" style="fill:${v.col}">${v.name}</text>`; }
   for(const s of o.series){
     const pts = o.xs.map((x,i)=>isFinite(s.ys[i]) && s.ys[i]>0 ? `${X(x).toFixed(1)},${Y(s.ys[i]).toFixed(1)}` : null).filter(Boolean);
-    g += `<polyline fill="none" stroke="${s.col}" stroke-width="2.2" points="${pts.join(' ')}" style="filter:drop-shadow(0 0 4px ${s.col})"/>`;
+    g += `<polyline fill="none" stroke="${s.col}" stroke-width="2" stroke-dasharray="${s.dash||''}" points="${pts.join(' ')}"/>`;
   }
-  for(const p of o.points||[]) g += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="6" fill="${p.col}" stroke="var(--bg)" stroke-width="2" style="filter:drop-shadow(0 0 6px ${p.col})"/>`;
+  for(const p of o.points||[]){ const x=X(p.x), y=Y(p.y); g += `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${p.col}" stroke-width="2"/><path d="M${x-9},${y} h18 M${x},${y-9} v18" stroke="${p.col}" stroke-width="1.2"/>`; }
   let leg = '';
-  if(o.legend) leg = `<div class="keys">${o.series.map(s=>`<span style="--c:${s.col}">${s.name}</span>`).join('')}</div>`;
+  if(o.legend) leg = `<div class="keys">${o.series.map(s=>`<span class="ln"><svg width="34" height="10" style="vertical-align:middle;margin-right:6px"><line x1="0" y1="5" x2="34" y2="5" stroke="${s.col}" stroke-width="2" stroke-dasharray="${s.dash||''}"/></svg>${s.name}</span>`).join('')}</div>`;
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>${leg}`;
 }
 function scatterChart(pts){
@@ -1223,8 +1423,8 @@ function scatterChart(pts){
     while(placed.some(q=>Math.abs(q[0]-x)<90 && Math.abs(q[1]-ly)<11)) ly += 11;
     placed.push([x,ly]); p.ly = ly; }
   for(const p of pts){ const x=X(p.x), y=Y(p.y);
-    g += `<g class="sc" data-dram="${p.id}" data-n="${p.n}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${p.cur?8:6}" fill="${p.col}" fill-opacity=".85" stroke="${p.cur?'var(--text)':'var(--bg)'}" stroke-width="2" style="filter:drop-shadow(0 0 5px ${p.col})"/>
-      <text x="${x+9}" y="${p.ly}" style="fill:var(--text);font-size:10px">${esc(p.label)}</text><title>${esc(p.label)}: ${p.n} units, ${fmtW(p.y)}, ${fmtA(p.x)}</title></g>`; }
+    g += `<g class="sc" data-dram="${p.id}" data-n="${p.n}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${p.cur?7:5}" fill="${p.col}" fill-opacity=".9" stroke="var(--ink)" stroke-width="${p.cur?2.5:1}"/>${p.cur?`<circle cx="${x}" cy="${y}" r="13" fill="none" stroke="var(--ink)" stroke-dasharray="3 3"/>`:''}
+      <text x="${x+9}" y="${p.ly}" style="fill:var(--ink);font-size:11px">${esc(p.label)}</text><title>${esc(p.label)}: ${p.n} units, ${fmtW(p.y)}, ${fmtA(p.x)}</title></g>`; }
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="DRAM options: power vs PHY area">${g}</svg>`;
 }
 
@@ -1233,8 +1433,10 @@ function scatterChart(pts){
    ===================================================================== */
 let M = null;
 function update(){
+  S.mod = isModified();
+  paintScenario();
   const m = model(S); M = m;
-  paintVerdict(m); paintDiagram(m); paintInspector(m);
+  paintVerdict(m); paintDiagram(m); paintInspector(m); paintTitleBlock(m);
   const panes = {sizing:paneSizing, ppa:panePPA, latency:paneLatency, headroom:paneHeadroom, roofline:paneRoofline, cons:paneCons, model:paneModel};
   const el = document.getElementById('p_'+tab); if(el) el.innerHTML = panes[tab](m);
   const C = considerations(m), nb = C.filter(c=>c.lvl==='bad').length, nw = C.filter(c=>c.lvl==='warn').length;
@@ -1258,7 +1460,26 @@ document.addEventListener('click', e=>{
 /* presets, share, theme */
 function applyPreset(id){
   const p = PRESETS.find(x=>x.id===id); if(!p) return;
-  S = merge(clone(BASE), clone(p.p)); buildAll();
+  S = merge(clone(BASE), clone(p.p)); S.preset = id; buildAll();
+}
+// a scenario is "modified" when any setting differs from the preset it was loaded from
+function isModified(){
+  const p = PRESETS.find(x=>x.id===S.preset); if(!p) return false;
+  const strip = o => { const c = clone(o); delete c.preset; delete c.mod; return JSON.stringify(c); };
+  return strip(S) !== strip(merge(clone(BASE), clone(p.p)));
+}
+function paintTitleBlock(m){
+  const p = PRESETS.find(x=>x.id===S.preset);
+  txt('tbScenario', p ? p.name+(S.mod?' (modified)':'') : 'Host · link · accelerator · DRAM');
+  txt('tbRev', S.mod ? 'B' : 'A');
+  const ok = m.worst.U<=1 && isFinite(m.latency) && m.latency<=S.lat;
+  const c = document.getElementById('tbCheck'); c.textContent = ok ? 'passes ✓' : 'see notes ✗'; c.style.color = ok ? 'var(--ok)' : 'var(--bad)';
+}
+function paintScenario(){
+  const el = document.getElementById('scenario'), p = PRESETS.find(x=>x.id===S.preset);
+  if(!p){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `<div class="sc-g">${esc(p.g)}${S.mod?' · <i>modified</i>':''}</div><div class="sc-n">${esc(p.name)}</div><div class="sc-d">${esc(p.d)}</div>`;
 }
 function saveHash(){ try{ history.replaceState(null, '', '#s='+btoa(unescape(encodeURIComponent(JSON.stringify(S))))); }catch(e){} }
 function loadHash(){
@@ -1266,16 +1487,17 @@ function loadHash(){
   try{ S = merge(clone(BASE), JSON.parse(decodeURIComponent(escape(atob(h[1]))))); if(!DRAMS[S.dev.dram]||!LINKS[S.link.id]) throw 0; return true; }catch(e){ S = clone(BASE); return false; }
 }
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('on'), 1800); }
-document.getElementById('preset').innerHTML = `<option value="">Presets…</option>`+PRESETS.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+document.getElementById('preset').innerHTML = `<option value="">Presets: ${PRESETS.length} example applications…</option>`+
+  [...new Set(PRESETS.map(p=>p.g))].map(g=>`<optgroup label="${esc(g)}">${PRESETS.filter(p=>p.g===g).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>`).join('');
 document.getElementById('preset').addEventListener('change', e=>{ if(e.target.value) applyPreset(e.target.value); toast(e.target.selectedOptions[0].text); e.target.value=''; });
 document.getElementById('share').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(location.href); toast('Link copied'); }catch(e){ toast('Copy the address bar to share'); } });
+function setTheme(t){ document.documentElement.dataset.theme = t; document.getElementById('theme').textContent = t==='light' ? 'Blueprint' : 'Whiteprint'; }
 document.getElementById('theme').addEventListener('click', ()=>{
-  const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme==='dark' : !matchMedia('(prefers-color-scheme: light)').matches;
-  root.dataset.theme = dark ? 'light' : 'dark'; try{ localStorage.setItem('bx-theme', root.dataset.theme); }catch(e){}
+  const t = document.documentElement.dataset.theme==='light' ? 'dark' : 'light'; setTheme(t); try{ localStorage.setItem('bx-theme', t); }catch(e){}
 });
-try{ const t = localStorage.getItem('bx-theme'); if(t) document.documentElement.dataset.theme = t; }catch(e){}
+try{ setTheme(localStorage.getItem('bx-theme')==='light' ? 'light' : 'dark'); }catch(e){ setTheme('dark'); }
 
-loadHash();
+if(!loadHash()){ S.preset = 'gbms'; }
 buildTabs(); buildAll();
 requestAnimationFrame(tick);
 </script>
