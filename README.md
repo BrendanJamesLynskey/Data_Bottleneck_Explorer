@@ -7,7 +7,7 @@ peak-to-average ratio, headroom) and the workload (bytes over the link and throu
 processed, arithmetic per byte), and it shows which component is the bottleneck. It also gives the
 minimum specification of every component, and the power, performance and area (PPA) of the result.
 
-**Live app:** https://brendanjameslynskey.github.io/Data_Bottleneck_Explorer/
+**Live app:** https://data-bottleneck-explorer.vercel.app/ (also mirrored on [GitHub Pages](https://brendanjameslynskey.github.io/Data_Bottleneck_Explorer/))
 
 ![System view](system.png)
 
