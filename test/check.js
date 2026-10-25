@@ -3,7 +3,8 @@
 //   node test/check.js --update   rewrite the golden file after an intended model change
 // Checks: no page errors; every published reference figure within tolerance; overhead breakdowns multiply out to the
 // model's capacities; every example matches its golden result within 2 %; the optimiser finds a design for each;
-// the rate sweep finds a design at every rate; compare pins A, reports the change and carries A in the link.
+// the rate sweep finds a design at every rate; compare pins A, reports the change and carries A in the link;
+// short links round-trip every example (changed or not) and old full-state links still load; the spec sheet prints on one A4 page.
 const puppeteer = require('puppeteer');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..'), GOLDEN = path.join(__dirname, 'golden.json');
@@ -61,6 +62,26 @@ const update = process.argv.includes('--update');
     document.getElementById('cmpClear').click();
     return {power: /power\s*[+−]/.test(text), changed: text.includes('changed'), hasA: hash.includes('&a='), back, cleared: document.getElementById('cmp').textContent === ''};
   });
+  // short links: each example plus a few changes comes back exactly; an old base64 link still loads
+  const links = await page.evaluate(() => {
+    const strip = o => { const c = clone(o); delete c.mod; return JSON.stringify(c); };
+    let bad = [], longest = 0;
+    for (const p of PRESETS) {
+      applyPreset(p.id); if (strip(unpackS(packS(S))) !== strip(S)) bad.push(p.id);
+      S.dev.units += 1; S.T *= 1.37; S.link.rtt = 0.1 + 0.2; S.vary.deadline = 'hard'; S.note = '42';
+      const t = packS(S); if (strip(unpackS(t)) !== strip(S)) bad.push(p.id + '*'); longest = Math.max(longest, t.length); delete S.note;
+    }
+    applyPreset('video'); S.T = 3e10; const want = strip(S);
+    history.replaceState(null, '', '#s=' + enc(S)); S = clone(BASE); const legacy = loadHash() && strip(S) === want;
+    return {bad, longest, legacy};
+  });
+  // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
+  await page.setViewport({width: 711, height: 1039}); await page.emulateMediaType('print');
+  const spec = await page.evaluate(ids => {
+    const tall = {};
+    for (const id of ids) { applyPreset(id); openSpec(); const h = document.getElementById('sheet').getBoundingClientRect().height; if (h > 1039) tall[id] = Math.round(h); }
+    return {tall, link: document.getElementById('sheet').textContent.includes(location.hash), n: ids.length};
+  }, Object.keys(result.presets));
   await browser.close();
 
   let fails = 0;
@@ -85,6 +106,10 @@ const update = process.argv.includes('--update');
   else console.log(`ok   rate sweep: designs at all ${sweep.n} rates, stepping through ${sweep.lines.join(' → ')}`);
   if (!(cmp.power && cmp.changed && cmp.hasA && cmp.back && cmp.cleared)) fail(`compare: ${JSON.stringify(cmp)}`);
   else console.log('ok   compare: pinned A against B, carried in the link, cleared');
+  if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
+  else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
+  if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);
+  else console.log(`ok   spec sheet: one A4 page for all ${spec.n} examples, with the share link`);
 
   if (update || !fs.existsSync(GOLDEN)) {
     fs.writeFileSync(GOLDEN, JSON.stringify(result.presets, null, 1) + '\n');

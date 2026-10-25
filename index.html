@@ -315,6 +315,40 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   .cols,.cons{grid-template-columns:minmax(0,1fr)}
   .bar{grid-template-columns:110px 1fr 64px}
 }
+/* ---------- spec sheet: a one-page summary on paper, shown over the page and printed alone ---------- */
+.spec{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.86); overflow:auto; padding:20px 16px 40px}
+.spec[hidden]{display:none}
+.spec-bar{max-width:210mm; margin:0 auto 10px; display:flex; gap:8px; justify-content:flex-end}
+.sheet{max-width:210mm; margin:0 auto; background:#fff; color:#111; padding:14mm 13mm; font-size:11px; line-height:1.4; color-scheme:light}
+.sheet h2{margin:0; font-size:19px; font-weight:600; letter-spacing:-.01em}
+.sheet h3{margin:12px 0 4px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#555}
+.sheet .sh-top{display:flex; justify-content:space-between; gap:12px; align-items:baseline; border-bottom:2px solid #111; padding-bottom:6px}
+.sheet .sh-brand{font-size:10px; color:#555; white-space:nowrap}
+.sheet .sh-meta{margin-top:4px; color:#555; overflow-wrap:anywhere}
+.sheet .sh-meta a{color:#111}
+.sheet .sh-verdict{margin-top:10px; padding:6px 9px; border:1px solid #111; font-weight:500}
+.sheet .sh-verdict.bad{background:#111; color:#fff}
+.sheet .sh-cols{display:grid; grid-template-columns:1fr 1fr; gap:0 18px}
+.sheet table{width:100%; border-collapse:collapse}
+.sheet td,.sheet th{padding:2.5px 6px 2.5px 0; border-bottom:1px solid #ddd; text-align:left; vertical-align:top; font-weight:400}
+.sheet th{font-size:9.5px; color:#555; border-bottom:1px solid #111}
+.sheet td.n,.sheet th.n{text-align:right; font-family:var(--mono); white-space:nowrap; padding-right:0}
+.sheet .kv td:first-child{color:#555; width:46%}
+.sheet tr.tot td{border-top:1px solid #111; border-bottom:none; font-weight:600}
+.sheet tr.over td{font-weight:600}
+.sheet ul{margin:2px 0 0; padding-left:16px}
+.sheet .sh-foot{margin-top:12px; padding-top:6px; border-top:1px solid #ddd; color:#555; font-size:9.5px}
+@media (max-width:640px){ .sheet{padding:18px 16px} .sheet .sh-cols{grid-template-columns:minmax(0,1fr)} .sheet .sh-top{flex-direction:column-reverse} }
+@media print{
+  @page{size:A4; margin:11mm}
+  :root{color-scheme:light}
+  html,body{background:#fff; overflow:visible}
+  body > *:not(#spec){display:none !important}
+  .spec{position:static; display:block !important; background:none; padding:0; overflow:visible}
+  .spec-bar{display:none}
+  .sheet{max-width:none; padding:0; font-size:10.5px}
+  .sheet *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
 </style>
 </head>
@@ -387,6 +421,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   <form class="chatin" id="chatForm"><textarea id="chatInput" rows="2" placeholder="Describe the system, or answer the questions…" aria-label="Message"></textarea><button class="btn">Send</button></form>
 </aside>
 <div class="toast" id="toast"></div>
+<div class="spec" id="spec" hidden role="dialog" aria-label="Spec sheet"><div class="spec-bar"><button class="btn" id="specPrint">Print or save as PDF</button><button class="btn" id="specClose">Close</button></div><article class="sheet" id="sheet"></article></div>
 
 <script>
 'use strict';
@@ -1652,7 +1687,7 @@ function paintSummary(m){
     <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}"><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${fmtW(fullPower(S).total)} at full load${tp.nA>1?' · '+fmtW(fullPower(S).rack)+'/rack':' · '+sig(m.Ptot/m.T*1e12)+' pJ/B'}</div></div>`;
   const p = PRESETS.find(x=>x.id===S.preset);
   document.getElementById('reqLine').innerHTML = `<span>${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
-    <button class="link" data-open="left">Edit inputs</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
+    <button class="link" data-open="left">Edit inputs</button><button class="link" id="specBtn" title="A one-page summary to print or save as PDF">Spec sheet</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
   document.getElementById('scen').innerHTML = p && scenOpen ? esc(p.d) : '';
   const sm = document.getElementById('scenMore'); if(sm) sm.onclick = ()=>{ scenOpen = !scenOpen; paintSummary(M); };
   paintChain(m);
@@ -2216,19 +2251,106 @@ function isModified(){
   const strip = o => { const c = clone(o); delete c.preset; delete c.mod; return JSON.stringify(c); };
   return strip(S) !== strip(merge(clone(BASE), clone(p.p)));
 }
+/* share links: a design is stored as its example plus only the fields that differ from it, e.g. #d=nvl72,dev.units:6,T:2e12
+   (the pinned A follows as &a=…). Older links held the whole state as base64 JSON (#s=…) and still load. */
 const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))), dec = t => JSON.parse(decodeURIComponent(escape(atob(t))));
 const validS = s => DRAMS[s.dev.dram] && LINKS[s.link.id] && FABRICS[s.scale.fabric] && NICS[s.scale.nic];
-function saveHash(){ try{ history.replaceState(null, '', '#s='+enc(S)+(pinA ? '&a='+enc(pinA) : '')); }catch(e){} }   // a shared link carries the pinned A too
+const refOf = id => { const p = PRESETS.find(x=>x.id===id); return merge(clone(BASE), p ? clone(p.p) : {}); };
+function diffOf(s, r, pre='', out=[]){
+  for(const k in s){ if(!pre && (k==='preset' || k==='mod')) continue;
+    const v = s[k], w = r ? r[k] : undefined;
+    if(v && typeof v==='object' && !Array.isArray(v)) diffOf(v, w, pre+k+'.', out);
+    else if(JSON.stringify(v)!==JSON.stringify(w)) out.push([pre+k, v]); }
+  return out;
+}
+const numTxt = n => { const a = String(n), b = n.toExponential().replace('e+','e'); return Number(b)===n && b.length<a.length ? b : a; };
+// numbers and true/false/null are written bare; a string that would read back as one gets a ~ in front; arrays go as JSON after !
+const valTxt = v => typeof v==='number' ? numTxt(v) : typeof v==='boolean' || v===null ? String(v)
+  : typeof v==='string' ? encodeURIComponent(/^$|^[-+\d.~!]|^(true|false|null|Infinity|NaN)$/.test(v) ? '~'+v : v) : '!'+encodeURIComponent(JSON.stringify(v));
+const txtVal = t => { t = decodeURIComponent(t); if(t[0]==='~') return t.slice(1); if(t[0]==='!') return JSON.parse(t.slice(1));
+  if(t==='true' || t==='false' || t==='null') return JSON.parse(t); const n = Number(t); return t!=='' && !isNaN(n) ? n : t; };
+function packS(s){
+  const id = PRESETS.some(p=>p.id===s.preset) ? s.preset : '_';
+  return [id, ...diffOf(s, refOf(id)).map(([k,v])=>k+':'+valTxt(v))].join(',');
+}
+function unpackS(t){
+  const [id, ...kv] = t.split(','); if(id!=='_' && !PRESETS.some(p=>p.id===id)) throw 0;
+  const s = refOf(id); if(id!=='_') s.preset = id;
+  for(const x of kv){ const i = x.indexOf(':'); if(i<1) throw 0;
+    const ks = decodeURIComponent(x.slice(0,i)).split('.'); let o = s;
+    for(const k of ks.slice(0,-1)) o = (o[k] && typeof o[k]==='object') ? o[k] : (o[k] = {});
+    o[ks[ks.length-1]] = txtVal(x.slice(i+1)); }
+  return s;
+}
+const readS = t => { try{ return unpackS(t); }catch(e){ return merge(clone(BASE), dec(t)); } };   // new form, else a legacy base64 one
+function saveHash(){ try{ history.replaceState(null, '', '#d='+packS(S)+(pinA ? '&a='+packS(pinA) : '')); }catch(e){} }   // a shared link carries the pinned A too
 function loadHash(){
-  const h = location.hash.match(/#s=([^&]+)(?:&a=(.+))?/); if(!h) return false;
-  try{ if(h[2]){ const a = merge(clone(BASE), dec(h[2])); if(validS(a)) pinA = a; } }catch(e){}
-  try{ S = merge(clone(BASE), dec(h[1])); if(!validS(S)) throw 0; return true; }catch(e){ S = clone(BASE); return false; }
+  const h = Object.fromEntries(location.hash.slice(1).split('&').map(x=>{ const i = x.indexOf('='); return [x.slice(0,i), x.slice(i+1)]; }));
+  const t = h.d || h.s; if(!t) return false;
+  try{ if(h.a){ const a = readS(h.a); if(validS(a)) pinA = a; } }catch(e){}
+  try{ S = readS(t); if(!validS(S)) throw 0; return true; }catch(e){ S = clone(BASE); return false; }
 }
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('on'), 1800); }
 document.getElementById('preset').innerHTML = `<option value="">Examples (${PRESETS.length})…</option>`+
   [...new Set(PRESETS.map(p=>p.g))].map(g=>`<optgroup label="${esc(g)}">${PRESETS.filter(p=>p.g===g).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>`).join('');
 document.getElementById('preset').addEventListener('change', e=>{ if(e.target.value){ applyPreset(e.target.value); toast(e.target.selectedOptions[0].text); } e.target.value=''; });
 document.getElementById('share').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(location.href); toast('Link copied'); }catch(e){ toast('Copy the address bar to share'); } });
+
+/* spec sheet: the current design on one page — requirement, result, parts with their power, every limit's load
+   and open issues — to print or save as PDF. Printing from the browser menu prints it too. */
+function specHTML(){
+  const m = model(S), tp = m.tp, fp = fullPower(S), lh = latHead(m), p = PRESETS.find(x=>x.id===S.preset), cool = coolOf(S), OH = overhead(S);
+  const name = p ? p.name+(S.mod ? ' (modified)' : '') : 'Custom design';
+  const url = location.href, cons = considerations(m), fails = cons.filter(c=>c.lvl==='bad'), tight = cons.filter(c=>c.lvl==='warn');
+  const st = state(m.worst.U), latOk = lh<=S.lat, ok = st!=='bad' && latOk;
+  const kv = rows => `<table class="kv">${rows.filter(Boolean).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>`;
+  const lk = LINKS[S.link.id], hostLink = lk.kind==='pcie' ? `${lk.name} x${S.link.lanes}` : `UCIe, ${S.link.lanes} lanes`;
+  const multi = tp.nA>1, up = multi && tp.dom>1, nics = hasNics(S, tp), nc = NOC_TOPO[S.noc.topo];
+  // [part, specification, quantity, total power without fans and conversion]
+  const parts = [
+    ['Accelerator', `${sig(S.acc.tops)} TOPS peak at ${fmtPct(S.acc.util)} use, ${fmtN(S.acc.sram)} MB SRAM, ${fmtA(m.die)} die${m.die>830?' (several dies)':''}`, tp.nA, (m.A.compute+m.A.leak+m.A.noc)*tp.nA],
+    ['Device DRAM', `${DRAMS[S.dev.dram].name}, ${S.dev.units} per accelerator: ${fmtBps(m.devBW)} usable, ${fmtB(m.devCap*1e9)}`, S.dev.units*tp.nA, m.A.devDram*tp.nA],
+    ['Host link', `${hostLink}${S.link.count>1?', '+S.link.count+' per accelerator':''}`, S.link.count*tp.nA, m.A.link*tp.nA],
+    ['On-chip interconnect', `${nc.name.replace(/ \(.*\)/,'')}, ${S.noc.tiles} tiles, ${S.noc.width}-bit at ${sig(S.noc.ghz)} GHz`, null, null],
+    up && ['Scale-up fabric', `${FABRICS[S.scale.fabric].name}, domain of ${fmtN(tp.dom)}`, tp.nA, m.A.up*tp.nA],
+    nics && ['Scale-out NIC', `${NICS[S.scale.nic].name}${S.scale.nics>1?', '+S.scale.nics+' per accelerator':''}`, S.scale.nics*tp.nA, m.A.out*tp.nA],
+    ['Host', `${S.host.cores} cores, ${S.host.units} × ${DRAMS[S.host.dram].name}${m.srcName?', '+m.srcName:''}${S.host.base?', '+fmtW(S.host.base)+' fixed':''}`, tp.nN, m.pNodeHost*tp.nN],
+  ].filter(Boolean);
+  const sub = parts.reduce((a,x)=>a+(x[3]||0), 0);
+  const partRows = parts.map(([n,d,q,w])=>`<tr><td>${n}</td><td>${esc(d)}</td><td class="n">${q===null?'':fmtN(q)}</td><td class="n">${w===null?'in die':fmtW(w)}</td></tr>`).join('')
+    + `<tr><td>Fans and conversion</td><td>${cool.name} cooling, ${cool.supply}</td><td class="n"></td><td class="n">${fmtW(sub*OH)}</td></tr>`
+    + `<tr class="tot"><td colspan="3">System at the target rate</td><td class="n">${fmtW(m.Ptot)}</td></tr>`;
+  const loadRows = m.comps.map(c=>{ const s = state(c.U); return `<tr class="${s==='bad'?'over':''}"><td>${c.name}</td><td class="n">${c.f(c.need)}</td><td class="n">${c.f(c.have)}</td><td class="n">${fmtPct(c.U)}${s==='bad'?' over':s==='warn'?' tight':''}</td></tr>`; }).join('');
+  const chk = runChecks().filter(x=>!x.fitted);
+  const issues = [...fails, ...tight].slice(0, 6);
+  return `<div class="sh-top"><h2>${esc(name)}</h2><span class="sh-brand">Hardware System Design Explorer · spec sheet</span></div>
+    <div class="sh-meta">${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})} · <a href="${esc(url)}">${esc(url)}</a></div>
+    <div class="sh-verdict ${ok?'':'bad'}">${ok ? `${st==='warn' ? `Meets the rate, but above the ${fmtPct(S.ceil)} utilisation ceiling` : 'Meets the requirement'}. Most loaded: ${m.worst.name} at ${fmtPct(m.worst.U)}; it runs up to ${sig(m.maxT/m.T)}× the target rate.${fails.length ? ` ${fails.length} check${fails.length>1?'s fail':' fails'}: see open issues.` : ''}`
+      : `Does not meet the requirement: ${[st==='bad' ? `${m.worst.name} is ${fmtPct(m.worst.U)} loaded` : '', latOk ? '' : `latency ${fmtT(lh)} against a ${fmtT(S.lat)} budget`].filter(Boolean).join('; ')}.`}</div>
+    <div class="sh-cols">
+      <div><h3>Requirement</h3>${kv([['Rate', fmtBps(S.T)], ['Latency budget', `${fmtT(S.lat)} per block, ${S.vary.deadline==='hard' ? 'hard deadline' : 'p'+sig(S.vary.pct*100)+', soft'}`],
+        ['Block', fmtB(S.block)], ['Compute', sig(S.ops)+' op/B'], ['Host link per byte', `in ${sig(S.inR)} · out ${sig(S.outR)}`], ['Extra DRAM per byte', `read ${sig(S.xR)} · write ${sig(S.xW)}`],
+        ['Resident per accelerator', fmtB(S.resident*1e9)], ['Data arrives from', m.srcName || 'host memory'], ['Utilisation ceiling', fmtPct(S.ceil)]])}</div>
+      <div><h3>Result</h3>${kv([['Max sustainable', `${fmtBps(m.maxT)} (${sig(m.maxT/m.T)}×)`], ['Most loaded', `${m.worst.name}, ${fmtPct(m.worst.U)}`], ['Latency, '+latLabel(), `${fmtT(lh)} of ${fmtT(S.lat)}`],
+        ['Power at the target', fmtW(m.Ptot)], ['Power at full load', fmtW(fp.total)], ['Energy per byte', sig(m.Ptot/m.T*1e12)+' pJ'],
+        ['Accelerators', multi ? `${fmtN(tp.nA)}: ${S.scale.perNode} per node, ${fmtN(tp.nN)} node${tp.nN>1?'s':''}` : '1'],
+        multi && ['Racks', `${fmtN(S.scale.racks)} × ${fmtW(fp.rack)} at full load, limit ${S.scale.rackKW} kW`], ['Die per accelerator', `${fmtA(m.die)}${m.padArea>m.coreArea?', pad-limited':''}`]])}</div>
+    </div>
+    <h3>Parts and power</h3><table><thead><tr><th>Part</th><th>Specification</th><th class="n">Qty</th><th class="n">Power</th></tr></thead><tbody>${partRows}</tbody></table>
+    <h3>Load on every limit at the target</h3><table><thead><tr><th>Limit</th><th class="n">Needs</th><th class="n">Has</th><th class="n">Load</th></tr></thead><tbody>${loadRows}</tbody></table>
+    <h3>Open issues</h3>${issues.length ? `<ul>${issues.map(c=>`<li>${c.lvl==='bad'?'<b>Fails:</b> ':'Tight: '}${c.title}</li>`).join('')}</ul>` : '<p>None: every check in the Notes tab passes.</p>'}
+    <div class="sh-foot">First-order model: throughput, M/D/1 and G/G/1 queueing, Monte Carlo latency and power from pJ/bit and pJ/op. It reproduces ${chk.filter(x=>x.pass).length} of ${chk.length} published reference figures within tolerance. Decimal units. Power excludes cooling plant outside the rack.</div>`;
+}
+function openSpec(){ document.getElementById('sheet').innerHTML = specHTML(); document.getElementById('spec').hidden = false; }
+document.addEventListener('click', e=>{
+  if(e.target.id==='specBtn') openSpec();
+  else if(e.target.id==='specPrint') window.print();
+  else if(e.target.id==='specClose' || e.target.id==='spec') document.getElementById('spec').hidden = true;
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') document.getElementById('spec').hidden = true; });
+let specForPrint = false;   // printing from the browser menu prints the sheet as well
+addEventListener('beforeprint', ()=>{ if(document.getElementById('spec').hidden){ specForPrint = true; openSpec(); } });
+addEventListener('afterprint', ()=>{ if(specForPrint){ specForPrint = false; document.getElementById('spec').hidden = true; } });
 
 /* =====================================================================
    DESIGN ASSISTANT

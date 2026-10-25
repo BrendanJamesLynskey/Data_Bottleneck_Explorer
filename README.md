@@ -128,7 +128,8 @@ model no longer pay for a network they don't use.
 `npm test` (also run in GitHub Actions on every push) reruns these checks in headless Chrome. It also
 checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
-round-trips through a shared link, and that all 28 examples match their golden results within 2 %.
+round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
+spec sheet fits one A4 page, and that all 28 examples match their golden results within 2 %.
 
 ## Design optimiser
 
@@ -176,6 +177,25 @@ per byte. *swap* exchanges A and B, and *re-pin* makes B the new A. The shared l
 opens the comparison as you left it.
 
 ![Compare](compare.png)
+
+## Spec sheet
+
+*Spec sheet* (next to *Edit inputs*) puts the current design on one page: the requirement and the result,
+every part with its quantity and power (adding up to the system total, fans and conversion included), the
+load on every limit, and the open issues from the Notes tab. *Print or save as PDF* prints just the sheet in
+black on white, on one A4 page. Printing from the browser's menu prints the sheet too. The sheet carries the
+design's share link, so a printed copy leads back to the live model.
+
+![Spec sheet](spec.png)
+
+## Short share links
+
+The address holds the example the design started from plus only the fields that differ from it, so an unchanged
+example is `#d=nvl72` and a changed one reads like `#d=nvl72,T:2e12,dev.units:6`. A pinned A follows as
+`&a=…` in the same form. Links that changed designs typically stay well under 150 characters, against about
+1,350 when the whole state was stored. Older links, which held the full state as base64 JSON (`#s=…`), still
+load. A short link names its example, so if that example is edited in a later version, the link opens the
+edited version plus the same changes.
 
 ## Overheads, raw to usable
 
@@ -280,7 +300,7 @@ would have to carry 4 TB/s to feed that link.
     offload, storage compression.
   - *Science, HPC & crypto*: a CFD stencil, genomic alignment on an FPGA card, an FHE bootstrapping
     accelerator.
-- **Share links**: the whole configuration lives in the URL.
+- **Share links**: short, in the URL: the example plus what you changed. A one-page **spec sheet** prints or saves as PDF.
 
 ## The model
 
