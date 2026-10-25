@@ -478,7 +478,17 @@ const SOURCES = {
   nvme:     'NVMe SSDs → host memory → accelerator',
   nvme_p2p: 'NVMe SSDs → accelerator (peer-to-peer DMA)',
 };
-const NODE_OVERHEAD = 0.15;   // fans (~8–10 %), VRM and PSU (~6 %) losses on top of component power
+/* Fans and power conversion on top of the components, set by how the rack is cooled (from its power limit).
+   fans = share of IT power: about 6 % measured on GPU nodes (arXiv 2607.00819), taken as 8 % at full air-cooled load
+   and 2 % for the residual fans of a direct-liquid rack. conv = AC→DC efficiency: 80 PLUS Titanium server supplies
+   (96 % at half load, 94 % at full) or, in a liquid rack, ORv3 power shelves (Vertiv GB200 shelf: over 96.5 % across
+   50–100 % load) followed by the tray's 48→12 V bus converter (about 97.5 %). */
+const TRAY_CONV = 0.975;
+const COOLING = {air:{name:'air', fans:0.08, conv:0.95, supply:'server supplies'}, hybrid:{name:'rear-door / hybrid', fans:0.05, conv:0.95, supply:'server supplies'},
+  liquid:{name:'direct liquid', fans:0.02, conv:0.965*TRAY_CONV, supply:'power shelves and 48→12 V'}};
+const coolOf = s => COOLING[s.scale.rackKW>=132 ? 'liquid' : s.scale.rackKW>=80 ? 'hybrid' : 'air'];
+const overhead = s => { const c = coolOf(s); return (1+c.fans)/c.conv - 1; };   // fraction added to component power
+const hasNics = (s, tp) => tp.nA>1 && s.scale.xOut>0 && s.scale.nics>0;          // NICs only where traffic leaves the system
 /* on-chip interconnect, networks-on-chip and AMBA. kind: grid (router per tile), axi (crossbar of masters and
    memory-side slave ports, separate read and write channels), stream (point-to-point pipelines), bus (shared,
    one transfer at a time). eff = usable share of each link after headers, snoops, arbitration and turnaround;
@@ -553,10 +563,10 @@ const merge = (a,b) => { for(const k in b){ if(b[k] && typeof b[k]==='object' &&
 const PRESETS = [
   // ---------------------------------------------------------------- AI and ML (multi-accelerator first)
   {g:'AI & LLMs', id:'nvl72', name:'Rack-scale LLM inference (72 accelerators, one NVLink domain)',
-   d:'A large model served across one rack: 18 nodes of 4 accelerators, all 72 in a single NVLink 5 domain, so expert and tensor-parallel traffic never leaves the rack. B200-class parts (4.5 PFLOPS FP8, 8 × HBM3E at 8 Gb/s). HBM bandwidth and the fabric run close; at full load the rack lands near the 120 kW that racks of this class are provisioned for.', p:{
+   d:'A large model served across one rack: 18 nodes of 4 accelerators, all 72 in a single NVLink 5 domain, so expert and tensor-parallel traffic never leaves the rack. GB200-class parts (5 PFLOPS dense FP8, 8 × HBM3E at 8 Gb/s). HBM bandwidth and the fabric run close; at full load the rack lands near the 120 kW that racks of this class are provisioned for.', p:{
     T:72*5.5e12, lat:100e-3, block:1e11, burst:1, resident:200, inR:0.00001, outR:0.00001, xR:1, xW:0.02, ops:200,
     pattern:'stream', dev:{dram:'hbm3e_80', units:8}, link:{id:'pcie6', lanes:16, count:1},
-    host:{dram:'lp5x_8533', units:16, cores:72, cpuUs:10, base:600}, acc:{tops:4500, util:0.5, pj:0.17, topsMm2:3.5, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
+    host:{dram:'lp5x_8533', units:16, cores:72, cpuUs:10, base:1000}, acc:{tops:5000, util:0.5, pj:0.17, topsMm2:3.5, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:4, nodes:18, racks:1, domain:'rack', xUp:0.1, xOut:0.001, fabric:'nvl5', nic:'e800', nics:1, rackKW:132}}},
   {g:'AI & LLMs', id:'train1k', name:'LLM training cluster (1,024 accelerators, 64 racks)',
    d:'Tensor parallelism inside each 8-accelerator NVLink node, data-parallel gradient all-reduce across an 800G scale-out network. Two B200-class servers per air-cooled 40 kW rack, 64 racks. The scale-out network is the one to watch.', p:{
@@ -574,7 +584,7 @@ const PRESETS = [
    d:'A DGX H100-style node: eight H100-class accelerators (5 × HBM3 at 5.2 Gb/s, 3.35 TB/s each) with NVLink 4. Each decode step streams a shard of the weights from HBM, so HBM bandwidth sets the token rate; the tensor-parallel traffic is light.', p:{
     T:8*2.3e12, lat:50e-3, block:4e10, burst:1, resident:60, inR:0.00001, outR:0.00001, xR:1, xW:0.05, ops:64,
     pattern:'stream', dev:{dram:'hbm3_52', units:5}, link:{id:'pcie5', lanes:16, count:1},
-    host:{dram:'ddr5_4800', units:16, cores:112, cpuUs:10, base:900}, acc:{tops:1979, util:0.5, pj:0.29, topsMm2:2.43, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
+    host:{dram:'ddr5_4800', units:16, cores:112, cpuUs:10, base:1250}, acc:{tops:1979, util:0.5, pj:0.29, topsMm2:2.43, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:8, nodes:1, racks:1, domain:'node', xUp:0.02, xOut:0, fabric:'nvl4', nic:'e400', nics:1, rackKW:40}}},
   {g:'AI & LLMs', id:'moenoc', name:'Mixture-of-experts layer on an 8 × 8 mesh ✗',
    d:'Deliberately broken: tokens are routed all-to-all between expert tiles, four bytes of tile-to-tile traffic per byte processed. HBM keeps up, but the mesh bisection cannot; open the On-chip tab and try a torus, wider links or more tiles.', p:{
@@ -975,15 +985,15 @@ function model(s){
     compute: Ta*s.ops*s.acc.pj*1e-12, leak: die*s.acc.leak,
     noc: ((inT+outT)*hopsEdge + localT*hopsLocal)*8*nc.pj*1e-12 + Ta*(dR+dW+nc.xNoc+s.inR+s.outR)*8*SRAM_PJ*1e-12,
     up: multi && tp.dom>1 ? Ta*xUp*8*fab.pj*1e-12 + fab.w : 0,
-    out: multi && tp.nA>tp.dom ? Ta*xOut*8*15e-12 + nic.w*s.scale.nics : 0};
+    out: hasNics(s, tp) ? Ta*xOut*8*15e-12 + nic.w*s.scale.nics : 0};
   const pAcc = Object.values(A).reduce((a,b)=>a+b,0);
   const H = {base: s.host.base||0, hostDram: Tn*(hR+hW)*8*hd.pj*1e-12 + hd.bg*s.host.units,
     hostCpu: (Tn/s.block*s.host.cpuUs*1e-6)*s.host.wCore,
     src: s.src.startsWith('net') ? ETH[s.net.id].w*s.net.count : s.src.startsWith('nvme') ? NVME[s.nvme.id].w*s.nvme.count : 0};
   const pNodeHost = Object.values(H).reduce((a,b)=>a+b,0);
-  const Ptot = (pAcc*tp.nA + pNodeHost*tp.nN)*(1+NODE_OVERHEAD);
+  const OH = overhead(s), Ptot = (pAcc*tp.nA + pNodeHost*tp.nN)*(1+OH);
   const Prack = Ptot/s.scale.racks;
-  const Pmove = ((A.devDram+A.link+A.up+A.out+A.noc)*tp.nA + (H.hostDram+H.src)*tp.nN)*(1+NODE_OVERHEAD);
+  const Pmove = ((A.devDram+A.link+A.up+A.out+A.noc)*tp.nA + (H.hostDram+H.src)*tp.nN)*(1+OH);
 
   return {T, Tb, Ta, Tba, Tn, Tbn, tp, dev, hd, lk, fab, nic, multi, xUp, xOut, dR, dW, hR, hW, hIn, ledger, devE, hostE, devBW, hostBW, ops,
     dem, cap, U, comps, worst, maxT, maxTceil, stages, latency, inflightPcie, tags, inflightDram, dramReqs, devCap, sramNeed,
@@ -1045,9 +1055,9 @@ function tolStats(m){
 function fullPower(s){
   const m = model(s), d = m.dev, tp = m.tp, L = m.lk.L;
   const acc = s.acc.tops*1e12*s.acc.pj*1e-12 + m.die*s.acc.leak + m.devBW*8*(d.pj+SRAM_PJ)*1e-12 + d.bg*s.dev.units
-    + L.idle*m.lk.totalLanes + (tp.nA>1 && tp.dom>1 ? m.fab.bw*m.fab.eff*8*m.fab.pj*1e-12 + m.fab.w : 0) + (tp.nA>1 ? m.nic.w*s.scale.nics : 0);
+    + L.idle*m.lk.totalLanes + (tp.nA>1 && tp.dom>1 ? m.fab.bw*m.fab.eff*8*m.fab.pj*1e-12 + m.fab.w : 0) + (hasNics(s, tp) ? m.nic.w*s.scale.nics : 0);
   const node = (s.host.base||0) + m.hd.bg*s.host.units + m.H.src;
-  const total = (acc*tp.nA + node*tp.nN)*(1+NODE_OVERHEAD);
+  const total = (acc*tp.nA + node*tp.nN)*(1+overhead(s));
   return {acc, node, total, rack:total/s.scale.racks, perRackAcc:acc*tp.perRack, m};
 }
 
@@ -1057,6 +1067,13 @@ const H100 = {dev:{dram:'hbm3_52', units:5}, acc:{tops:1979, util:1, pj:0.29, to
   noc:{tiles:144, width:1024, ghz:2, banks:288}};
 const B200 = {dev:{dram:'hbm3e_80', units:8}, acc:{tops:4500, util:1, pj:0.17, topsMm2:3.5, sram:50, leak:0.02}, link:{id:'pcie6', lanes:16}, scale:{fabric:'nvl5'},
   noc:{tiles:144, width:1024, ghz:2, banks:288}};
+// reference systems: both are cluster building blocks, so a NIC per accelerator is fitted (xOut > 0)
+// DGX host, per NVIDIA's parts list: 2 × Xeon 8480C (350 W TDP) 700 W; 32 DDR5 RDIMMs at about 10 W, less the standby the
+// host-memory model already counts, 290 W; 8 U.2 + 2 M.2 NVMe 180 W; 2 dual-port ConnectX-7 for storage 50 W; BMC 30 W
+const DGX = {host:{dram:'ddr5_4800', units:16, base:1250}, scale:{perNode:8, nodes:1, racks:1, domain:'node', xUp:0.05, xOut:0.02, nic:'e400', nics:1, rackKW:40}};
+// GB200 runs its GPUs harder than HGX B200: 10 PFLOPS sparse FP8 per GPU in NVL72, so 5 dense; liquid cooled, 132 kW class
+// per compute tray: 2 Grace with their LPDDR5X 600 W; 2 BlueField-3 DPUs (over the 75 W a slot gives) 250 W; E1.S drives 120 W; BMC 30 W
+const NVL72 = {acc:{tops:5000}, host:{dram:'lp5x_8533', units:16, base:1000}, scale:{perNode:4, nodes:18, racks:1, domain:'rack', xUp:0.1, xOut:0.02, nic:'e800', nics:1, rackKW:132}};
 const cfgOf = (...parts) => parts.reduce((a,p)=>merge(a, clone(p)), clone(BASE));
 const REFS = [
   {id:'h100bw', name:'H100 SXM HBM3 bandwidth', tests:'DRAM speed-grade arithmetic', pub:3.35e12, f:fmtBps, tol:0.02,
@@ -1085,12 +1102,15 @@ const REFS = [
    run:()=>fullPower(cfgOf(B200)).acc, how:'4.5 PFLOPS FP8 dense, 8 TB/s'},
   {id:'dgx', name:'DGX H100 system, full load', tests:'system composition: 8 accelerators, hosts, NVSwitch, NICs, overheads', pub:10.2e3, f:fmtW, tol:0.25,
    src:['NVIDIA DGX H100 user guide: 10.2 kW max','https://docs.nvidia.com/dgx/dgxh100-user-guide/introduction-to-dgxh100.html'],
-   run:()=>fullPower(cfgOf(H100, {host:{dram:'ddr5_4800', units:16, base:900}, scale:{perNode:8, nodes:1, racks:1, domain:'node', xUp:0.05, nic:'e400', nics:1}})).total,
-   how:'10.2 kW is a planning maximum, so a wider tolerance; the model sits low (switches and fans under-counted)'},
-  {id:'nvl72', name:'GB200 NVL72 rack, full load', tests:'rack composition: 72 accelerators, 36 CPUs, NVLink switches, NICs, overheads', pub:120e3, f:fmtW, tol:0.15,
+   run:()=>fullPower(cfgOf(H100, DGX)).total,
+   how:'10.2 kW is a planning maximum with fans at full speed, so a wider tolerance; the model sits low, most likely on fan power'},
+  {id:'nvl72', name:'GB200 NVL72 rack, full load', tests:'rack composition: 72 accelerators, 36 CPUs, NVLink switches, NICs, overheads', pub:120e3, f:fmtW, tol:0.10,
    src:['SemiAnalysis: about 120 kW per rack (HPE quotes 132 kW)','https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component'],
-   run:()=>fullPower(cfgOf(B200, {host:{dram:'lp5x_8533', units:16, base:600}, scale:{perNode:4, nodes:18, racks:1, domain:'rack', xUp:0.1, nic:'e800', nics:1}})).rack,
-   how:'18 compute trays of 4 GPUs + 2 CPUs; GB200 runs its GPUs above the 1,000 W HGX rating, one reason the model sits low'},
+   run:()=>fullPower(cfgOf(B200, NVL72)).rack,
+   how:'18 compute trays of 4 GPUs + 2 CPUs at GB200 clocks, NVLink switch power per GPU, NICs; liquid cooled (power shelves, 48→12 V)'},
+  {id:'nvl72tray', name:'GB200 NVL72 compute tray, max', tests:'node composition: 4 GPUs, 2 Grace, NICs, DPUs, drives, fans, 48→12 V', pub:6.3e3, f:fmtW, tol:0.10,
+   src:['SemiAnalysis: max TDP of each compute tray is 6.3 kW','https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component'],
+   run:()=>{ const f = fullPower(cfgOf(B200, NVL72)); return (f.acc*4 + f.node)*(1+COOLING.liquid.fans)/TRAY_CONV; }, how:'DC power into the tray, after the power shelf'},
 ];
 function runChecks(){
   return REFS.map(r=>{ const v = r.run(), err = v/r.pub - 1; return {...r, v, err, pass:Math.abs(err)<=r.tol}; });
@@ -1763,9 +1783,13 @@ function dramSweep(s){
   return {xs, lines, segs};
 }
 function designSweep(s, opt){
+  let prev = null;
   return sweepXs(s.T).map(x=>{ const r = optimise(atRate(s, x), opt);
-    if(!r.best) return {x};
-    return {x, P:r.best.P, A:r.best.A, nA:r.best.m.tp.nA, d:designLine(r.best.s), line:DRAMS[r.best.s.dev.dram].line}; });
+    if(!r.best) return prev = null, {x};
+    // near-ties flip between designs from one rate to the next: stay on the previous DRAM type if that costs under 3 %
+    const stay = prev && r.front.find(f=>DRAMS[f.s.dev.dram].line===prev && f.P<=r.best.P*1.03 && f.A<=r.best.A*1.03), b = stay || r.best;
+    prev = DRAMS[b.s.dev.dram].line;
+    return {x, P:b.P, A:b.A, nA:b.m.tp.nA, d:designLine(b.s), line:prev}; });
 }
 // a fixed design as the rate grows: its power until it runs out of capacity
 const fixedSweep = (s, xs) => xs.map(x=>{ const m = model(atRate(s, x)); return m.comps.every(c=>c.U<=1) ? {P:m.Ptot, A:m.die} : {P:NaN, A:NaN}; });
@@ -1917,7 +1941,7 @@ function paneRack(m){
     ${rs('Rack power, full load', fmtW(fp.rack), over)}${rs('Rack limit', sc.rackKW+' kW')}${rs('Rack power at the target rate', fmtW(m.Prack))}</div>
     <div class="card">${svg}</div>
     <div class="cols" style="margin-top:16px"><div class="card"><h3>Power per accelerator</h3>${Object.entries({'Device DRAM':m.A.devDram,'Host link':m.A.link,'Compute':m.A.compute,'Leakage':m.A.leak,'Scale-up fabric':m.A.up,'Scale-out NICs':m.A.out}).map(([k,v])=>stat(k,fmtW(v))).join('')}${stat('Total',fmtW(m.pAcc))}</div>
-    <div class="card"><h3>Rack at full load</h3>${stat('Accelerators ('+tp.perRack+' × '+fmtW(fp.acc)+')', fmtW(fp.perRackAcc))}${stat('Hosts ('+sc.nodes+' × '+fmtW(fp.node)+')', fmtW(fp.node*sc.nodes))}${stat('Fans, VRM, PSU losses ('+(NODE_OVERHEAD*100)+' %)', fmtW((fp.perRackAcc+fp.node*sc.nodes)*NODE_OVERHEAD))}${stat('Rack total, full load', fmtW(fp.rack))}${stat('At the target rate', fmtW(m.Prack))}
+    <div class="card"><h3>Rack at full load</h3>${stat('Accelerators ('+tp.perRack+' × '+fmtW(fp.acc)+')', fmtW(fp.perRackAcc))}${stat('Hosts ('+sc.nodes+' × '+fmtW(fp.node)+')', fmtW(fp.node*sc.nodes))}${stat(`Fans and conversion (${coolOf(S).name}: fans ${coolOf(S).fans*100} %, ${coolOf(S).supply} ${coolOf(S).conv*100} %)`, fmtW((fp.perRackAcc+fp.node*sc.nodes)*overhead(S)))}${stat('Rack total, full load', fmtW(fp.rack))}${stat('At the target rate', fmtW(m.Prack))}
       <p class="note">Racks are provisioned for full load: <b>${fmtW(fp.rack)}</b> per rack needs <b>${cooling}</b>${over?`, above the ${sc.rackKW} kW limit you set: spread the nodes over more racks or move to liquid cooling`:''}.</p></div></div>`;
 }
 
@@ -2003,7 +2027,7 @@ function panePPA(m){
   return `<div class="cols">
     <div class="card"><h3>Performance</h3>${stat('Target rate', fmtBps(m.T))}${stat('Max sustainable', fmtBps(m.maxT))}${stat('Latency per block, '+latLabel(), fmtT(latHead(m)))}
       ${stat('Throughput per watt', fmtBps(m.T/m.Ptot)+'/W')}${stat('Energy per processed byte', sig(m.Ptot/m.T*1e12)+' pJ')}${stat('Data movement share of power', fmtPct(m.Pmove/m.Ptot))}</div>
-    <div class="card"><h3>Power per accelerator · <span>${fmtW(m.pAcc)}</span></h3>${stackOf(pItems, fmtW)}<p class="note">System total ${fmtW(m.Ptot)} including hosts and ${NODE_OVERHEAD*100} % for fans and conversion losses.</p></div>
+    <div class="card"><h3>Power per accelerator · <span>${fmtW(m.pAcc)}</span></h3>${stackOf(pItems, fmtW)}<p class="note">System total ${fmtW(m.Ptot)} including hosts and ${(overhead(S)*100).toFixed(1)} % for fans and conversion losses (${coolOf(S).name} cooling, from the rack limit).</p></div>
     <div class="card"><h3>Die area · <span>${fmtA(m.die)}</span></h3>${stackOf(aItems, fmtA)}
       ${stat('Core-limited area', fmtA(m.coreArea))}${stat('Pad-limited area', fmtA(m.padArea))}${stat('Die edge needed / available', sig(m.shoreNeed)+' / '+sig(m.shoreHave)+' mm')}
       <p class="note">${m.padArea>m.coreArea ? 'Pad-limited: the edge its PHYs need sizes the die, not its logic. ' : ''}${m.die>830 ? 'Above the ~830 mm² reticle limit: this needs several dies on one package.' : 'Within one reticle (~830 mm²).'}</p></div>
@@ -2072,7 +2096,7 @@ function paneModel(){
   const lk = Object.values(LINKS).map(l=>`<tr><td>${l.name}</td><td class="n">${l.kind==='pcie'?l.gt+' GT/s':l.gbps+' GB/s/module'}</td><td class="n">${l.kind==='pcie'?(l.flit?'FLIT 236/256':'128b/130b'):'~90 %'}</td><td class="n">${l.pj}</td><td class="n">${l.phy}</td><td class="n">${l.rtt} µs</td></tr>`).join('');
   const fb = Object.values(FABRICS).map(f=>`<tr><td>${f.name}</td><td class="n">${fmtBps(f.bw)}</td><td class="n">${(f.eff*100).toFixed(0)} %</td><td class="n">${f.pj}</td><td class="n">${f.w} W</td><td class="n">${f.maxDom}</td></tr>`).join('');
   return `<div class="cols"><div class="card span"><h3>How the model works</h3>
-  <p style="margin:0;color:var(--t2)">Everything flows from the processing rate <i>T</i>. With <i>N</i> accelerators across <i>n</i> nodes, each accelerator handles <i>T/N</i> and each host <i>T/n</i>. A component's demand is its share × peak-to-average × the bytes it moves per processed byte; capacity is peak × efficiency; utilisation is demand ÷ capacity and the bottleneck is the largest. Peer traffic is split into what stays inside the scale-up domain and what crosses the scale-out network. Power is traffic × energy per bit plus standby per unit, compute pJ/op and leakage, plus ${NODE_OVERHEAD*100} % for fans and conversion; area is compute + SRAM + PHYs + 15 %, or the area a square die needs for enough PHY edge. Latency is one block through every stage with M/D/1 queueing.</p>
+  <p style="margin:0;color:var(--t2)">Everything flows from the processing rate <i>T</i>. With <i>N</i> accelerators across <i>n</i> nodes, each accelerator handles <i>T/N</i> and each host <i>T/n</i>. A component's demand is its share × peak-to-average × the bytes it moves per processed byte; capacity is peak × efficiency; utilisation is demand ÷ capacity and the bottleneck is the largest. Peer traffic is split into what stays inside the scale-up domain and what crosses the scale-out network. Power is traffic × energy per bit plus standby per unit, compute pJ/op and leakage, plus fans and power-conversion losses set by how the rack is cooled (${(overhead(S)*100).toFixed(1)} % here, ${coolOf(S).name}); area is compute + SRAM + PHYs + 15 %, or the area a square die needs for enough PHY edge. Latency is one block through every stage with M/D/1 queueing.</p>
   <p class="note">Units are decimal (1 GB = 10⁹ B). Catalogue values are indicative first-order figures for a 5 nm-class design from JEDEC rates, public datasheets and published estimates; energy and area vary by about 2× between implementations.</p></div>
   <div class="card span"><h3>DRAM · ${Object.keys(DRAMS).length} speed grades in ${DRAM_LINES.length} types</h3><details class="more"><summary>Show the catalogue</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>Technology</th><th class="n">MT/s</th><th class="n">Bits</th><th class="n">Peak/unit</th><th class="n">Cap</th><th class="n">Latency</th><th class="n">pJ/bit</th><th class="n">Standby W</th><th class="n">PHY mm²</th><th class="n">Edge mm</th><th class="n">Max units</th></tr></thead><tbody>${dr}</tbody></table></div></details></div>
   <div class="card span"><h3>Host links</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Rate</th><th class="n">Encoding</th><th class="n">pJ/bit</th><th class="n">PHY mm²/lane</th><th class="n">Read RTT</th></tr></thead><tbody>${lk}</tbody></table></div></div>

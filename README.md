@@ -110,12 +110,20 @@ The *Checks* tab (under More) compares the model with published figures:
 | Jetson AGX Orin: 204.8 GB/s | LPDDR5-6400, 256-bit | 0.0 % |
 | EPYC Genoa STREAM Triad: about 376 GB/s per socket | DRAM efficiency model (refresh, row misses, turnaround) | +5.2 % |
 | PCIe 5.0 x16 pinned copies: 56.2 GB/s H→D, 55.1 GB/s D→H | PCIe protocol overheads | −0.2 %, +0.4 % |
-| DGX H100: 10.2 kW maximum | System composition: accelerators, hosts, switches, NICs, overheads | −21 % (a planning maximum) |
-| GB200 NVL72: about 120 kW per rack | Rack composition | −12 % |
+| DGX H100: 10.2 kW maximum | System composition: accelerators, hosts, switches, NICs, fans, power supplies | −18 % (a planning maximum) |
+| GB200 NVL72: about 120 kW per rack | Rack composition, liquid cooled | −5.0 % |
+| GB200 NVL72 compute tray: 6.3 kW maximum | Node composition: 4 GPUs, 2 Grace, NICs, DPUs, drives, 48→12 V | −3.0 % |
 
 Two more are calibration points rather than validations: energy per operation is set from the H100 (700 W)
-and B200 (1,000 W) TDPs. Every reference links its source in the app. Both system-level checks sit low,
-which points at switch trays and fans, and the tab says so.
+and B200 (1,000 W) TDPs. Every reference links its source in the app.
+
+Fans and power conversion are no longer a flat 15 %. They follow the rack's cooling, read from its power limit.
+Air-cooled racks add 8 % for fans and lose 5 % in Titanium server supplies. Direct-liquid racks add 2 % for fans
+and lose power twice, in ORv3 power shelves (96.5 %) and in each tray's 48→12 V converter (97.5 %). The
+reference hosts are built from their parts lists (CPUs, DIMMs, drives, storage NICs, DPUs, BMC). DGX H100 still
+sits 18 % low. Its 10.2 kW is a provisioning maximum with fans at full speed, and fan power is the likeliest gap.
+NICs are counted only when traffic leaves the system (scale-out traffic above zero), so independent copies of a
+model no longer pay for a network they don't use.
 
 `npm test` (also run in GitHub Actions on every push) reruns these checks in headless Chrome. It also
 checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
@@ -291,7 +299,8 @@ How each kind of component is treated:
   + header + framing) × DLLP overhead. Each direction is sized separately, and completion size and
   read requests are counted.
 - **Power** is average traffic × energy per bit for each technology, plus standby power per unit,
-  compute pJ/op and leakage per mm².
+  compute pJ/op and leakage per mm², plus hosts, NICs where traffic leaves the system, and fans and
+  power-conversion losses set by the rack's cooling (about 14 % air-cooled, 8 % direct liquid).
 - **Area** is compute + SRAM + PHYs + 15 %. It is replaced by the pad-limited area when a square die
   would not have enough edge for the PHYs.
 
