@@ -2,7 +2,8 @@
 //   node test/check.js            check against test/golden.json
 //   node test/check.js --update   rewrite the golden file after an intended model change
 // Checks: no page errors; every published reference figure within tolerance; overhead breakdowns multiply out to the
-// model's capacities; every example matches its golden result within 2 %; the optimiser finds a design for each.
+// model's capacities; every example matches its golden result within 2 %; the optimiser finds a design for each;
+// the rate sweep finds a design at every rate; compare pins A, reports the change and carries A in the link.
 const puppeteer = require('puppeteer');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..'), GOLDEN = path.join(__dirname, 'golden.json');
@@ -43,6 +44,23 @@ const update = process.argv.includes('--update');
     }
     return out;
   });
+
+  // rate sweep: the DRAM band covers the whole range and the optimiser finds a design at every rate in the LLM example
+  const sweep = await page.evaluate(async () => {
+    applyPreset('llm'); tab = 'sweep'; buildTabs(); update();
+    for (let i = 0; i < 100 && document.getElementById('p_sweep').textContent.includes('Running the optimiser'); i++) await new Promise(r => setTimeout(r, 100));
+    const ds = dramSweep(S), rows = sweepMemo.rows;
+    return {from: ds.segs[0].from, to: ds.segs[ds.segs.length - 1].to, xs: ds.xs, lines: [...new Set(rows.map(r => r.line))], found: rows.filter(r => r.d).length, n: rows.length,
+      steps: document.querySelectorAll('#p_sweep table tbody tr').length};
+  });
+  // compare: pin, change the DRAM, and the bar reports the difference; the link carries A
+  const cmp = await page.evaluate(() => {
+    applyPreset('llm'); document.getElementById('pinBtn').click(); S.dev.dram = 'hbm4_8'; S.dev.units = 2; buildAll(); document.getElementById('cmpMore').click();
+    const text = document.getElementById('cmp').textContent, hash = location.hash;
+    const a = clone(pinA); pinA = null; loadHash(); const back = pinA && pinA.dev.dram === a.dev.dram && S.dev.dram === 'hbm4_8';
+    document.getElementById('cmpClear').click();
+    return {power: /power\s*[+−]/.test(text), changed: text.includes('changed'), hasA: hash.includes('&a='), back, cleared: document.getElementById('cmp').textContent === ''};
+  });
   await browser.close();
 
   let fails = 0;
@@ -61,6 +79,12 @@ const update = process.argv.includes('--update');
   // deliberately broken examples (marked ✗) may have no fix in hardware, e.g. a hard deadline the host round trip alone exceeds
   for (const [id, o] of Object.entries(result.optimiser)) if (!o.broken && (!o.found || !o.worst)) fail(`optimiser found no design for ${id}`);
   console.log(`ok   optimiser: a design under the ceiling for ${Object.values(result.optimiser).filter(o => o.found).length} of ${Object.keys(result.optimiser).length} examples (broken ones may have none)`);
+
+  if (Math.abs(sweep.from / sweep.xs[0] - 1) > 1e-9 || Math.abs(sweep.to / sweep.xs[sweep.xs.length - 1] - 1) > 1e-9 || sweep.found < sweep.n || sweep.lines.length < 2 || !sweep.steps)
+    fail(`rate sweep incomplete: ${JSON.stringify({found: sweep.found, n: sweep.n, lines: sweep.lines, steps: sweep.steps})}`);
+  else console.log(`ok   rate sweep: designs at all ${sweep.n} rates, stepping through ${sweep.lines.join(' → ')}`);
+  if (!(cmp.power && cmp.changed && cmp.hasA && cmp.back && cmp.cleared)) fail(`compare: ${JSON.stringify(cmp)}`);
+  else console.log('ok   compare: pinned A against B, carried in the link, cleared');
 
   if (update || !fs.existsSync(GOLDEN)) {
     fs.writeFileSync(GOLDEN, JSON.stringify(result.presets, null, 1) + '\n');

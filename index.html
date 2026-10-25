@@ -236,6 +236,14 @@ input[type=range]::-moz-range-thumb{width:13px; height:13px; border-radius:50%; 
 .ch.warn{border-style:dashed; border-color:var(--warn)} .ch.bad{border-color:var(--t1)}
 .ch.weak{background:var(--t1); color:var(--bg); border-color:var(--t1)} .ch.weak b, .ch.weak i{color:var(--bg)}
 .ch-a{color:var(--l3)}
+.cmp{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; margin-top:10px; font-size:13px; color:var(--t2)}
+.cmp:empty{display:none}
+.cmp .ch-l{color:var(--t3)}
+.cmp b{font-family:var(--mono); font-weight:500}
+.better{color:var(--t1); font-weight:600 !important} .worse{color:var(--t3)}
+.cmp-t{flex-basis:100%; margin-top:4px}
+.cmp-t td.diff{color:var(--t1); font-weight:500}
+.band text{font-size:11px; font-family:var(--sans)}
 details.more{margin-top:14px} details.more > summary, details.legend-d > summary{cursor:pointer; font-size:12.5px; color:var(--t3); list-style:none}
 details.more > summary::-webkit-details-marker, details.legend-d > summary::-webkit-details-marker{display:none}
 details.more > summary::before, details.legend-d > summary::before{content:"+ "; font-family:var(--mono)}
@@ -297,8 +305,9 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   header.top,.summary,.stage,.tabs,footer{padding-left:16px; padding-right:16px}
   .brand h1{font-size:20px}
   .brand svg{width:24px; height:24px}
-  .top .ctrl{width:100%; display:flex; gap:8px}
-  #preset{flex:1 1 0; min-width:0; width:0; max-width:none}
+  .top .ctrl{width:100%; display:flex; flex-wrap:wrap; gap:8px}
+  .top .ctrl .btn{flex:1 1 0; justify-content:center; padding:6px 8px}
+  #preset{flex:1 1 100%; min-width:0; width:auto; max-width:none}
   .drawer.wide{width:100vw; max-width:100vw}
   .ask .btn{padding:8px 12px}
   .ask{flex-wrap:wrap} .ask input{flex-basis:100%}
@@ -317,6 +326,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
     <select id="preset" aria-label="Example application"></select>
     <button class="btn" id="openAssist"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12v8H7l-3 3v-3H2z"/></svg>Assistant</button>
     <button class="btn" id="openInputs"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5" cy="4" r="1.6" fill="#0a0a0a"/><circle cx="11" cy="8" r="1.6" fill="#0a0a0a"/><circle cx="7" cy="12" r="1.6" fill="#0a0a0a"/></svg>Inputs</button>
+    <button class="btn" id="pinBtn" title="Pin the current design as A, then change anything to compare">Compare</button>
     <button class="btn" id="share">Share</button>
   </div>
 </header>
@@ -326,6 +336,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
     placeholder="Describe what the system has to do, e.g. “serve a 70B model at 3,000 tokens/s, under 50 ms per token”"><button class="btn">Design it</button><button type="button" class="btn demo" id="demoBtn">Watch a demo</button></form>
   <div class="verdict" id="verdict" aria-live="polite"></div>
   <div class="chain" id="chain"></div>
+  <div class="cmp" id="cmp"></div>
   <div class="req-line" id="reqLine"></div>
   <div class="scen" id="scen"></div>
 </section>
@@ -1097,6 +1108,8 @@ function paneChecks(){
    candidates are screened one at a time, then the best few of each are combined and evaluated in full; the result
    is the Pareto front of system power against die area. */
 function optimise(base, opt){
+  // add accelerators only when no design fits with the count as it is
+  if(opt.scale){ const r0 = optimise(base, {...opt, scale:false}); if(r0.best) return r0; }
   const t0 = performance.now(), ceil = base.ceil, out = {evals:0};
   const ev = s => { out.evals++; const m = model(s); const ok = m.comps.every(c=>c.U<=ceil) && m.latency<=s.lat*(s.vary.deadline==='hard'?1:1.0);
     return {s, m, ok, P:m.Ptot, A:m.die, worst:m.worst}; };
@@ -1106,7 +1119,15 @@ function optimise(base, opt){
   // accelerator count: scale nodes, then racks, until per-accelerator loads fit (if allowed)
   const fixCount = s => { if(!opt.scale) return s; for(let g=0; g<8; g++){ const m = model(s), an = accNeeded(m); if(an.n<=m.tp.nA) break;
     const per = s.scale.perNode; const nodes = Math.ceil(an.n/per); if(nodes<=36 && s.scale.racks===1) s.scale.nodes = nodes; else s.scale.racks = Math.ceil(an.n/(per*s.scale.nodes)); } return s; };
-  cur = fixCompute(fixCount(cur));
+  // host: more memory channels (up to a big server's 12), then faster DDR, and enough cores, before anything else
+  const fixHost = s => { let m = model(s);
+    for(let g=0; g<8 && m.U.host>ceil; g++){
+      if(s.host.units<12) s.host.units = Math.min(12, Math.ceil(s.host.units*m.U.host/ceil));
+      else { const bw = id => dramUnitBW(DRAMS[id]), nx = HOST_DRAMS.filter(id=>bw(id)>bw(s.host.dram)).sort((a,b)=>bw(a)-bw(b))[0]; if(!nx) break; s.host.dram = nx; s.host.units = 8; }
+      m = model(s); }
+    if(m.U.cpu>ceil) s.host.cores = Math.min(192, Math.ceil(s.host.cores*m.U.cpu/ceil*1.05));
+    return s; };
+  cur = fixCompute(fixCount(fixHost(cur)));
   const m0 = model(cur);
   // DRAM candidates: every grade at the fewest units meeting bandwidth and capacity
   const dram = sizeDram(cur, m0).filter(r=>opt.practical ? r.feas==='ok' : r.feas!=='bad').map(r=>({dev:{dram:r.id, units:r.n}}));
@@ -1129,6 +1150,13 @@ function optimise(base, opt){
     let s = merge(merge(merge(merge(merge(clone(cur), clone(d)), clone(l)), clone(n)), clone(f)), clone(c));
     // SRAM banks: raise to the next option if the banks are the limit
     let m = model(s); for(const b of [64,128,288,576,1024]) { if(m.U.sram<=ceil) break; if(b>s.noc.banks){ s.noc.banks = b; m = model(s); } }
+    // latency: when the budget is missed, widen the slowest transfer (DRAM units or link width), within the size limits
+    for(let g=0; g<10 && m.latency>s.lat && isFinite(m.latency); g++){
+      const st = m.stages.filter(x=>['dram','h2d','d2h'].includes(x.k)).sort((a,b)=>b.svc-a.svc)[0]; if(!st || st.svc<=0) break;
+      if(st.k==='dram'){ const d = DRAMS[s.dev.dram], n = Math.ceil(s.dev.units*1.3); if(n>(opt.practical?d.pract:d.ext)) break; s.dev.units = n; }
+      else if(LINKS[s.link.id].kind==='pcie' && s.link.lanes<16) s.link.lanes *= 2;
+      else if(s.link.count<(LINKS[s.link.id].kind==='pcie' && opt.practical ? 1 : 4)) s.link.count++; else break;
+      m = model(s); }
     const r = ev(s); if(opt.reticle && r.A>830) r.ok = false; res.push(r);
   }
   const ok = res.filter(r=>r.ok);
@@ -1139,7 +1167,8 @@ function optimise(base, opt){
   front.sort((a,b)=>key(a)-key(b));
   const uniq = []; for(const r of front){ const sig = JSON.stringify([r.s.dev, r.s.link.id, r.s.link.lanes, r.s.link.count, r.s.noc.topo, r.s.noc.width, r.s.scale.fabric, r.s.scale.nic]); if(!uniq.some(u=>u.sig===sig)) uniq.push({...r, sig}); }
   return {best:uniq[0]||null, front:uniq.slice(0,8), tried:res.length, feasible:ok.length, evals:out.evals, ms:performance.now()-t0,
-    scaled: cur.scale.nodes!==base.scale.nodes || cur.scale.racks!==base.scale.racks, tops: cur.acc.tops!==base.acc.tops ? cur.acc.tops : null};
+    scaled: cur.scale.nodes!==base.scale.nodes || cur.scale.racks!==base.scale.racks, tops: cur.acc.tops!==base.acc.tops ? cur.acc.tops : null,
+    host: JSON.stringify(cur.host)!==JSON.stringify(base.host) ? cur.host : null};
 }
 const designLine = s => `${s.dev.units} × ${DRAMS[s.dev.dram].name} · ${LINKS[s.link.id].kind==='pcie' ? (s.link.count>1?s.link.count+' × ':'')+LINKS[s.link.id].name+' x'+s.link.lanes : s.link.count+' × UCIe'} · ${NOC_TOPO[s.noc.topo].name.replace(/ \(.*\)/,'')} ${s.noc.width}-bit`;
 let optState = {goal:'balanced', practical:true, reticle:false, scale:true, onPackage:false}, optResult = null;
@@ -1150,7 +1179,7 @@ function paneOpt(m){
   if(optResult){
     const r = optResult;
     if(!r.best) res = `<div class="answer"><b>No design found</b> that keeps every component under the ${fmtPct(S.ceil)} ceiling${o.practical?' with practical bus widths':''}${o.reticle?' on one reticle':''}. Try allowing more accelerators, impractical widths, or a looser latency budget. (${r.tried} combinations tried.)</div>`;
-    else res = `<div class="answer">Best ${({balanced:'balanced',power:'lowest-power',area:'smallest'})[o.goal]} design: <b>${esc(designLine(r.best.s))}</b>${r.best.s.scale.fabric!==S.scale.fabric&&r.best.m.xUp>0?' · '+FABRICS[r.best.s.scale.fabric].name.split(' (')[0]:''}${r.tops?` · peak compute raised to ${sig(r.tops)} TOPS`:''}${r.scaled?` · ${fmtN(r.best.m.tp.nA)} accelerators`:''}.
+    else res = `<div class="answer">Best ${({balanced:'balanced',power:'lowest-power',area:'smallest'})[o.goal]} design: <b>${esc(designLine(r.best.s))}</b>${r.best.s.scale.fabric!==S.scale.fabric&&r.best.m.xUp>0?' · '+FABRICS[r.best.s.scale.fabric].name.split(' (')[0]:''}${r.tops?` · peak compute raised to ${sig(r.tops)} TOPS`:''}${r.host?` · host widened to ${r.host.units} × ${DRAMS[r.host.dram].name}, ${r.host.cores} cores`:''}${r.scaled?` · ${fmtN(r.best.m.tp.nA)} accelerators`:''}.
       System ${fmtW(r.best.P)}, die ${fmtA(r.best.A)}, most loaded: ${r.best.worst.name} at ${fmtPct(r.best.worst.U)}. <button class="use" data-optuse="0">use this design</button><br>
       <span class="note">${r.feasible} of ${r.tried} combinations meet every limit; ${r.evals} model evaluations in ${Math.round(r.ms)} ms. The table is the power-against-area trade-off: no design in it is beaten on both.</span></div>
       <div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Design</th><th class="n">System power</th><th class="n">Die</th><th class="n">Most loaded</th><th class="n">Latency</th><th></th></tr></thead><tbody>${
@@ -1618,10 +1647,40 @@ function paintChain(m){
   document.getElementById('chain').innerHTML = `<span class="ch-l">Weakest link</span>` + items.map((i,n)=>`${n?'<span class="ch-a">→</span>':''}<span class="ch ${i.rate===min?'weak':''} ${state(i.c.U)}" title="${esc(i.c.name)}: alone it would sustain ${fmtBps(i.rate)} (${fmtPct(i.c.U)} loaded at the target)${i.weak!==null?'; weakest in '+fmtPct(i.weak)+' of tolerance draws':''}">${i.label}${i.rate===min||i.rate===second?` <b>${fmtBps(i.rate)}</b>`:''}${i.weak>0.005?` <i>${fmtPct(i.weak)}</i>`:''}</span>`).join('');
 }
 
+/* compare: pin a design as A, change anything, and the current design (B) is set against it */
+let pinA = null, cmpOpen = false, digA = null;
+const withS = (s, f) => { const keep = S; S = s; try{ return f(); } finally{ S = keep; } };   // latency and tolerance read the global S
+function digest(s){ const m = model(s); return withS(s, ()=>({s, m, lat:latHead(m), full:fullPower(s).total})); }
+const CMP_DESIGN = [['Device DRAM', s=>designLine(s).split(' · ')[0]], ['Host link', s=>designLine(s).split(' · ')[1]], ['On-chip interconnect', s=>designLine(s).split(' · ')[2]],
+  ['Peak compute', s=>sig(s.acc.tops)+' TOPS'], ['Accelerators', (s,m)=>fmtN(m.tp.nA)], ['Requirement', s=>`${fmtBps(s.T)} · ≤ ${fmtT(s.lat)} · ${sig(s.ops)} op/B`]];
+// [label, value, format, lower is better]
+const CMP_NUM = [['Most loaded', d=>d.m.worst.U, (v,d)=>`${d.m.worst.name} · ${fmtPct(v)}`, true], ['Max sustainable', d=>d.m.maxT, fmtBps, false],
+  ['Latency', d=>d.lat, fmtT, true], ['Power at the target', d=>d.m.Ptot, fmtW, true], ['Power at full load', d=>d.full, fmtW, true],
+  ['Die per accelerator', d=>d.m.die, fmtA, true], ['Energy per byte', d=>d.m.Ptot/d.m.T, v=>sig(v*1e12)+' pJ', true]];
+function delta(a, b, lower){ if(!isFinite(a) || !isFinite(b)) return a===b ? '<span>same</span>' : `<span class="${(isFinite(a)===lower)?'worse':'better'}">${isFinite(b)?'finite':'∞'}</span>`;
+  const r = b/a-1; if(Math.abs(r)<0.005) return '<span>same</span>';
+  return `<span class="${(r<0)===lower?'better':'worse'}">${r>=9 ? sig(b/a)+'×' : (r>0?'+':'−')+(Math.abs(r)*100).toFixed(Math.abs(r)<0.1?1:0)+' %'}</span>`; }
+function paintCompare(m){
+  const el = document.getElementById('cmp');
+  document.getElementById('pinBtn').classList.toggle('on', !!pinA);
+  if(!pinA){ el.innerHTML = ''; return; }
+  const key = JSON.stringify(pinA); if(!digA || digA.key!==key) digA = {key, d:digest(pinA)};
+  const a = digA.d, b = {s:S, m, lat:latHead(m), full:fullPower(S).total};
+  const same = CMP_DESIGN.every(([,f])=>f(a.s,a.m)===f(b.s,b.m)) && CMP_NUM.every(([,f])=>f(a)===f(b));
+  const head = same ? `<span>B is the same as A: change anything and it is compared here.</span>`
+    : [['power', 3], ['die', 5], ['max rate', 1], ['latency', 2]].map(([n,i])=>`${n} <b>${delta(CMP_NUM[i][1](a), CMP_NUM[i][1](b), CMP_NUM[i][3])}</b>`).join(' · ');
+  const tbl = cmpOpen ? `<div class="cmp-t tbl-wrap"><table class="t"><thead><tr><th></th><th>A (pinned)</th><th>B (current)</th><th class="n">B against A</th></tr></thead><tbody>${
+    CMP_DESIGN.map(([n,f])=>{ const va = f(a.s,a.m), vb = f(b.s,b.m); return `<tr><td>${n}</td><td>${esc(va)}</td><td class="${va!==vb?'diff':''}">${esc(vb)}</td><td class="n">${va===vb?'':'changed'}</td></tr>`; }).join('')}${
+    CMP_NUM.map(([n,f,fm,lo])=>`<tr><td>${n}${n==='Latency'?', '+latLabel():''}</td><td class="n">${fm(f(a),a)}</td><td class="n">${fm(f(b),b)}</td><td class="n">${delta(f(a), f(b), lo)}</td></tr>`).join('')}</tbody></table>
+    <p class="note">Bold = better than A. Each design is evaluated at its own requirement; the Rate sweep tab draws both as the rate grows.</p></div>` : '';
+  el.innerHTML = `<span class="ch-l">A → B</span>${head}<button class="link" id="cmpMore">${cmpOpen?'hide details':'details'}</button><button class="link" id="cmpSwap" title="Load A and pin the current design in its place">swap</button><button class="link" id="cmpPin" title="Pin the current design as A">re-pin</button><button class="link" id="cmpClear">clear</button>${tbl}`;
+}
+function pinCurrent(msg){ pinA = clone(S); digA = null; toast(msg || 'Pinned as A: change anything to compare'); }
+
 /* =====================================================================
    TABS
    ===================================================================== */
-const TABS = [{id:'opt', name:'Optimise'}, {id:'sizing', name:'Minimum specs'}, {id:'onchip', name:'On-chip'}, {id:'rack', name:'Racks'}, {id:'ppa', name:'Power & area'}, {id:'cons', name:'Notes'},
+const TABS = [{id:'opt', name:'Optimise'}, {id:'sizing', name:'Minimum specs'}, {id:'sweep', name:'Rate sweep'}, {id:'onchip', name:'On-chip'}, {id:'rack', name:'Racks'}, {id:'ppa', name:'Power & area'}, {id:'cons', name:'Notes'},
   {id:'latency', name:'Latency', more:true}, {id:'checks', name:'Checks', more:true}, {id:'headroom', name:'Headroom', more:true}, {id:'roofline', name:'Roofline', more:true}, {id:'model', name:'Model', more:true}];
 let moreOpen = false;
 let tab = 'sizing';
@@ -1678,6 +1737,84 @@ function paneSizing(m){
     ${fabT}
     <div class="card"><h3>Host memory${m.tp.nN>1?' per node':''}</h3><div class="tbl-wrap"><table class="t"><tbody>${hostRows}</tbody></table></div></div>
     <div class="card"><h3>Compute &amp; CPU</h3>${stat('Peak compute needed per accelerator', sig(m.Tba*S.ops/(S.acc.util*S.ceil)/1e12)+' TOPS')}${stat('Host cores for I/O'+(m.tp.nN>1?' per node':''), sig(m.dem.cpu/S.ceil))}${stat('Blocks per second'+(m.tp.nN>1?' per node':''), fmtIOPS(m.Tbn/S.block))}</div></div>`;
+}
+
+/* rate sweep: the sizing questions asked at rates either side of the target. Device DRAM is re-sized at each rate
+   for the current accelerators; the optimiser then finds the cheapest whole design at each rate, so the points
+   where the technology has to step up show as steps. */
+const SWEEP_LINES = ['DDR5','LPDDR5X','LPDDR6','GDDR7','HBM3E','HBM4'];
+const SWEEP_STYLE = {DDR5:['#6b6b6b','6 3'], LPDDR5X:['#a3a3a3','2 3'], LPDDR6:['#a3a3a3',''], GDDR7:['#cfcfcf','8 4'], HBM3E:['#ededed',''], HBM4:['#ededed','12 3 2 3']};
+const FAM_FILL = {DDR:'#3a3a3a', LPDDR:'#6b6b6b', LPDDR6:'#6b6b6b', GDDR:'#a3a3a3', HBM:'#ededed'};
+const sweepXs = T => Array.from({length:25}, (_,i)=>T*Math.pow(10, -2+i/6));   // a hundredth to a hundred times the target
+const atRate = (s, T) => { const c = clone(s); c.T = T; return c; };
+function cheapestDram(s){ return sizeDram(s, model(s)).filter(r=>r.feas==='ok').sort((a,b)=>a.power-b.power)[0] || null; }
+function dramSweep(s){
+  const xs = sweepXs(s.T), lines = Object.fromEntries(SWEEP_LINES.map(l=>[l, {ok:[], st:[]}])), win = [];
+  for(const x of xs){ const c = atRate(s, x), rows = sizeDram(c, model(c));
+    for(const l of SWEEP_LINES){ const r = rows.find(r=>r.id===DRAM_LINE_TOP[l]); lines[l].ok.push(r.feas==='ok' ? r.power : NaN); lines[l].st.push(r.feas!=='bad' ? r.power : NaN); }
+    const best = rows.filter(r=>r.feas==='ok').sort((a,b)=>a.power-b.power)[0]; win.push(best ? best.d.line : null); }
+  // runs of the same winning technology; each boundary found by bisection between the two samples either side
+  const lineAt = x => { const b = cheapestDram(atRate(s, x)); return b ? b.d.line : null; };
+  const segs = [{line:win[0], from:xs[0]}];
+  for(let i=1; i<xs.length; i++) if(win[i]!==win[i-1]){
+    let lo = xs[i-1], hi = xs[i]; for(let k=0; k<12; k++){ const mid = Math.sqrt(lo*hi); if(lineAt(mid)===win[i-1]) lo = mid; else hi = mid; }
+    segs[segs.length-1].to = hi; segs.push({line:win[i], from:hi}); }
+  segs[segs.length-1].to = xs[xs.length-1];
+  return {xs, lines, segs};
+}
+function designSweep(s, opt){
+  return sweepXs(s.T).map(x=>{ const r = optimise(atRate(s, x), opt);
+    if(!r.best) return {x};
+    return {x, P:r.best.P, A:r.best.A, nA:r.best.m.tp.nA, d:designLine(r.best.s), line:DRAMS[r.best.s.dev.dram].line}; });
+}
+// a fixed design as the rate grows: its power until it runs out of capacity
+const fixedSweep = (s, xs) => xs.map(x=>{ const m = model(atRate(s, x)); return m.comps.every(c=>c.U<=1) ? {P:m.Ptot, A:m.die} : {P:NaN, A:NaN}; });
+let sweepMemo = {key:null, rows:null}, sweepJob = null;
+function bandSvg(segs, xs, T){
+  const W = 760, H = 46, ml = 64, mr = 14, X = x => ml + Math.log10(x/xs[0])/Math.log10(xs[xs.length-1]/xs[0])*(W-ml-mr);
+  let g = '';
+  for(const sg of segs){ const x0 = X(sg.from), x1 = X(sg.to), fam = sg.line ? DRAM_LINES.find(L=>L.line===sg.line).fam : null, fill = fam ? FAM_FILL[fam] : 'none';
+    g += `<g><rect x="${x0}" y="4" width="${Math.max(0, x1-x0-1)}" height="24" fill="${fill}" ${fam?'':'stroke="#6b6b6b" stroke-dasharray="3 3"'}/>
+      ${x1-x0>54 ? `<text x="${(x0+x1)/2}" y="20" text-anchor="middle" style="fill:${['GDDR','HBM'].includes(fam) ? '#0a0a0a' : '#ededed'}">${sg.line || 'none fits'}</text>` : ''}
+      <title>${sg.line || 'No practical DRAM'}: ${fmtBps(sg.from)} to ${fmtBps(sg.to)}</title></g>`; }
+  g += `<path d="M${X(T)},2 v28" stroke="#ededed" stroke-width="2"/><text x="${X(T)}" y="42" text-anchor="middle" style="fill:#a3a3a3">target</text>`;
+  return `<svg class="chart band" viewBox="0 0 ${W} ${H}" role="img" aria-label="Lowest-power practical device DRAM at each rate">${g}</svg>`;
+}
+function paneSweep(m){
+  const ds = dramSweep(S), xs = ds.xs, last = ds.segs[ds.segs.length-1];
+  const nA = m.tp.nA, accs = nA>1 ? `${fmtN(nA)} accelerators` : 'one accelerator';
+  const story = ds.segs.map((g,i)=>`<b>${g.line || 'nothing practical'}</b>${i<ds.segs.length-1 ? ' up to about '+fmtBps(g.to) : ''}`).join(', then ');
+  const series = SWEEP_LINES.flatMap(l=>[{name:l, col:SWEEP_STYLE[l][0], dash:SWEEP_STYLE[l][1], ys:ds.lines[l].st, op:0.35, noKey:true},
+    {name:l, col:SWEEP_STYLE[l][0], dash:SWEEP_STYLE[l][1], ys:ds.lines[l].ok}]);
+  const dramChart = lineChart({xs, series, xfmt:fmtBps, yfmt:fmtW, vlines:[{x:S.T, col:'#a3a3a3', name:'target'}], h:280, legend:true});
+  const answer = `<div class="answer">For ${accs}, from ${fmtBps(xs[0])} to ${fmtBps(xs[xs.length-1])}, the lowest-power practical device DRAM is ${story}.
+    ${last.line===null ? `Above about ${fmtBps(last.from)} no practical DRAM fits on one accelerator, so the cheapest designs below add accelerators.` : ''}</div>`;
+  const card1 = `<div class="card span"><h3>Lowest-power practical device DRAM at each rate</h3>${bandSvg(ds.segs, xs, S.T)}
+    <h3 style="margin-top:14px">Device DRAM power${nA>1?' per accelerator':''}, fastest grade of each type</h3>${dramChart}
+    <p class="note">Each technology is sized at every rate as in Minimum specs. Solid = practical width, faint = stretch; a line stops where the type becomes impractical. HBM costs more at low rates because each stack has a fixed background power.</p></div>`;
+  const key = JSON.stringify([S, optState]);
+  if(sweepMemo.key!==key){
+    const s = clone(S), o = {...optState};
+    clearTimeout(sweepJob); sweepJob = setTimeout(()=>{ sweepMemo = {key, rows:designSweep(s, o)};
+      const el = document.getElementById('p_sweep'); if(el && tab==='sweep') el.innerHTML = paneSweep(M); }, 150);
+    return answer + `<div class="cols">${card1}<div class="card span"><h3>Cheapest whole design at each rate</h3><p class="note">Running the optimiser at ${xs.length} rates…</p></div></div>`;
+  }
+  const rows = sweepMemo.rows, P = rows.map(r=>r.P ?? NaN), Ar = rows.map(r=>r.A ?? NaN);
+  const mine = fixedSweep(S, xs), a = pinA ? fixedSweep(pinA, xs) : null;
+  // consecutive rates on the same DRAM type form one step; widths, link and interconnect may change within it
+  const steps = []; rows.forEach(r=>{ const k = r.line || null, prev = steps[steps.length-1];
+    if(prev && prev.k===k) prev.to = r.x, prev.r = r; else steps.push({k, from:r.x, to:r.x, r, n0:r.nA}); });
+  const sys = (ys, mineY, aY, fmt) => lineChart({xs, xfmt:fmtBps, yfmt:fmt, h:240, legend:true, vlines:[{x:S.T, col:'#a3a3a3', name:'target'}],
+    series:[{name:'cheapest design at each rate', col:'#ededed', ys, w:2.2}, {name:pinA?'B · this design':'this design', col:'#a3a3a3', dash:'6 3', ys:mineY},
+      ...(aY ? [{name:'A · pinned', col:'#6b6b6b', dash:'2 3', ys:aY}] : [])]});
+  const opt = optState, rules = [opt.practical?'practical sizes':'any size', opt.scale?'adding accelerators when needed':'with the accelerator count fixed', opt.reticle?'one reticle':''].filter(Boolean).join(', ');
+  return answer + `<div class="cols">${card1}
+    <div class="card span"><h3>Cheapest whole design at each rate · system power</h3>${sys(P, mine.map(r=>r.P), a && a.map(r=>r.P), fmtW)}
+    <h3 style="margin-top:14px">Die area per accelerator</h3>${sys(Ar, mine.map(r=>r.A), a && a.map(r=>r.A), fmtA)}
+    <p class="note">The optimiser (goal: ${({balanced:'balance of power and area',power:'lowest power',area:'smallest die'})[opt.goal]}; ${rules}; set on the Optimise tab) re-run at each rate with everything else as it is. The table below lists where the DRAM type changes. The dashed line${pinA?'s are':' is'} a fixed design, drawn up to the rate where it runs out of capacity.</p></div>
+    <div class="card span"><h3>Where the design steps up</h3><div class="tbl-wrap"><table class="t"><thead><tr><th class="n">Rate</th><th>Cheapest design</th><th class="n">Accelerators</th><th class="n">System power</th><th class="n">Die</th></tr></thead><tbody>${
+      steps.map(st=>`<tr class="${st.from<=S.T*1.0001 && st.to>=S.T*0.9999?'cur':''}"><td class="n">${st.from===st.to ? fmtBps(st.from) : fmtBps(st.from)+' – '+fmtBps(st.to)}</td>${st.k ? `<td>${esc(st.r.d)}</td><td class="n">${st.n0===st.r.nA ? fmtN(st.r.nA) : fmtN(st.n0)+' – '+fmtN(st.r.nA)}</td><td class="n">${fmtW(st.r.P)}</td><td class="n">${fmtA(st.r.A)}</td>` : '<td colspan="4">no design within the limits</td>'}</tr>`).join('')}</tbody></table></div>
+    <p class="note">Rates are the sampled points (${xs.length} across four decades); power and die are at the top of each range.</p></div></div>`;
 }
 
 function paneOnchip(m){
@@ -1957,7 +2094,9 @@ function lineChart(o){
   const Y = y => mt + (1-(Math.log10(Math.min(Math.max(y,ymin),ymax))-Math.log10(ymin))/(Math.log10(ymax)-Math.log10(ymin)))*(H-mt-mb);
   let g = '';
   const e0 = Math.ceil(Math.log10(ymin)), e1 = Math.floor(Math.log10(ymax)), step = Math.max(1, Math.ceil((e1-e0+1)/6));
-  for(let e=e0; e<=e1; e+=step){ const y = Y(Math.pow(10,e)); g += `<line class="gl" x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}"/><text x="${ml-6}" y="${y+3}" text-anchor="end">${o.yfmt(Math.pow(10,e))}</text>`; }
+  let yt = []; for(let e=e0; e<=e1; e+=step) yt.push(Math.pow(10,e));
+  if(yt.length<3){ yt = []; for(let e=Math.floor(Math.log10(ymin)); e<=e1; e++) for(const k of [1,2,5]){ const v = k*Math.pow(10,e); if(v>=ymin && v<=ymax) yt.push(v); } }   // narrow range: 1-2-5 ticks
+  for(const v of yt){ const y = Y(v); g += `<line class="gl" x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}"/><text x="${ml-6}" y="${y+3}" text-anchor="end">${o.yfmt(v)}</text>`; }
   const x0 = Math.ceil(Math.log10(xmin)), x1 = Math.floor(Math.log10(xmax)), xs = Math.max(1, Math.ceil((x1-x0+1)/7));
   for(let e=x0; e<=x1; e+=xs){ const x = X(Math.pow(10,e)); g += `<line class="gl" y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}"/><text x="${x}" y="${H-mb+16}" text-anchor="middle">${o.xfmt(Math.pow(10,e))}</text>`; }
   g += `<line class="ax" x1="${ml}" x2="${ml}" y1="${mt}" y2="${H-mb}"/><line class="ax" x1="${ml}" x2="${W-mr}" y1="${H-mb}" y2="${H-mb}"/>`;
@@ -1966,11 +2105,12 @@ function lineChart(o){
   for(const v of o.vlines||[]){ if(!isFinite(v.x)||v.x<xmin||v.x>xmax) continue; const x = X(v.x);
     g += `<line y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}" stroke="${v.col}" stroke-dasharray="2 4"/><text x="${x+4}" y="${mt+10}" style="fill:${v.col}">${v.name}</text>`; }
   for(const s of o.series){
-    const pts = o.xs.map((x,i)=>isFinite(s.ys[i]) && s.ys[i]>0 ? `${X(x).toFixed(1)},${Y(s.ys[i]).toFixed(1)}` : null).filter(Boolean);
-    g += `<polyline fill="none" stroke="${s.col}" stroke-width="1.6" stroke-dasharray="${s.dash||''}" points="${pts.join(' ')}"/>`;
+    // a gap (no value) breaks the line rather than bridging it
+    const runs = [[]]; o.xs.forEach((x,i)=>{ if(isFinite(s.ys[i]) && s.ys[i]>0) runs[runs.length-1].push(`${X(x).toFixed(1)},${Y(s.ys[i]).toFixed(1)}`); else if(runs[runs.length-1].length) runs.push([]); });
+    for(const pts of runs.filter(r=>r.length)) g += `<polyline fill="none" stroke="${s.col}" stroke-width="${s.w||1.6}" stroke-dasharray="${s.dash||''}"${s.op?` opacity="${s.op}"`:''} points="${pts.join(' ')}"/>`;
   }
   for(const p of o.points||[]){ const x=X(p.x), y=Y(p.y); g += `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="#ededed" stroke-width="1.6"/><path d="M${x-9},${y} h18 M${x},${y-9} v18" stroke="#ededed"/>`; }
-  const leg = o.legend ? `<div class="keys">${o.series.map(s=>`<span><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="${s.col}" stroke-width="1.6" stroke-dasharray="${s.dash||''}"/></svg>${s.name}</span>`).join('')}</div>` : '';
+  const leg = o.legend ? `<div class="keys">${o.series.filter(s=>!s.noKey).map(s=>`<span><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="${s.col}" stroke-width="1.6" stroke-dasharray="${s.dash||''}"/></svg>${s.name}</span>`).join('')}</div>` : '';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>${leg}`;
 }
 function scatterChart(pts){
@@ -2000,11 +2140,11 @@ function scatterChart(pts){
    UPDATE LOOP, PRESETS, SHARE
    ===================================================================== */
 let M = null;
-const PANES = {opt:paneOpt, checks:paneChecks, sizing:paneSizing, onchip:paneOnchip, rack:paneRack, ppa:panePPA, latency:paneLatency, headroom:paneHeadroom, roofline:paneRoofline, cons:paneCons, model:paneModel};
+const PANES = {opt:paneOpt, checks:paneChecks, sizing:paneSizing, sweep:paneSweep, onchip:paneOnchip, rack:paneRack, ppa:panePPA, latency:paneLatency, headroom:paneHeadroom, roofline:paneRoofline, cons:paneCons, model:paneModel};
 function update(){
   S.mod = isModified();
   const m = model(S); M = m;
-  paintSummary(m); paintDiagram(m); paintInspector(m);
+  paintSummary(m); paintCompare(m); paintDiagram(m); paintInspector(m);
   const el = document.getElementById('p_'+tab); if(el) el.innerHTML = PANES[tab](m);
   const nb = considerations(m).filter(c=>c.lvl==='bad').length;
   const n = document.getElementById('n_cons'); if(n){ n.hidden = !nb; n.className = 'n bad'; n.textContent = nb; }
@@ -2032,7 +2172,12 @@ document.addEventListener('click', e=>{
   if(e.target.id==='notesAll'){ showAllNotes = !showAllNotes; update(); return; }
   if(e.target.id==='optRun'){ e.target.textContent = 'Searching…'; setTimeout(()=>{ optResult = optimise(S, optState); update(); }, 20); return; }
   const ou = e.target.closest('[data-optuse]');
-  if(ou && optResult){ const x = optResult.front[+ou.dataset.optuse]; if(x){ S = merge(clone(S), clone(x.s)); buildAll(); toast('Applied: '+designLine(x.s)); } return; }
+  if(ou && optResult){ const x = optResult.front[+ou.dataset.optuse]; if(x){ const auto = !pinA; if(auto) pinCurrent();
+    S = merge(clone(S), clone(x.s)); buildAll(); toast(auto ? 'Applied; the previous design is pinned as A to compare' : 'Applied: '+designLine(x.s)); } return; }
+  if(e.target.id==='pinBtn' || e.target.id==='cmpPin'){ pinCurrent(); update(); return; }
+  if(e.target.id==='cmpClear'){ pinA = null; digA = null; update(); return; }
+  if(e.target.id==='cmpMore'){ cmpOpen = !cmpOpen; update(); return; }
+  if(e.target.id==='cmpSwap' && pinA){ const a = pinA; pinA = clone(S); digA = null; S = a; buildAll(); toast('Swapped: A is now the design you had'); return; }
   const tl = e.target.closest('[data-tab]');
   if(tl){ e.preventDefault(); tab = tl.dataset.tab; buildTabs(); update(); document.getElementById('tabbar').scrollIntoView({behavior:'smooth'}); return; }
   const o = e.target.closest('[data-open]');
@@ -2047,11 +2192,13 @@ function isModified(){
   const strip = o => { const c = clone(o); delete c.preset; delete c.mod; return JSON.stringify(c); };
   return strip(S) !== strip(merge(clone(BASE), clone(p.p)));
 }
-function saveHash(){ try{ history.replaceState(null, '', '#s='+btoa(unescape(encodeURIComponent(JSON.stringify(S))))); }catch(e){} }
+const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))), dec = t => JSON.parse(decodeURIComponent(escape(atob(t))));
+const validS = s => DRAMS[s.dev.dram] && LINKS[s.link.id] && FABRICS[s.scale.fabric] && NICS[s.scale.nic];
+function saveHash(){ try{ history.replaceState(null, '', '#s='+enc(S)+(pinA ? '&a='+enc(pinA) : '')); }catch(e){} }   // a shared link carries the pinned A too
 function loadHash(){
-  const h = location.hash.match(/#s=(.+)/); if(!h) return false;
-  try{ S = merge(clone(BASE), JSON.parse(decodeURIComponent(escape(atob(h[1])))));
-    if(!DRAMS[S.dev.dram]||!LINKS[S.link.id]||!FABRICS[S.scale.fabric]||!NICS[S.scale.nic]) throw 0; return true; }catch(e){ S = clone(BASE); return false; }
+  const h = location.hash.match(/#s=([^&]+)(?:&a=(.+))?/); if(!h) return false;
+  try{ if(h[2]){ const a = merge(clone(BASE), dec(h[2])); if(validS(a)) pinA = a; } }catch(e){}
+  try{ S = merge(clone(BASE), dec(h[1])); if(!validS(S)) throw 0; return true; }catch(e){ S = clone(BASE); return false; }
 }
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('on'), 1800); }
 document.getElementById('preset').innerHTML = `<option value="">Examples (${PRESETS.length})…</option>`+

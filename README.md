@@ -119,13 +119,16 @@ which points at switch trays and fans, and the tab says so.
 
 `npm test` (also run in GitHub Actions on every push) reruns these checks in headless Chrome. It also
 checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
-design for every example that can be fixed, and that all 28 examples match their golden results within 2 %.
+design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
+round-trips through a shared link, and that all 28 examples match their golden results within 2 %.
 
 ## Design optimiser
 
 The *Optimise* tab searches every DRAM type and speed grade, the host link, the on-chip interconnect, the
-scale-up fabric and the NICs. Where they limit, it also raises peak compute and SRAM banks, and (if allowed)
-adds accelerators. It returns the best design for power, die area or a balance of the two, plus the
+scale-up fabric and the NICs. Where they limit, it also raises peak compute and SRAM banks, widens host
+memory (up to 12 channels, then faster DDR) and adds host cores. When a design misses the latency budget, it
+widens whichever transfer dominates (more DRAM units or a wider link). It adds accelerators, if allowed, only
+when nothing fits with the count as it is. It returns the best design for power, die area or a balance of the two, plus the
 trade-off between them, each design one click from being applied.
 
 Practical limits apply unless you switch them off:
@@ -138,6 +141,33 @@ Practical limits apply unless you switch them off:
 A search takes about 20 ms. The assistant can call it as a tool.
 
 ![Optimiser](optimiser.png)
+
+Applying a design from the table pins the one you had as A, so the change is compared straight away (below).
+
+## Rate sweep: where the design has to step up
+
+The *Rate sweep* tab asks the sizing questions again at 25 rates from a hundredth to a hundred times the
+target. First, for the accelerators you have, it shows the lowest-power practical device DRAM at each rate as a
+band, with each boundary found by bisection. A sentence sums it up, for example "LPDDR5X up to about 4.9 GB/s,
+then LPDDR6 up to about 196 GB/s, then HBM4". Below that it plots the DRAM power of the fastest grade of each
+type. A line goes faint where the width is a stretch and stops where the type becomes impractical.
+
+Then it runs the optimiser at every rate and plots the system power and die area of the cheapest whole
+design. Your current design (and a pinned A) is drawn up to the rate where it runs out of capacity. A table lists
+where the DRAM type changes and where accelerators have to be added. The sweep takes about 0.4 s and runs in
+the background.
+
+![Rate sweep](sweep.png)
+
+## Compare two designs
+
+*Compare* pins the current design as A. Change anything, and a line under the weakest-link strip shows how
+the current design (B) differs on power, die area, maximum rate and latency. Bold means better than A.
+*details* opens the full table: the components that changed, the most loaded part, full-load power and energy
+per byte. *swap* exchanges A and B, and *re-pin* makes B the new A. The shared link carries A too, so a link
+opens the comparison as you left it.
+
+![Compare](compare.png)
 
 ## Overheads, raw to usable
 
@@ -210,6 +240,9 @@ would have to carry 4 TB/s to feed that link.
   practical / stretch / impractical verdict. Also every link (PCIe 3.0 to 7.0, UCIe), host memory
   channels, scale-up fabrics, scale-out NICs, compute, host cores, network ports and SSDs. One click
   applies any option.
+- **Rate sweep**: the lowest-power practical DRAM at every rate from a hundredth to a hundred times the
+  target, and the optimiser's cheapest whole design at each rate (see above).
+- **Compare**: pin a design as A and see how the current one differs (see above).
 - **PPA**: power broken down by component, a die-area estimate that switches to *pad-limited* when
   the memory and link PHYs need more edge than the logic provides, a reticle-limit check, and a DRAM
   design-space plot of power against PHY area.
