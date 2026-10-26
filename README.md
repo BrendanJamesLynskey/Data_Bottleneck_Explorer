@@ -9,6 +9,8 @@ minimum specification of every component, and the power, performance and area (P
 
 **Live app:** https://hw-system-design-explorer.vercel.app/ (also mirrored on [GitHub Pages](https://brendanjameslynskey.github.io/HW_System_Design_Explorer/))
 
+**Case study:** [what it models, how it is checked, and five things it shows](CASE_STUDY.md)
+
 ![System view](system.png)
 
 ## Layout
