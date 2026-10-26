@@ -295,6 +295,8 @@ and that chiplets add die-to-die power for the crossing traffic and split the si
   - It also shows that HBM pseudo-channels need deep queues: 32 requests of 64 B cover only about 57 % of the latency
     at 32 GB/s per channel.
 
+![Chip: voltage and heat, memory controller, floorplan](chip.png)
+
 ## LLM serving: from the model to the workload
 
 *LLM serving* (top of Inputs) derives the workload from the model instead of asking for bytes and op/B. Pick a
@@ -471,6 +473,8 @@ would have to carry 4 TB/s to feed that link.
   applies any option.
 - **Rate sweep**: the lowest-power practical DRAM at every rate from a hundredth to a hundred times the
   target, and the optimiser's cheapest whole design at each rate (see above).
+- **Chip**: the compute array and how a matrix multiply maps onto it, voltage, frequency and heat, an optional
+  memory-controller model, the floorplan, the package and a chiplet sweep (see above).
 - **Compare**: pin a design as A and see how the current one differs (see above).
 - **Cost**: build cost of one accelerator, capital and running cost of the system, and cost per million tokens
   or per PB (see above).

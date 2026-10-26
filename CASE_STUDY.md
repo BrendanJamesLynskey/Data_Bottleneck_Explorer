@@ -33,6 +33,14 @@ I wanted a model that is quick enough to explore with, and specific enough to ar
     optional prefill. Prefill and decode can run on separate pools, as production serving increasingly does.
   - *LLM training:* compute, memory and traffic come from tensor, pipeline and data parallelism, including pipeline
     bubbles, activation recomputation and ZeRO-1.
+- **Inside the chip.**
+  - A compute array of cores, rows × columns of processing elements, clock, supply voltage, precision and dataflow can
+    derive the accelerator's peak, area and energy.
+  - A representative matrix multiply is mapped onto it for utilisation, and tiled through SRAM for the least DRAM
+    traffic.
+  - Junction temperature is solved with the leakage it causes.
+  - An optional memory-controller model works from banks, timings and queue depth.
+  - A floorplan and package view, and chiplets joined by UCIe links, set cost and yield against die-to-die power.
 - **Design tools.**
   - An optimiser searches DRAM types and speed grades, links, interconnects and fabrics for the cheapest design that
     meets every limit.
@@ -44,7 +52,7 @@ I wanted a model that is quick enough to explore with, and specific enough to ar
   runs the optimiser. Visitors bring their own key (OpenAI, Gemini, OpenRouter or Anthropic). It stays in their
   browser and goes only to that provider. A recorded session plays without a key.
 
-There are 31 worked examples, from rack-scale LLM inference and a 1,024-accelerator training cluster to a 5G radio
+There are 32 worked examples, from rack-scale LLM inference and a 1,024-accelerator training cluster to a 5G radio
 unit, an ultrasound beamformer and a detector trigger. Six are deliberately broken, each showing a classic
 bottleneck.
 
@@ -72,7 +80,7 @@ Some things are deliberately *not* checked. The training model has no published 
 checking.
 
 Behind that, a regression suite runs in GitHub Actions on every push:
-- **Regression:** all 31 examples against golden results within 2 %.
+- **Regression:** all 32 examples against golden results within 2 %.
 - **Hand calculations:**
   - the overhead breakdowns multiply out to the model's capacities;
   - the LLM and training workloads match the sums done by hand;

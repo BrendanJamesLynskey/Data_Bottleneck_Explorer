@@ -2259,7 +2259,9 @@ let pinA = null, cmpOpen = false, digA = null;
 const withS = (s, f) => { const keep = S; S = s; try{ return f(); } finally{ S = keep; } };   // latency and tolerance read the global S
 function digest(s){ const m = model(s); return withS(s, ()=>({s, m, lat:latHead(m), full:sysFull(s), cost:costOf(s, m)})); }
 const CMP_DESIGN = [['Device DRAM', s=>designLine(s).split(' · ')[0]], ['Host link', s=>designLine(s).split(' · ')[1]], ['On-chip interconnect', s=>designLine(s).split(' · ')[2]],
-  ['Peak compute', s=>sig(s.acc.tops)+' TOPS'], ['Accelerators', (s,m)=>fmtN(m.tp.nA)], ['Requirement', s=>`${fmtBps(s.T)} · ≤ ${fmtT(s.lat)} · ${sig(s.ops)} op/B`]];
+  ['Peak compute', s=>sig(s.acc.tops)+' TOPS'], ['Accelerators', (s,m)=>fmtN(m.tp.nA)+(m.pre ? ' + '+fmtN(m.pre.tp.nA)+' prefill' : '')], ['Requirement', s=>`${fmtBps(s.T)} · ≤ ${fmtT(s.lat)} · ${sig(s.ops)} op/B`],
+  ['Workload', s=>s.llm.on ? `LLM serving, ${fmtN(s.llm.users)} users, batch ${fmtN(s.llm.batch)}${s.llm.prefill ? (s.llm.disagg ? ', split prefill' : ', with prefill') : ''}` : s.train.on ? `LLM training, tensor ${s.train.tp} × pipeline ${s.train.pp}` : 'set directly'],
+  ['Chip', (s,m)=>[s.chip.on ? `${fmtN(s.chip.cores)} × ${s.chip.rows}×${s.chip.cols} at ${s.chip.vdd.toFixed(2)} V, ${s.chip.flow}` : 'given', m.nD ? `${m.nD} chiplets` : '', s.mc.on ? 'controller model' : ''].filter(Boolean).join(' · ')]];
 // [label, value, format, lower is better]
 const CMP_NUM = [['Most loaded', d=>sysOf(d.m).U, (v,d)=>`${sysOf(d.m).worst.name} · ${fmtPct(v)}`, true], ['Max sustainable', d=>sysOf(d.m).maxT, fmtBps, false],
   ['Latency', d=>d.lat, fmtT, true], ['Power at the target', d=>sysOf(d.m).Ptot, fmtW, true], ['Power at full load', d=>d.full, fmtW, true],
@@ -3074,6 +3076,7 @@ function specHTML(){
         ['Power at the target', fmtW(Y.Ptot)], ['Power at full load', fmtW(sysFull(S))], ['Energy per byte', sig(m.Ptot/m.T*1e12)+' pJ'],
         ['Accelerators', multi ? `${fmtN(tp.nA)}: ${S.scale.perNode} per node, ${fmtN(tp.nN)} node${tp.nN>1?'s':''}` : '1'],
         multi && ['Racks', `${fmtN(S.scale.racks)} × ${fmtW(fp.rack)} at full load, limit ${S.scale.rackKW} kW`], ['Die per accelerator', `${fmtA(m.die)}${m.padArea>m.coreArea?', pad-limited':''}`],
+        (S.chip.on || m.nD) && ['Chip', [S.chip.on ? `${fmtN(S.chip.cores)} × ${S.chip.rows}×${S.chip.cols} ${S.chip.bits}-bit PEs at ${S.chip.vdd.toFixed(2)} V, ${chipF(S.chip).toFixed(2)} GHz` : '', m.thermal ? `junction ${Math.round(m.thermal.T)} °C` : '', m.nD ? `${m.nD} chiplet${m.nD>1?'s':''} of ${fmtA(m.dieEach)}` : ''].filter(Boolean).join('; ')],
         ['Cost', `${fmtUSD(cost.unit)} ${cost.unitName}; ${fmtUSD(cost.perYear)} a year over ${S.cost.years} years`]])}</div>
     </div>
     <h3>Parts, power and cost</h3><table><thead><tr><th>Part</th><th>Specification</th><th class="n">Qty</th><th class="n">Power</th><th class="n">${S.cost.basis==='buy'?'Price':'Build cost'}</th></tr></thead><tbody>${partRows}</tbody></table>
@@ -3200,6 +3203,28 @@ const LLM_MAP = {
   context_tokens:['llm.ctx','int',16,4e6,'context',v=>fmtN(v)+' tokens'], include_prefill:['llm.prefill','bool',null,null,'prefill',v=>v?'on':'off'],
   prompt_tokens:['llm.prompt','int',1,4e6,'prompt',v=>fmtN(v)+' tokens'], reply_tokens:['llm.reply','int',1,1e6,'reply',v=>fmtN(v)+' tokens'], users:['llm.users','int',1,1e8,'users',fmtN],
   tokens_per_s_per_user:['llm.tps','num',0.1,1000,'tokens/s per user',v=>sig(v)], users_per_model_copy:['llm.batch','int',1,16384,'users per copy',fmtN],
+  split_prefill_and_decode:['llm.disagg','bool',null,null,'separate prefill pool',v=>v?'on':'off'], time_to_first_token_budget_s:['llm.ttft','num',0.01,60,'first-token budget',fmtT],
+  prefill_pool_accelerators_per_node:['llm.pre.perNode','int',1,8,'prefill accelerators per node',v=>v], prefill_pool_nodes_per_rack:['llm.pre.nodes','int',1,36,'prefill nodes per rack',v=>v],
+  prefill_pool_racks:['llm.pre.racks','int',1,1024,'prefill racks',v=>v],
+};
+const TRAIN_MAP = {
+  params_billion:['train.params','num',0.1,5000,'parameters',v=>sig(v)+' B'], active_params_billion:['train.active','num',0.1,5000,'active parameters',v=>sig(v)+' B'],
+  layers:['train.layers','int',1,512,'layers',v=>v], hidden_size:['train.dModel','int',128,65536,'hidden size',fmtN],
+  compute_bytes:['train.prec','enum',[2,1],null,'precision',v=>v===2?'BF16':'FP8'], tokens_per_s:['train.tps','num',1e3,1e10,'training tokens/s',v=>fmtN(Math.round(v))],
+  sequence_tokens:['train.seq','int',128,1048576,'sequence',v=>fmtN(v)+' tokens'], global_batch_tokens:['train.gbatch','num',1e4,1e9,'global batch',v=>fmtN(Math.round(v))+' tokens'],
+  micro_batch_sequences:['train.micro','int',1,256,'micro-batch',v=>v+' seq'], tensor_parallel:['train.tp','int',1,128,'tensor parallel',v=>v],
+  pipeline_parallel:['train.pp','int',1,128,'pipeline parallel',v=>v], interleaved_stages:['train.vpp','int',1,16,'interleaved stages',v=>v],
+  recompute_activations:['train.recompute','bool',null,null,'recompute',v=>v?'on':'off'], zero1:['train.zero','bool',null,null,'ZeRO-1',v=>v?'on':'off'],
+  total_tokens:['train.total','num',1e8,1e15,'tokens to train on',v=>sig(v/1e12)+' T'],
+};
+const CHIP_MAP = {
+  derive_from_array:['chip.on','bool',null,null,'derive from array',v=>v?'on':'off'], cores:['chip.cores','int',1,65536,'cores',fmtN],
+  array_rows:['chip.rows','enum',[8,16,32,64,128,256],null,'rows',v=>v], array_cols:['chip.cols','enum',[8,16,32,64,128,256],null,'columns',v=>v],
+  clock_ghz_at_nominal:['chip.ghz','num',0.2,4,'clock at 0.75 V',v=>sig(v)+' GHz'], supply_v:['chip.vdd','num',0.5,1.0,'supply',v=>v.toFixed(2)+' V'],
+  pe_bits:['chip.bits','enum',[4,8,16],null,'PE precision',v=>v+'-bit'], dataflow:['chip.flow','enum',['ws','os'],null,'dataflow',v=>v==='ws'?'weight-stationary':'output-stationary'],
+  chiplets:['chip.dies','enum',[0,1,2,3,4,6,8],null,'chiplets',v=>v||'auto'],
+  dram_controller_model:['mc.on','bool',null,null,'controller model',v=>v?'on':'off'], row_hit_rate:['mc.hit','num',-1,1,'row hit rate',v=>v<0?'auto':fmtPct(v)],
+  requests_queued_per_channel:['mc.q','int',1,1024,'queue depth',v=>v], write_batch:['mc.batch','int',1,256,'write batch',v=>v],
 };
 function applyMap(map, input){
   const applied = [], rejected = [];
@@ -3230,7 +3255,14 @@ function agentSummary(){
       accelerator_build_cost:fmtUSD(c.acc.total), electricity_per_year:fmtUSD(c.year.energy)}))(costOf(S, m)),
     llm_workload: S.llm.on ? (i=>({model:LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom', copies_of_model:sig(i.copies), accelerators_per_copy:sig(i.g),
       weights:fmtB(i.W), kv_cache_per_user:fmtB(i.kvUser), bytes_read_per_step_per_copy:fmtB(i.step), tokens_per_s_total:fmtN(Math.round(i.tokens)), step_budget:fmtT(S.lat),
+      split_pools: m.pre ? {prefill_accelerators:m.pre.tp.nA, prefill_most_loaded:m.pre.worst.name+' '+fmtPct(m.pre.worst.U)} : 'no',
       prefill: S.llm.prefill ? {prompt_tokens_per_s:fmtN(Math.round(i.pre)), share_of_arithmetic:fmtPct(i.pre*i.preOpsTok/(i.tokens*i.opsTok + i.pre*i.preOpsTok)), min_time_to_first_token:fmtT(i.ttft)} : 'not included'}))(llmInfo(S)) : 'off',
+    training_workload: S.train.on ? (i=>({model:LLM_MODELS[S.train.model] ? LLM_MODELS[S.train.model].name : 'custom', tensor:i.TP, pipeline:i.PP, data:+sig(i.dp), pipeline_bubble:fmtPct(i.bubble),
+      memory_per_accelerator:fmtB(i.states + i.acts), step_time:fmtT(i.stepT), days_for_total_tokens:sig(i.days)}))(trainInfo(S)) : 'off',
+    chip: {derived_from_array:S.chip.on, chiplets:m.nD || 'auto', die_each:fmtA(m.dieEach),
+      ...(S.chip.on ? {array:`${S.chip.cores} cores × ${S.chip.rows}×${S.chip.cols} ${S.chip.bits}-bit, ${S.chip.flow}`, supply:S.chip.vdd.toFixed(2)+' V', clock:chipF(S.chip).toFixed(2)+' GHz',
+        array_utilisation:fmtPct(S.acc.util), junction_c:m.thermal ? Math.round(m.thermal.T) : null, overheats:m.thermal ? m.thermal.over : null} : {}),
+      dram_controller_model:S.mc.on ? {efficiency:fmtPct(m.devE), limited_by:mcEff(m.dev, S.mc, S.pattern, m.dR, m.dW, S.ecc).bind} : 'off'},
     failing_checks: considerations(m).filter(c=>c.lvl==='bad').map(c=>c.title),
     feasible_dram_per_accelerator_by_power: sizeDram(S,m).filter(r=>r.feas!=='bad').sort((a,b)=>a.power-b.power).slice(0,5)
       .map(r=>({dram_type:r.id, units:r.n, bus_bits:r.width, power:fmtW(r.power), phy_area:fmtA(r.phy), verdict:TAGS[r.feas]})),
@@ -3245,6 +3277,10 @@ const AGENT_TOOLS = [
    input_schema:{type:'object', properties:{...schemaOf(REQ_MAP), assumptions:{type:'array', items:{type:'string'}, description:'Values you inferred rather than were told, one short phrase each.'}}}},
   {name:'set_llm_workload', description:'For LLM decode serving: give the model (a known one, or its shape), users decoding at once, tokens per second per user, users per copy of the model (batch) and average context. The rate, latency budget (one decode step), op/B, DRAM traffic, resident data per accelerator and tensor-parallel traffic are then derived exactly, and follow the accelerator count. Pass only the fields you want to change. Returns a fresh evaluation.',
    input_schema:{type:'object', properties:{model:{type:'string', enum:Object.keys(LLM_MODELS), description:Object.entries(LLM_MODELS).map(([k,v])=>`${k}: ${v.name}`).join('; ')}, ...schemaOf(LLM_MAP)}}},
+  {name:'set_training_workload', description:'For LLM pre-training: give the model (a known one, or its shape), precision, training tokens per second, sequence length, global batch, micro-batch and tensor and pipeline parallelism (data parallelism is what the accelerator count leaves). Compute with the pipeline bubble, DRAM traffic, memory per accelerator and fabric and network traffic are then derived. Pass only the fields you want to change.',
+   input_schema:{type:'object', properties:{model:{type:'string', enum:Object.keys(LLM_MODELS)}, ...schemaOf(TRAIN_MAP)}}},
+  {name:'set_chip', description:'Design inside the accelerator: derive peak compute, area, energy and achievable utilisation from a compute array (cores of rows × columns of processing elements, clock, supply voltage, precision, dataflow); split it into chiplets joined by UCIe; or model the device DRAM controller instead of the access-pattern table. Returns a fresh evaluation, including junction temperature when the array is on.',
+   input_schema:{type:'object', properties:schemaOf(CHIP_MAP)}},
   {name:'set_hardware', description:'Choose hardware: device DRAM type and count per accelerator, host link, accelerator compute and SRAM, host memory, scale-up fabric, NICs, on-chip network, network ports or SSDs. Pass only the fields you want to change. Returns a fresh evaluation.',
    input_schema:{type:'object', properties:schemaOf(HW_MAP)}},
   {name:'evaluate', description:'Run the model on the current inputs and hardware. Returns utilisation of every component, the bottleneck, latency against the budget, power, die area, failing checks, and the cheapest feasible DRAM and link options.',
@@ -3266,6 +3302,7 @@ How the model reads its inputs:
 - Variability: a soft deadline is judged at a latency percentile (p99 by default) from a Monte Carlo of lognormal stage delays; a hard deadline uses the worst-case stack of per-stage percentiles. peak_correlation full means peaks coincide everywhere (worst case); independent or partial lets shared resources such as the host be sized for a smoothed peak. If a latency target is tight and it is unclear whether missing it is a failure (hard) or a quality issue (soft), ask.
 
 Useful conversions:
+- For LLM training, use set_training_workload in the same way. To design inside the accelerator (compute array, voltage, chiplets, DRAM controller), use set_chip; check junction_c and overheats in the evaluation and lower the voltage or add cores if it runs hot.
 - For LLM decode serving, prefer set_llm_workload: it derives the rate, latency budget, op/B, resident data and tensor-parallel traffic from the model, users, tokens/s, batch and context, and keeps them right as the accelerator count changes. Setting any of those through set_requirements switches it off.
 - LLM decode by hand: each step reads every weight once per batch. rate = model bytes × steps per second, where steps/s = tokens/s ÷ batch; ops per byte ≈ 2 × batch ÷ bytes per parameter; dram_reads_per_byte 1; resident data per accelerator = weights ÷ accelerators + KV cache. Prefill reuses each weight across the prompt length, so ops per byte is in the thousands. Training: ops per byte several hundred, tensor-parallel peer traffic 0.05–0.2 B/B inside a domain, data-parallel 0.01–0.02 B/B over the network.
 - Video and imaging: rate = pixels × bytes per pixel × frames per second × streams. Radio and sensors: rate = channels × sample rate × bytes per sample.
@@ -3453,6 +3490,20 @@ function runTool(name, input){
     const r = applyMap(LLM_MAP, input); if(!md && r.applied.some(x=>/parameters|layers|hidden|KV numbers/.test(x))) S.llm.model = 'custom';
     S.llm.on = true; S.train.on = false; buildAll();
     chatAdd('act', '↳ LLM workload: '+esc([md ? md.name : '', ...r.applied].filter(Boolean).join(' · ')));
+    return {applied:r.applied, rejected:r.rejected, evaluation:agentSummary()};
+  }
+  if(name==='set_training_workload'){
+    const md = LLM_MODELS[input.model]; if(md){ Object.assign(S.train, {model:input.model, params:md.params, active:md.active, layers:md.layers, dModel:md.dModel}); }
+    const r = applyMap(TRAIN_MAP, input); if(!md && r.applied.some(x=>/parameters|layers|hidden/.test(x))) S.train.model = 'custom';
+    S.train.on = true; S.llm.on = false; buildAll();
+    chatAdd('act', '↳ training workload: '+esc([md ? md.name : '', ...r.applied].filter(Boolean).join(' · ')));
+    return {applied:r.applied, rejected:r.rejected, evaluation:agentSummary()};
+  }
+  if(name==='set_chip'){
+    const turning = input.derive_from_array===true && !S.chip.on;
+    const r = applyMap(CHIP_MAP, input);
+    if(turning && input.cores===undefined){ const c = S.chip; c.cores = Math.max(1, Math.round(S.acc.tops*1e12/(c.rows*c.cols*2*c.ghz*1e9*c.bits/8))); }   // keep the peak
+    buildAll(); if(r.applied.length) chatAdd('act', '↳ chip: '+esc(r.applied.join(' · ')));
     return {applied:r.applied, rejected:r.rejected, evaluation:agentSummary()};
   }
   if(name==='set_requirements'){
