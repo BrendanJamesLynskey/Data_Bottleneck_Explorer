@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide · Hardware System Design Explorer</title>
+<meta name="description" content="How to use Hardware System Design Explorer: size a host, links, accelerators, memory and racks from throughput and latency requirements, read the results, and check them.">
+<link rel="canonical" href="https://hw-system-design-explorer.vercel.app/guide">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230b0b0b'/%3E%3Cpath d='M10 22h16v20H10zM38 22h16v20H38z' fill='none' stroke='%23ededed' stroke-width='3'/%3E%3Cpath d='M26 32h12' stroke='%23ededed' stroke-width='6'/%3E%3C/svg%3E">
+<style>
+/* The explorer's sober monochrome, as a long read. Status is weight and inversion, never colour alone.
+   Dark by default like the app; a light scheme follows the reader's setting, and print is black on white. */
+:root{
+  --bg:#0a0a0a; --s1:#111; --s2:#171717; --s3:#1f1f1f;
+  --l1:#232323; --l2:#323232; --l3:#4a4a4a;
+  --t1:#ededed; --t2:#b4b4b4; --t3:#8c8c8c;
+  --inv-bg:#ededed; --inv-t:#0a0a0a;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root{ --bg:#fafafa; --s1:#f1f1f1; --s2:#e9e9e9; --s3:#dedede; --l1:#dcdcdc; --l2:#c4c4c4; --l3:#9a9a9a;
+    --t1:#111; --t2:#3d3d3d; --t3:#5c5c5c; --inv-bg:#111; --inv-t:#fafafa; color-scheme:light; }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:16px}
+body{margin:0; background:var(--bg); color:var(--t1); font-family:var(--sans); font-size:16.5px; line-height:1.65; -webkit-font-smoothing:antialiased}
+a{color:var(--t1); text-decoration-color:var(--l3); text-underline-offset:3px}
+a:hover{text-decoration-color:var(--t1)}
+:focus-visible{outline:2px solid var(--t1); outline-offset:3px}
+.sr{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.skip{position:absolute; left:16px; top:-60px; background:var(--inv-bg); color:var(--inv-t); padding:8px 14px; border-radius:6px; z-index:10}
+.skip:focus{top:12px}
+code,kbd,.mono{font-family:var(--mono); font-size:.9em}
+code{background:var(--s2); border:1px solid var(--l1); border-radius:4px; padding:1px 5px; overflow-wrap:anywhere}
+kbd{border:1px solid var(--l3); border-bottom-width:2px; border-radius:4px; padding:0 5px}
+
+header.top{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 24px; border-bottom:1px solid var(--l1)}
+.brand{display:flex; align-items:center; gap:12px; color:var(--t1); text-decoration:none; margin-right:auto}
+.brand svg{width:28px; height:28px; flex:none}
+.brand b{font-size:19px; letter-spacing:-.01em}
+.btn{background:var(--s1); border:1px solid var(--l2); border-radius:6px; padding:7px 13px; cursor:pointer; font:inherit; font-size:14px; color:var(--t1); text-decoration:none; display:inline-flex; align-items:center; gap:8px}
+.btn:hover{border-color:var(--l3); background:var(--s2)}
+.btn[aria-pressed="true"]{background:var(--inv-bg); color:var(--inv-t); border-color:var(--inv-bg)}
+
+.layout{display:grid; grid-template-columns:250px minmax(0, 1fr); gap:48px; max-width:1240px; margin:0 auto; padding:0 24px}
+nav.toc{position:sticky; top:0; align-self:start; max-height:100vh; overflow:auto; padding:28px 0; font-size:14px}
+nav.toc details{border:0; padding:0; margin:0; background:none}
+nav.toc summary{font-size:12px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--t2); margin:0 0 10px; padding:4px 0; cursor:pointer}
+nav.toc details[open] summary{border:0; margin-bottom:10px}
+nav.toc ol{list-style:none; margin:0; padding:0; counter-reset:t}
+nav.toc li{counter-increment:t}
+nav.toc a{display:block; padding:4px 0 4px 10px; border-left:2px solid var(--l1); color:var(--t2); text-decoration:none}
+nav.toc a::before{content:counter(t) ". "; color:var(--t3); font-family:var(--mono); font-size:12px}
+nav.toc a:hover,nav.toc a[aria-current="true"]{color:var(--t1); border-left-color:var(--t1)}
+main{min-width:0; padding:28px 0 80px; max-width:820px}
+section{padding-top:8px}
+h1{font-size:40px; line-height:1.12; letter-spacing:-.02em; margin:12px 0 14px}
+h2{font-size:27px; letter-spacing:-.01em; line-height:1.25; margin:64px 0 12px; padding-top:18px; border-top:1px solid var(--l1)}
+h2 .n{font-family:var(--mono); font-size:15px; color:var(--t3); font-weight:500; display:block; letter-spacing:.06em; margin-bottom:4px}
+h3{font-size:19px; margin:34px 0 8px}
+h4{font-size:16px; margin:22px 0 6px}
+p{margin:0 0 14px}
+.lede{font-size:19px; color:var(--t2); line-height:1.55}
+.muted{color:var(--t2)}
+ul,ol{padding-left:22px; margin:0 0 16px}
+li{margin:4px 0}
+.callout{border-left:3px solid var(--t1); background:var(--s1); padding:12px 16px; margin:18px 0; border-radius:0 6px 6px 0}
+.callout b:first-child{display:block; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--t2); margin-bottom:2px}
+.cards{display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:12px; margin:16px 0}
+.card{border:1px solid var(--l2); border-radius:8px; padding:14px 16px; background:var(--s1)}
+.card h3{margin:0 0 4px; font-size:15.5px}
+.card p{margin:0; font-size:14.5px; color:var(--t2)}
+.steps{counter-reset:s; list-style:none; padding:0}
+.steps>li{counter-increment:s; position:relative; padding-left:46px; margin:14px 0}
+.steps>li::before{content:counter(s); position:absolute; left:0; top:0; width:30px; height:30px; border:1px solid var(--t1); border-radius:50%; display:grid; place-items:center; font-family:var(--mono); font-size:14px}
+figure{margin:24px 0; padding:0}
+figcaption{font-size:14px; color:var(--t2); margin-top:8px}
+.fig{border:1px solid var(--l2); border-radius:8px; background:var(--s1); padding:14px; overflow:hidden}
+.fig svg{display:block; width:100%; height:auto}
+.shot{display:block; width:100%; height:auto; border:1px solid var(--l2); border-radius:8px}
+.shotwrap{position:relative}
+.pin{position:absolute; width:28px; height:28px; margin:-14px 0 0 -14px; border-radius:50%; background:var(--inv-bg); color:var(--inv-t); font:600 14px/28px var(--mono); text-align:center; box-shadow:0 0 0 3px var(--bg)}
+table{width:100%; border-collapse:collapse; font-size:15px; margin:12px 0 18px}
+th{text-align:left; font-weight:600; color:var(--t2); font-size:13px; letter-spacing:.04em; padding:8px; border-bottom:1px solid var(--l3)}
+td{padding:8px; border-bottom:1px solid var(--l1); vertical-align:top}
+.tbl{overflow-x:auto}
+details{border:1px solid var(--l2); border-radius:8px; padding:0 16px; margin:14px 0; background:var(--s1)}
+details summary{cursor:pointer; padding:12px 0; font-weight:600}
+details[open] summary{border-bottom:1px solid var(--l1); margin-bottom:12px}
+dl.gloss dt{font-weight:600; margin-top:14px}
+dl.gloss dd{margin:2px 0 0 0; color:var(--t2)}
+.tag{display:inline-block; font-size:11px; letter-spacing:.06em; text-transform:uppercase; padding:1px 7px; border-radius:3px; border:1px solid var(--l3); color:var(--t2); vertical-align:2px}
+.tag.inv{background:var(--inv-bg); color:var(--inv-t); border-color:var(--inv-bg)}
+
+/* interactive figures */
+.demo{border:1px solid var(--l2); border-radius:8px; background:var(--s1); padding:16px; margin:22px 0}
+.demo label{font-size:14px; color:var(--t2); display:block}
+.demo input[type=range]{width:100%; accent-color:var(--t1)}
+.demo .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+.bars{display:grid; gap:10px; margin:14px 0 4px}
+.bar{display:grid; grid-template-columns:140px 1fr 62px; gap:10px; align-items:center; font-size:14px}
+.track{position:relative; height:22px; background:var(--s3); border-radius:4px; overflow:hidden}
+.fill{position:absolute; inset:0 auto 0 0; background:var(--t3); transition:width .25s ease}
+.bar.over .fill{background:var(--t1)}
+.bar.bott .fill{background:var(--t1)}
+.bar.bott .name{font-weight:700}
+.ceil{position:absolute; top:-3px; bottom:-3px; width:0; border-left:2px dashed var(--t2)}
+.full{position:absolute; top:-3px; bottom:-3px; right:0; width:0; border-left:2px solid var(--t1)}
+.val{font-family:var(--mono); text-align:right}
+.readout{font-size:15px; margin-top:10px}
+.readout b{font-family:var(--mono)}
+
+/* animation: moving dashes for traffic; paused by the toggle or the reader's motion setting */
+.flow{stroke-dasharray:6 8; animation:dash 1.1s linear infinite}
+.flow.slow{animation-duration:2.4s}
+@keyframes dash{to{stroke-dashoffset:-28}}
+.pulse{animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.55}}
+.grow{transform-origin:left center; animation:grow 3.5s ease-out infinite}
+@keyframes grow{0%{transform:scaleX(0)} 60%,100%{transform:scaleX(1)}}
+.paused .flow,.paused .pulse,.paused .grow{animation-play-state:paused}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} .flow,.pulse,.grow{animation:none} .fill{transition:none} }
+
+svg text{font-family:var(--sans); fill:var(--t1)}
+svg .t2{fill:var(--t2)} svg .t3{fill:var(--t3)} svg .mono{font-family:var(--mono)}
+svg .box{fill:var(--s2); stroke:var(--l3); stroke-width:1.5}
+svg .boxhi{fill:var(--inv-bg); stroke:var(--inv-bg)}
+svg .txinv{fill:var(--inv-t)}
+svg .ln{stroke:var(--t2); stroke-width:2; fill:none}
+svg .lnhi{stroke:var(--t1); stroke-width:3; fill:none}
+svg .grid{stroke:var(--l1); stroke-width:1}
+svg .fillmid{fill:var(--t3)} svg .filllo{fill:var(--l3)} svg .fillhi{fill:var(--t1)}
+
+footer{border-top:1px solid var(--l1); padding:22px 24px 40px; color:var(--t3); font-size:14px; text-align:center}
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr; gap:0; padding:0 16px}
+  nav.toc{position:static; max-height:none; padding:20px 0 0}
+  nav.toc summary{font-size:14px; border:1px solid var(--l2); border-radius:6px; padding:8px 12px}
+  .fig{overflow-x:auto} .fig svg{min-width:620px}
+  h1{font-size:31px} h2{font-size:23px} body{font-size:16px}
+  .bar{grid-template-columns:96px 1fr 54px; font-size:13px}
+  header.top{padding:12px 16px}
+}
+@media print{
+  :root{--bg:#fff; --s1:#fff; --s2:#f2f2f2; --s3:#e6e6e6; --l1:#ddd; --l2:#bbb; --l3:#888; --t1:#000; --t2:#333; --t3:#555; --inv-bg:#000; --inv-t:#fff; color-scheme:light}
+  header.top .btn,nav.toc,.demo,.skip{display:none} .layout{display:block} main{max-width:none}
+  h2{break-before:auto; break-after:avoid} figure,table,.callout{break-inside:avoid}
+  .flow,.pulse,.grow{animation:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to the guide</a>
+<header class="top">
+  <a class="brand" href="./" aria-label="Hardware System Design Explorer: open the app"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 9h10v14H3zM19 9h10v14H19z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M13 16h6" stroke="currentColor" stroke-width="4"/></svg><b>Hardware System Design Explorer</b></a>
+  <button class="btn" id="motion" aria-pressed="false">Pause animations</button>
+  <a class="btn" href="./">Open the app</a>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="Guide contents">
+  <details id="tocD" open><summary>Contents</summary>
+  <ol>
+    <li><a href="#what">What it is</a></li>
+    <li><a href="#tour">A tour of the screen</a></li>
+    <li><a href="#idea">The one idea: load and the bottleneck</a></li>
+    <li><a href="#start">Getting started in five minutes</a></li>
+    <li><a href="#verdict">Reading the five headline figures</a></li>
+    <li><a href="#inputs">Setting the inputs</a></li>
+    <li><a href="#tabs">The analysis tabs</a></li>
+    <li><a href="#latency">Latency, queues and percentiles</a></li>
+    <li><a href="#llm">LLM serving and training</a></li>
+    <li><a href="#chip">Inside the chip</a></li>
+    <li><a href="#share">Compare, share and print</a></li>
+    <li><a href="#assistant">The design assistant</a></li>
+    <li><a href="#sim">Checking it by simulation</a></li>
+    <li><a href="#examples">Three worked examples</a></li>
+    <li><a href="#trust">How far to trust it</a></li>
+    <li><a href="#a11y">Keyboard, screen readers and phones</a></li>
+    <li><a href="#faq">Questions</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+  </details>
+</nav>
+
+<main id="content">
+<p class="muted" style="margin:0">User guide</p>
+<h1>Size a computer system before you build it</h1>
+<p class="lede">Hardware System Design Explorer takes what a system has to do (how much data per second, how fast each piece must come back) and shows which part of the hardware runs out first, what each part has to be, and what it costs in power, silicon and money. This guide explains every part of it, assuming no background in hardware.</p>
+
+<figure>
+  <div class="fig">
+  <svg viewBox="0 0 760 250" role="img" aria-labelledby="heroT heroD">
+    <title id="heroT">Data flowing through a system, with the bottleneck highlighted</title>
+    <desc id="heroD">Data arrives at the host, crosses the host link into the accelerator, and the accelerator reads and writes its own memory. Each block shows its load. Device memory is at 94 per cent, the highest, so it is drawn inverted as the bottleneck; the others are at 31, 52 and 63 per cent.</desc>
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--t2)"/></marker></defs>
+    <rect class="box" x="20" y="80" width="130" height="80" rx="8"/><text x="85" y="113" text-anchor="middle" font-size="15" font-weight="600">Host</text><text x="85" y="135" text-anchor="middle" class="t2 mono" font-size="13">31 %</text>
+    <rect class="box" x="215" y="95" width="120" height="50" rx="8"/><text x="275" y="117" text-anchor="middle" font-size="14" font-weight="600">Host link</text><text x="275" y="136" text-anchor="middle" class="t2 mono" font-size="12">52 %</text>
+    <rect class="box" x="400" y="60" width="160" height="120" rx="8"/><text x="480" y="98" text-anchor="middle" font-size="15" font-weight="600">Accelerator</text><text x="480" y="120" text-anchor="middle" class="t2" font-size="13">compute + SRAM</text><text x="480" y="142" text-anchor="middle" class="t2 mono" font-size="13">63 %</text>
+    <rect class="boxhi pulse" x="610" y="80" width="130" height="80" rx="8"/><text x="675" y="110" text-anchor="middle" font-size="15" font-weight="700" class="txinv">Device DRAM</text><text x="675" y="132" text-anchor="middle" font-size="13" class="txinv mono">94 %</text><text x="675" y="150" text-anchor="middle" font-size="11" class="txinv">bottleneck</text>
+    <path class="ln flow" d="M150 120H213" marker-end="url(#ah)"/><path class="ln flow" d="M335 120H398" marker-end="url(#ah)"/>
+    <path class="lnhi flow" d="M560 108H608" marker-end="url(#ah)"/><path class="lnhi flow" d="M610 132H562" marker-end="url(#ah)"/>
+    <text x="20" y="40" class="t3" font-size="13">data in</text><path class="ln flow slow" d="M20 52H140" marker-end="url(#ah)"/>
+    <text x="20" y="215" class="t2" font-size="13">The busiest part sets the most the whole system can do: here, target ÷ 0.94 ≈ 1.06 × the target.</text>
+  </svg></div>
+  <figcaption>Every block shows its load: the traffic it must carry at the peak ÷ what it can actually deliver. The highest load is the bottleneck, drawn inverted, exactly as in the app.</figcaption>
+</figure>
+
+<section aria-labelledby="what">
+<h2 id="what"><span class="n">01</span>What it is, and who it’s for</h2>
+<p>A system that processes data (an AI server answering questions, a radar receiver, a video encoder, a database accelerator) is a chain of parts: a host computer and its memory, a link such as PCIe, one or more accelerators with fast on-chip memory and their own DRAM, and, at scale, networks joining many of them across racks. Data has to pass through every link in that chain. The chain is only as fast as its slowest link.</p>
+<p>The explorer models that chain. You state the requirement, and it works out, for every part:</p>
+<ul>
+  <li><b>how loaded it is</b>, and which part is the bottleneck;</li>
+  <li><b>how long one piece of data takes</b> to get through, including waiting in queues;</li>
+  <li><b>what each part must be</b> to meet the requirement: which memory, how many channels, which link;</li>
+  <li><b>power, chip area and cost</b>, from the energy and silicon each part needs.</li>
+</ul>
+<p>It is for engineers sizing a design, students learning how systems are balanced, and anyone who wants to check a claim like “this needs HBM” or “one PCIe link is enough”. It runs entirely in your browser; there is nothing to install and nothing is sent anywhere unless you use the optional assistant with your own key.</p>
+<div class="callout"><b>Good to know</b>It is a <i>first-order</i> model: quick and transparent, good for seeing which part limits and roughly by how much, not for final sign-off. Section 15 says how it is checked and where it stops.</div>
+</section>
+
+<section aria-labelledby="tour">
+<h2 id="tour"><span class="n">02</span>A tour of the screen</h2>
+<p>The page shows little at once and keeps detail a click away. From top to bottom:</p>
+<figure>
+  <div class="shotwrap" id="tourShot">
+    <img class="shot" src="guide-img/main.webp" width="1400" height="1250" alt="The explorer showing the LLM serving example: the header with example picker and buttons, the request box, five headline figures, a block diagram of the system, and the analysis tabs below." loading="lazy">
+    <span class="pin" style="left:42.5%;top:2.6%" aria-hidden="true">1</span>
+    <span class="pin" style="left:6.2%;top:8.7%" aria-hidden="true">2</span>
+    <span class="pin" style="left:6.2%;top:13.2%" aria-hidden="true">3</span>
+    <span class="pin" style="left:6.2%;top:20.9%" aria-hidden="true">4</span>
+    <span class="pin" style="left:6.2%;top:32.8%" aria-hidden="true">5</span>
+    <span class="pin" style="left:6.2%;top:82.6%" aria-hidden="true">6</span>
+  </div>
+  <figcaption>The main screen, numbered to match the list below.</figcaption>
+</figure>
+<ol>
+  <li><b>Header.</b> The <i>example</i> picker loads one of 32 ready-made systems. <i>Assistant</i> opens the design assistant, <i>Inputs</i> opens every setting, <i>Compare</i> pins the current design to compare against, <i>Share</i> copies a link, and <i>Guide</i> opens this page.</li>
+  <li><b>Describe it.</b> Type what the system must do in plain words and press <i>Design it</i>; or press <i>Watch a demo</i> to see a recorded assistant session drive the page.</li>
+  <li><b>Five headline figures</b>: the most loaded part, the maximum sustainable rate, latency, power and cost. Click any one to see how it is worked out (section 5).</li>
+  <li><b>The weakest-link strip and the requirement line</b>: every part on the data path with the rate it alone could carry, the requirement in one line, and links to <i>Edit inputs</i>, <i>Spec sheet</i>, <i>Export simulation</i> and <i>Simulate</i>.</li>
+  <li><b>The block diagram.</b> Moving dashes show traffic. Each block shows its load; hover for figures, click to configure it. <i>Legend</i> explains the markings.</li>
+  <li><b>Analysis tabs</b>: nine main views and five more under <i>More</i> (section 7).</li>
+</ol>
+<h3>How status is shown</h3>
+<p>The app is black and white on purpose. Status is shown by weight, dashes and inversion, so it never depends on seeing colour:</p>
+<figure><div class="fig">
+<svg viewBox="0 0 760 120" role="img" aria-labelledby="stT stD"><title id="stT">The four block states</title><desc id="stD">A grey outlined block means within the utilisation ceiling. A light dashed outline means above the ceiling. A bright solid outline means over capacity. A filled, inverted block is the bottleneck.</desc>
+  <rect x="10" y="20" width="160" height="56" rx="8" fill="var(--s2)" stroke="var(--l3)" stroke-width="1.5"/><text x="90" y="53" text-anchor="middle" font-size="14">62 %</text><text x="90" y="104" text-anchor="middle" class="t2" font-size="13">within the ceiling</text>
+  <rect x="200" y="20" width="160" height="56" rx="8" fill="var(--s2)" stroke="var(--t2)" stroke-width="2" stroke-dasharray="6 4"/><text x="280" y="53" text-anchor="middle" font-size="14">86 %</text><text x="280" y="104" text-anchor="middle" class="t2" font-size="13">above the ceiling</text>
+  <rect x="390" y="20" width="160" height="56" rx="8" fill="var(--s2)" stroke="var(--t1)" stroke-width="3"/><text x="470" y="53" text-anchor="middle" font-size="14" font-weight="700">128 %</text><text x="470" y="104" text-anchor="middle" class="t2" font-size="13">over capacity</text>
+  <rect x="580" y="20" width="160" height="56" rx="8" class="boxhi"/><text x="660" y="53" text-anchor="middle" font-size="14" font-weight="700" class="txinv">94 %</text><text x="660" y="104" text-anchor="middle" class="t2" font-size="13">the bottleneck</text>
+</svg></div></figure>
+</section>
+
+<section aria-labelledby="idea">
+<h2 id="idea"><span class="n">03</span>The one idea: load and the bottleneck</h2>
+<p>Everything starts from one number, the <b>processing rate</b>: bytes of input handled per second. Each part has to move or compute some amount for every byte processed. So for every part:</p>
+<ul>
+  <li><b>demand</b> = rate × peak-to-average ratio × how much that part handles per byte;</li>
+  <li><b>capacity</b> = its peak × an efficiency (protocol overheads, refresh, access pattern);</li>
+  <li><b>load</b> (utilisation) = demand ÷ capacity.</li>
+</ul>
+<p>The part with the highest load is the <b>bottleneck</b>. The most the system can sustain is the target rate ÷ that load: at 125 % it can only do 80 % of the target. The <b>utilisation ceiling</b> (80 % by default) is the headroom you want to keep, because queues grow fast as a part approaches 100 %.</p>
+
+<div class="demo" id="loadDemo">
+  <h3 style="margin-top:0">Try it: push the rate and watch the bottleneck move</h3>
+  <p class="muted" style="font-size:14.5px">A made-up three-part system, for illustration (not the app’s numbers). Each processed byte crosses the link once, is read and written in DRAM three times, and needs 40 operations.</p>
+  <label for="rate">Processing rate: <b id="rateV" class="mono">200 GB/s</b></label>
+  <input type="range" id="rate" min="20" max="600" step="10" value="200" aria-describedby="loadOut">
+  <div class="bars" id="loadBars" aria-hidden="true"></div>
+  <p class="readout" id="loadOut" aria-live="polite"></p>
+  <p class="muted" style="font-size:13px; margin:0">Dashed line: the 80 % ceiling. Solid line: 100 %. The bold bar is the bottleneck.</p>
+</div>
+
+<p>Two things follow, and they are the heart of sizing:</p>
+<ol>
+  <li><b>Speeding up anything other than the bottleneck changes nothing.</b> The app’s weakest-link strip lists every part with the rate it alone could carry, so you see the next limit too.</li>
+  <li><b>Peaks matter, not averages.</b> If traffic arrives in bursts 1.5 × the average, every part must be sized for 1.5 ×. Where many independent streams share a part, such as a host serving eight accelerators, their bursts partly cancel, and the model sizes that part for a smaller, smoothed peak.</li>
+</ol>
+</section>
+
+<section aria-labelledby="start">
+<h2 id="start"><span class="n">04</span>Getting started in five minutes</h2>
+<ol class="steps">
+  <li><b>Pick an example.</b> Open the picker in the header. Examples are grouped (AI and LLMs, imaging and video, signal processing, data and storage, science) and each has an <i>about</i> note saying what it shows. Ones marked ✗ are deliberately broken, to show a classic bottleneck.</li>
+  <li><b>Read the verdict.</b> The first headline figure names the most loaded part. If it says <i>Bottleneck</i> and is inverted, the design can’t meet the target.</li>
+  <li><b>Click the bottleneck block</b> in the diagram. Its drawer opens on the right with its settings: change the memory type, add channels, widen the link. The page recalculates as you drag.</li>
+  <li><b>Or let it search.</b> The <i>Optimise</i> tab tries memory types and counts, links, on-chip networks and fabrics, and returns the best designs for power, area, cost or a balance, one click from being applied.</li>
+  <li><b>Keep the result.</b> <i>Share</i> copies a short link that reopens exactly this design; <i>Spec sheet</i> prints it on one page.</li>
+</ol>
+<div class="callout"><b>Tip</b>Not sure what numbers to enter? Type a sentence such as “serve a 70B model at 3,000 tokens/s, under 50 ms per token” into the box and press <i>Design it</i>. Without an API key a small built-in reader picks out rates, latencies and the kind of workload and starts from the nearest example.</div>
+</section>
+
+<section aria-labelledby="verdict">
+<h2 id="verdict"><span class="n">05</span>Reading the five headline figures</h2>
+<div class="tbl"><table>
+  <thead><tr><th scope="col">Figure</th><th scope="col">What it means</th><th scope="col">When to worry</th></tr></thead>
+  <tbody>
+    <tr><td><b>Most loaded / Bottleneck</b></td><td>The part with the highest load, and that load. The label changes from <i>Most loaded</i> to <i>Limiting (above ceiling)</i> to <i>Bottleneck</i> as it rises.</td><td>Above the ceiling (dashed) you have little headroom; above 100 % (inverted) the target can’t be met.</td></tr>
+    <tr><td><b>Max sustainable</b></td><td>The highest rate the system can carry, and how many times the target that is.</td><td>Below 1 × the target.</td></tr>
+    <tr><td><b>Latency</b></td><td>How long one block takes end to end, at the percentile you chose (p99 by default), or the worst-case stack for a hard deadline. Compared with your budget.</td><td>Over budget, or <i>queue unstable</i> when a part is over 100 % on average.</td></tr>
+    <tr><td><b>Power</b></td><td>Average power at the target rate, with full-load power underneath, including fans and power conversion. Per rack when there are racks.</td><td>Full-load rack power over the rack’s cooling limit.</td></tr>
+    <tr><td><b>Cost</b></td><td>Cost per million tokens (LLM workloads) or per petabyte processed: a year’s hardware write-off, facility and electricity, divided by a year’s work. Capital cost underneath.</td><td>Compare designs: it is most useful as a relative figure.</td></tr>
+  </tbody>
+</table></div>
+<figure><img class="shot" src="guide-img/why.webp" width="1400" height="760" alt="The power figure clicked open: a worked sum listing compute, memory, links, hosts and overheads with this design's numbers, ending on the total shown in the headline." loading="lazy">
+<figcaption><b>Click any headline figure</b> and the sum behind it opens underneath with this design’s numbers. The test suite checks that every explanation ends on exactly the figure shown.</figcaption></figure>
+</section>
+
+<section aria-labelledby="inputs">
+<h2 id="inputs"><span class="n">06</span>Setting the inputs</h2>
+<p><i>Inputs</i> (header) opens a drawer of collapsible sections. On wide screens it pushes the page aside so you can watch the diagram while you drag. Every control has a hint; log-scale sliders cover many orders of magnitude.</p>
+<figure><img class="shot" src="guide-img/inputs.webp" width="1400" height="900" alt="The Inputs drawer open on the left, showing the Requirements section with sliders for processing rate, latency budget, block size, peak-to-average ratio and utilisation ceiling, beside the live diagram." loading="lazy">
+<figcaption>The Inputs drawer beside the diagram, which updates as you drag.</figcaption></figure>
+<div class="cards">
+  <div class="card"><h3>Requirements</h3><p>Processing rate, latency budget per block, block size (one DMA, frame, batch or step), peak-to-average ratio, and the utilisation ceiling.</p></div>
+  <div class="card"><h3>Workload</h3><p>Where data comes from (host, network, NVMe), bytes over the link in and out per byte, extra DRAM reads and writes, arithmetic per byte, access pattern, ECC, resident data.</p></div>
+  <div class="card"><h3>Scale</h3><p>Accelerators per node, nodes per rack, racks, the scale-up domain, peer traffic inside it and across the network, and the rack power limit.</p></div>
+  <div class="card"><h3>Variability</h3><p>Soft or hard deadline, percentile, jitter, arrival burstiness, whether peaks line up, and catalogue tolerance.</p></div>
+  <div class="card"><h3>LLM serving / training</h3><p>Derive the whole workload from a model’s shape instead (section 9).</p></div>
+  <div class="card"><h3>Chip and cost</h3><p>The compute array behind the accelerator (section 10), and electricity price, write-off period and purchase or build cost.</p></div>
+</div>
+<h3>The hardware itself</h3>
+<p>Hardware is set per component: <b>click a block</b> in the diagram. Its drawer shows the choices (51 DRAM speed grades in 16 types from DDR4 to HBM4, PCIe 3.0 to 7.0 or UCIe, ten on-chip networks and AMBA fabrics, scale-up fabrics, NICs), the figures behind its load, and how its rate breaks down from raw to usable, overhead by overhead.</p>
+<figure><img class="shot" src="guide-img/component.webp" width="1400" height="900" alt="The component drawer for device DRAM: memory type and speed grade, unit count, and a table breaking raw bandwidth down to usable through refresh, row misses and turnaround." loading="lazy">
+<figcaption>A component drawer: settings, load, and the raw-to-usable breakdown.</figcaption></figure>
+<details><summary>What “bytes per byte processed” means, with an example</summary>
+<p>The workload is described per byte of input, so it scales with the rate. A video encoder that reads each input frame once over the link (1 B in), writes back a tenth as much compressed video (0.1 B out), and touches each frame five times in DRAM for motion search (5 B of DRAM reads) has <code>in 1, out 0.1, extra reads 5</code>. Multiply by the rate to get every part’s traffic. The examples are a good source of realistic values.</p>
+</details>
+</section>
+
+<section aria-labelledby="tabs">
+<h2 id="tabs"><span class="n">07</span>The analysis tabs</h2>
+<div class="cards">
+  <div class="card"><h3>Optimise</h3><p>Searches memory, links, on-chip networks, fabrics and NICs (and, if allowed, the accelerator count) for designs under the ceiling and within budget. Goal: power, area, cost or balanced. Practical limits can be switched off.</p></div>
+  <div class="card"><h3>Minimum specs</h3><p>Every DRAM technology sized for the requirement (width, capacity, power, PHY area, pins) with a practical / stretch / impractical verdict, plus every link, host memory, fabric, NIC, compute and SSD option. One click applies one.</p></div>
+  <div class="card"><h3>Rate sweep</h3><p>The same questions at 25 rates from 1/100 to 100 × the target: where the memory type has to change, and the optimiser’s design at every rate.</p></div>
+  <div class="card"><h3>Chip</h3><p>The compute array, how a matrix multiply maps onto it, voltage and heat, the memory controller, the floorplan, the package and chiplets.</p></div>
+  <div class="card"><h3>On-chip</h3><p>The on-chip network or AMBA fabric drawn, and all ten compared at typical settings.</p></div>
+  <div class="card"><h3>Racks</h3><p>Rack elevations and rack power against the cooling limit (multi-accelerator designs).</p></div>
+  <div class="card"><h3>Power &amp; area</h3><p>Power by component; die area, switching to pad-limited when the memory and link PHYs need more edge than the logic gives; the reticle check.</p></div>
+  <div class="card"><h3>Cost</h3><p>Build cost of one accelerator (dies, yield, DRAM, package), the system’s capital, yearly cost and unit cost.</p></div>
+  <div class="card"><h3>Notes</h3><p>Checks generated for this design: DRAM turnaround, capacity, PCIe efficiency, outstanding reads, queueing, buffering, beachfront, ECC and more. A number on the tab counts the failures.</p></div>
+  <div class="card"><h3>Latency <span class="tag">More</span></h3><p>One block through every stage: fixed time, transfer and queueing; the latency distribution; latency against block size.</p></div>
+  <div class="card"><h3>Checks <span class="tag">More</span></h3><p>The model against published figures, and against a simulation (section 13).</p></div>
+  <div class="card"><h3>Headroom <span class="tag">More</span></h3><p>Every part’s load as the rate scales: the first line past 100 % is the bottleneck, the next shows what fixing it buys.</p></div>
+  <div class="card"><h3>Roofline <span class="tag">More</span></h3><p>Arithmetic intensity against memory bandwidth and the ridge point, with a second roof set by the host link.</p></div>
+  <div class="card"><h3>Model <span class="tag">More</span></h3><p>Every formula and every catalogue value, with sources.</p></div>
+</div>
+<figure><img class="shot" src="guide-img/specs.webp" width="1400" height="900" alt="The Minimum specs tab: a table of DRAM technologies sized for the requirement, each with bus width, capacity, power, PHY area and a practical, stretch or impractical verdict." loading="lazy">
+<figcaption>Minimum specs: what each memory technology would take to meet the requirement.</figcaption></figure>
+<figure><img class="shot" src="guide-img/optimise.webp" width="1400" height="900" alt="The Optimise tab: goal and limit options, the best design found, and a table of trade-off designs with power, area, cost, the most loaded part and latency, each with a use button." loading="lazy">
+<figcaption>Optimise: the best design and the trade-off between power, area and cost. <i>use</i> applies one and pins your old design for comparison.</figcaption></figure>
+</section>
+
+<section aria-labelledby="latency">
+<h2 id="latency"><span class="n">08</span>Latency, queues and percentiles</h2>
+<p>Throughput says whether the system keeps up on average; latency says how long each block waits. One block passes a series of <b>stages</b>: host submit, the link to the accelerator, device memory, the on-chip network, compute, any collective exchange with other accelerators, the link back and completion. Each stage costs three things:</p>
+<figure><div class="fig">
+<svg viewBox="0 0 760 170" role="img" aria-labelledby="stgT stgD"><title id="stgT">One block's latency, stage by stage</title><desc id="stgD">A horizontal bar split into stages: submit, link in, DRAM, network on chip, compute, link out and completion. Each stage has a fixed part, a transfer part and a queueing part, shown in three shades. DRAM and compute are the longest, and compute has the largest queueing part.</desc>
+  <g class="grow">
+  <rect x="20" y="40" width="22" height="40" class="fillmid"/><rect x="42" y="40" width="40" height="40" class="filllo"/><rect x="82" y="40" width="160" height="40" class="fillmid"/><rect x="242" y="40" width="34" height="40" class="fillhi"/><rect x="276" y="40" width="18" height="40" class="filllo"/><rect x="294" y="40" width="200" height="40" class="fillmid"/><rect x="494" y="40" width="96" height="40" class="fillhi"/><rect x="590" y="40" width="60" height="40" class="filllo"/><rect x="650" y="40" width="22" height="40" class="fillmid"/>
+  </g>
+  <g font-size="12" class="t2"><text x="20" y="30">submit</text><text x="50" y="100">link in</text><text x="140" y="30">DRAM transfer</text><text x="242" y="100">wait</text><text x="350" y="30">compute</text><text x="500" y="100">queue wait</text><text x="592" y="30">link out</text></g>
+  <g font-size="13"><rect x="20" y="128" width="14" height="14" class="filllo"/><text x="40" y="140">fixed delay</text><rect x="150" y="128" width="14" height="14" class="fillmid"/><text x="170" y="140">transfer (block ÷ usable rate)</text><rect x="400" y="128" width="14" height="14" class="fillhi"/><text x="420" y="140">waiting in a queue</text></g>
+</svg></div>
+<figcaption>Mean latency = the sum over stages of fixed delay + transfer + queueing. The Latency tab draws this bar for the current design.</figcaption></figure>
+
+<h3>Why queues grow so fast</h3>
+<p>A part that is busy 50 % of the time makes an arriving block wait a little; at 90 % it waits about nine times as long; at 100 % the queue never empties. How long depends on two more things: how irregular the arrivals are (the <b>arrival burstiness</b>, a coefficient of variation: 0 for clockwork, 1 for random) and how much the part’s own service time varies (its <b>jitter</b>). The model uses Kingman’s formula: wait ≈ (burstiness² + jitter²) ÷ 2 × load ÷ (1 − load) × service time.</p>
+
+<div class="demo" id="qDemo">
+  <h3 style="margin-top:0">Try it: a live queue</h3>
+  <p class="muted" style="font-size:14.5px">Blocks (squares) arrive at one server. Raise the load or make arrivals random and watch the queue build. This runs a small simulation in your browser.</p>
+  <div class="row">
+    <div style="flex:1; min-width:200px"><label for="qLoad">Load: <b id="qLoadV" class="mono">70 %</b></label><input type="range" id="qLoad" min="10" max="97" step="1" value="70"></div>
+    <div><label for="qArr">Arrivals</label><select id="qArr" style="font:inherit; background:var(--s2); color:var(--t1); border:1px solid var(--l2); border-radius:6px; padding:5px 8px"><option value="1">random (CV 1)</option><option value="0">regular (CV 0)</option></select></div>
+  </div>
+  <svg id="qSvg" viewBox="0 0 700 120" role="img" aria-labelledby="qT qD" style="width:100%; height:auto; margin-top:10px"><title id="qT">Animated queue</title><desc id="qD">Squares arrive from the left, wait in a line, pass through a server box on the right one at a time, and leave. The line gets longer as the load rises or when arrivals are random.</desc></svg>
+  <p class="readout">Waiting now: <b id="qLen">0</b> blocks · average wait so far: <b id="qWait">–</b> service times · Kingman predicts <b id="qKing">–</b></p>
+</div>
+
+<h3>Percentiles, and why the worst case isn’t the sum of worst cases</h3>
+<p>Latency varies from block to block. A <b>soft deadline</b> is judged at a percentile: p99 means 99 blocks in 100 are at least this fast. The model draws tens of thousands of random blocks through the stages (a Monte Carlo) and reads the percentile off the result. A <b>hard deadline</b> (a trading feed, a 5G slot, a detector trigger) instead uses the <b>tolerance stack</b>: every stage at its own bad case at once, which is pessimistic but safe.</p>
+<figure><div class="fig">
+<svg viewBox="0 0 760 230" role="img" aria-labelledby="hT hD"><title id="hT">A latency distribution</title><desc id="hD">A histogram of block latencies, peaked near the left with a long tail to the right. Vertical markers show, from left to right, the median p50, the 99th percentile p99, the tolerance stack, and the budget.</desc>
+  <line x1="40" y1="180" x2="730" y2="180" class="grid"/>
+  <g class="fillmid">
+  <rect x="60" y="170" width="18" height="10"/><rect x="80" y="140" width="18" height="40"/><rect x="100" y="90" width="18" height="90"/><rect x="120" y="50" width="18" height="130"/><rect x="140" y="40" width="18" height="140"/><rect x="160" y="60" width="18" height="120"/><rect x="180" y="90" width="18" height="90"/><rect x="200" y="115" width="18" height="65"/><rect x="220" y="135" width="18" height="45"/><rect x="240" y="150" width="18" height="30"/><rect x="260" y="160" width="18" height="20"/><rect x="280" y="166" width="18" height="14"/><rect x="300" y="171" width="18" height="9"/><rect x="320" y="174" width="18" height="6"/><rect x="340" y="176" width="18" height="4"/><rect x="360" y="177" width="18" height="3"/><rect x="380" y="178" width="18" height="2"/>
+  </g>
+  <line x1="150" y1="20" x2="150" y2="180" class="lnhi" stroke-dasharray="3 4"/><text x="150" y="200" text-anchor="middle" font-size="13">p50</text>
+  <line x1="330" y1="20" x2="330" y2="180" class="lnhi"/><text x="330" y="200" text-anchor="middle" font-size="13" font-weight="700">p99</text>
+  <line x1="520" y1="20" x2="520" y2="180" class="ln" stroke-dasharray="8 5"/><text x="520" y="200" text-anchor="middle" font-size="13">stack</text>
+  <line x1="640" y1="20" x2="640" y2="180" class="ln" stroke-width="3"/><text x="640" y="200" text-anchor="middle" font-size="13">budget</text>
+  <text x="420" y="80" class="t2" font-size="13">the gap between p99 and the stack</text><text x="420" y="98" class="t2" font-size="13">is margin a worst-case sum would waste</text>
+</svg></div>
+<figcaption>The Latency tab draws this histogram for your design, with p50, your percentile, the stack and the budget.</figcaption></figure>
+<p>Do peaks line up? Under <i>Variability</i>, choose whether bursts and delays at different stages are independent, partly correlated (the default) or fully correlated (the worst case). Shared resources such as a host are then sized for the smoothed peak.</p>
+<details><summary>How the model treats queues in detail (updated after the simulation check)</summary>
+<p>Each stage’s mean wait is Kingman’s G/G/1 approximation. The first queue sees your arrival burstiness. Each later queue sees the departures of the one before: a busy, steady stage spaces blocks out, so the next queue forms less. The model passes this on with Whitt’s linking equation, c<sub>d</sub>² = ρ²c<sub>s</sub>² + (1 − ρ²)c<sub>a</sub>². In the Monte Carlo, a queue wait is zero with probability 1 − load and otherwise exponential, with the same mean; fixed and transfer times are lognormal around their means. Both refinements came from comparing the model with a discrete-event simulation (section 13).</p>
+</details>
+<figure><img class="shot" src="guide-img/latency.webp" width="1400" height="900" alt="The Latency tab: the latency histogram with mean, p50, p99, p99.9, worst-case stack and budget, then a stacked bar of mean time per stage and a table of fixed, transfer and queueing time per stage." loading="lazy">
+<figcaption>The Latency tab for a real design.</figcaption></figure>
+</section>
+
+<section aria-labelledby="llm">
+<h2 id="llm"><span class="n">09</span>LLM serving and training</h2>
+<p>For large language models you don’t need to work out bytes per byte yourself. Turn on <i>LLM serving</i> or <i>LLM training</i> at the top of Inputs and describe the model and the traffic; the workload is derived and locked.</p>
+<h3>Serving</h3>
+<p>Choose the model (Llama 3.1 8B, 70B or 405B, Mixtral 8×7B, DeepSeek-V3, or a custom shape), weight and KV-cache precision, users decoding at once, tokens per second per user, users per copy (the batch) and the average context. Each decode step reads every weight once per copy, plus every user’s KV cache, so:</p>
+<ul>
+  <li>rate = users × tokens/s × (weights ÷ batch + KV cache per user);</li>
+  <li>latency budget = one decode step = 1 ÷ tokens per second.</li>
+</ul>
+<figure><div class="fig">
+<svg viewBox="0 0 760 200" role="img" aria-labelledby="kvT kvD"><title id="kvT">What one decode step reads</title><desc id="kvD">Two bars compare the bytes one decode step reads. With a batch of 500 users and 4,000-token contexts on Llama 3.1 70B at 8 bits, the weight share is small and the KV cache share is 83 per cent of the step.</desc>
+  <text x="20" y="34" font-size="14" font-weight="600">Llama 3.1 70B, 8-bit, 500 users per copy, 4k-token contexts</text>
+  <rect x="20" y="60" width="720" height="44" class="filllo"/><rect x="20" y="60" width="122" height="44" class="fillmid"/>
+  <rect x="142" y="60" width="598" height="44" class="fillhi grow"/>
+  <text x="81" y="88" text-anchor="middle" font-size="13" class="txinv">weights</text><text x="441" y="88" text-anchor="middle" font-size="14" class="txinv" font-weight="700">KV cache: 83 % of each step’s reads</text>
+  <text x="20" y="140" class="t2" font-size="13">Bigger batches share each weight read across more users, but every user still brings their own KV cache.</text>
+  <text x="20" y="162" class="t2" font-size="13">That is why long contexts, not model size, often set the memory a server needs.</text>
+</svg></div></figure>
+<p><i>Include prefill</i> adds the prompts, which add arithmetic and can make the system compute-bound. <i>Split prefill and decode across two pools</i> gives prompts their own accelerators, as production serving increasingly does; each prompt’s KV cache then crosses the network, and the headline figures cover both pools. The example <i>Prefill and decode on separate pools</i> shows a design that misses its 50 ms step budget in one pool and meets it split.</p>
+<h3>Training</h3>
+<p>Choose the model, precision (BF16 or FP8), training tokens per second, sequence length, global batch, micro-batch, and tensor and pipeline parallelism; data parallelism is whatever the accelerator count leaves. The model works out arithmetic (6 × active parameters per token plus attention, more with recomputation and the pipeline bubble), DRAM traffic, memory per accelerator (with optional ZeRO-1 sharding) and the traffic of every all-reduce, and gives the days and cost of a whole run.</p>
+</section>
+
+<section aria-labelledby="chip">
+<h2 id="chip"><span class="n">10</span>Inside the chip</h2>
+<p>The <i>Chip</i> tab looks beneath an accelerator’s headline numbers. Turn on <i>Derive the accelerator from its compute array</i> (Inputs › Chip micro-architecture) and the peak compute, area and energy follow from cores of rows × columns of processing elements, a clock and a precision.</p>
+<ul>
+  <li><b>Mapping a matrix multiply</b> onto the array gives the achievable share of peak: how well the tiles divide the matrix, fill and drain time, and how full the last round leaves the cores. A chart shows why small decode batches can’t fill a large systolic array.</li>
+  <li><b>Voltage and heat</b>: lower voltage slows the clock but cuts energy with V²; leakage rises with temperature, and the junction temperature is solved with the leakage it causes. Over 95 °C is flagged.</li>
+  <li><b>Floorplan, package and chiplets</b>: the die drawn to scale, the package against the reticle, and a sweep of 1 to 8 chiplets with die-to-die (UCIe) power, yield and cost.</li>
+  <li><b>Memory controller</b> (optional): DRAM efficiency from banks, timings, queue depth and refresh instead of a table.</li>
+</ul>
+<figure><img class="shot" src="guide-img/chip.webp" width="1400" height="900" alt="The Chip tab: the compute array and matrix-multiply mapping with utilisation figures, and charts of clock, power and temperature against supply voltage." loading="lazy">
+<figcaption>The Chip tab for the chiplet example.</figcaption></figure>
+</section>
+
+<section aria-labelledby="share">
+<h2 id="share"><span class="n">11</span>Compare, share and print</h2>
+<div class="cards">
+  <div class="card"><h3>Compare</h3><p>Pins the current design as A. Change anything and a line shows how B differs in power, area, maximum rate and latency; bold means better. <i>details</i> opens the full table, <i>swap</i> and <i>re-pin</i> manage A and B.</p></div>
+  <div class="card"><h3>Share</h3><p>Copies a short link holding the example plus only what you changed, for example <code>#d=nvl72,dev.units:6</code>. A pinned A travels in the link too.</p></div>
+  <div class="card"><h3>Spec sheet</h3><p>One printable A4 page: requirement and result, every part with its quantity and power, the load on every limit, open issues, and the share link.</p></div>
+  <div class="card"><h3>Export simulation</h3><p>Downloads a zip with <code>design.json</code> and <code>sim.py</code> to simulate the design on your own machine (section 13).</p></div>
+</div>
+<figure><img class="shot" src="guide-img/compare.webp" width="1400" height="600" alt="The compare line under the headline figures, showing design B against pinned design A: power, die area, maximum rate and latency differences, with details, swap and re-pin buttons." loading="lazy">
+<figcaption>Compare after doubling the DRAM devices: twice the maximum rate, half the latency, for 14 % more power.</figcaption></figure>
+</section>
+
+<section aria-labelledby="assistant">
+<h2 id="assistant"><span class="n">12</span>The design assistant</h2>
+<p><i>Assistant</i> opens a chat that turns plain language into the model’s inputs, asks up to three short questions when something important is missing, then picks hardware or runs the optimiser until every part is under the ceiling, redrawing the page as it goes.</p>
+<ul>
+  <li><b>Your key, your browser.</b> It uses your own API key from OpenAI, Google Gemini, OpenRouter or Anthropic. The key goes only to that provider and stays in your browser, for the session or longer if you tick <i>remember</i>. The site never sees it.</li>
+  <li><b>No key?</b> <i>Watch a demo</i> replays a recorded session whose tool calls run for real, and the <i>Design it</i> box falls back to a simple built-in reader.</li>
+</ul>
+<figure><img class="shot" src="guide-img/assistant.webp" width="1400" height="900" alt="The design assistant drawer during the demo: a user request, the assistant's tool calls such as load example and set hardware, and its replies, beside the updated diagram." loading="lazy">
+<figcaption>The recorded demo, driving the page.</figcaption></figure>
+</section>
+
+<section aria-labelledby="sim">
+<h2 id="sim"><span class="n">13</span>Checking it by simulation</h2>
+<p>The quick formulas behind latency and throughput are approximations. To check them, any design can be run as a <b>discrete-event simulation</b>: thousands of individual blocks pass through the same stages as real queues, with random arrivals and service times, and the results are compared with the model’s figures.</p>
+<figure><div class="fig">
+<svg viewBox="0 0 760 210" role="img" aria-labelledby="smT smD"><title id="smT">From design to model-versus-simulation table</title><desc id="smD">The design in the app is exported as design.json. The same simulator, sim.py, runs it in three places: in your browser, on your own computer and in the project's automated checks. Each produces a table comparing the model with the simulation.</desc>
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--t2)"/></marker></defs>
+  <rect class="box" x="10" y="80" width="120" height="50" rx="8"/><text x="70" y="110" text-anchor="middle" font-size="14" font-weight="600">Your design</text>
+  <rect class="box" x="175" y="80" width="120" height="50" rx="8"/><text x="235" y="104" text-anchor="middle" font-size="13" class="mono">design.json</text><text x="235" y="121" text-anchor="middle" font-size="11" class="t2">stages, loads, CVs</text>
+  <rect class="boxhi" x="340" y="80" width="110" height="50" rx="8"/><text x="395" y="110" text-anchor="middle" font-size="14" class="txinv mono" font-weight="600">sim.py</text>
+  <rect class="box" x="500" y="20" width="120" height="40" rx="8"/><text x="560" y="45" text-anchor="middle" font-size="13">in your browser</text>
+  <rect class="box" x="500" y="85" width="120" height="40" rx="8"/><text x="560" y="110" text-anchor="middle" font-size="13">on your computer</text>
+  <rect class="box" x="500" y="150" width="120" height="40" rx="8"/><text x="560" y="175" text-anchor="middle" font-size="13">in CI, every example</text>
+  <rect class="box" x="660" y="80" width="90" height="50" rx="8"/><text x="705" y="102" text-anchor="middle" font-size="12">model vs</text><text x="705" y="118" text-anchor="middle" font-size="12">simulation</text>
+  <g class="ln flow"><path d="M130 105H173" marker-end="url(#ah2)"/><path d="M295 105H338" marker-end="url(#ah2)"/><path d="M450 100L498 42" marker-end="url(#ah2)"/><path d="M450 105H498" marker-end="url(#ah2)"/><path d="M450 110L498 168" marker-end="url(#ah2)"/><path d="M620 40L658 95" marker-end="url(#ah2)"/><path d="M620 105H658" marker-end="url(#ah2)"/><path d="M620 170L658 115" marker-end="url(#ah2)"/></g>
+</svg></div></figure>
+<h3>Three ways to run it</h3>
+<ol class="steps">
+  <li><b>In your browser.</b> Click <i>Simulate</i> (next to <i>Spec sheet</i>), then <i>Simulate this design</i>. The first time, it fetches Python (Pyodide, about 10 MB) and the SimPy library; after that it is quick. A progress bar counts the runs; the page stays usable. Nothing about your design leaves the page.</li>
+  <li><b>On your computer.</b> Click <i>Export simulation</i>, unzip, and run <code>pip install simpy==4.1.1 &amp;&amp; python sim.py design.json --runs 200 --seed 1 --json out.json</code>. More runs give tighter confidence intervals.</li>
+  <li><b>For every example, automatically.</b> The project re-simulates all 32 examples on every change and publishes the table on the Checks tab.</li>
+</ol>
+<h3>Reading a row</h3>
+<p>The simulation’s answer comes with a <b>95 % confidence interval</b>: the range the true value is very likely in, given the randomness. A check <b>agrees</b> when the model’s figure falls inside that interval, widened by a small tolerance fixed in advance (2 % for ceilings and loads, 5 % for the mean, 10 % for queue waits and percentiles). Otherwise it is a <b>miss</b>, shown and explained, never hidden.</p>
+<figure><div class="fig">
+<svg viewBox="0 0 760 170" role="img" aria-labelledby="ciT ciD"><title id="ciT">How a row is judged</title><desc id="ciD">A horizontal axis with the simulation's confidence interval drawn as a solid bar and the tolerance widening as dashed extensions on each side. A model value inside the widened band agrees; a model value outside it is a miss.</desc>
+  <line x1="40" y1="80" x2="720" y2="80" class="grid"/>
+  <line x1="230" y1="80" x2="290" y2="80" class="ln" stroke-dasharray="5 4" stroke-width="3"/><line x1="470" y1="80" x2="530" y2="80" class="ln" stroke-dasharray="5 4" stroke-width="3"/>
+  <line x1="290" y1="80" x2="470" y2="80" class="lnhi" stroke-width="8"/>
+  <text x="380" y="58" text-anchor="middle" font-size="13">simulation: 95 % confidence interval</text><text x="380" y="120" text-anchor="middle" font-size="12" class="t2">widened by the tolerance (dashed)</text>
+  <circle cx="420" cy="80" r="9" fill="var(--bg)" stroke="var(--t1)" stroke-width="3" class="pulse"/><text x="420" y="150" text-anchor="middle" font-size="13">model here: <tspan font-weight="700">agrees</tspan></text>
+  <rect x="620" y="71" width="18" height="18" class="fillhi pulse"/><text x="629" y="150" text-anchor="middle" font-size="13">model here: <tspan font-weight="700">miss</tspan></text>
+</svg></div></figure>
+<figure><img class="shot" src="guide-img/sim.webp" width="1400" height="900" alt="The Model vs simulation section of the Checks tab: Simulate this design and Export buttons, a finished run's table of checks with model figure, simulation figure, confidence interval, tolerance and an agrees or miss tag, then a summary for every example." loading="lazy">
+<figcaption>A finished in-browser run, and the summary over every example below it.</figcaption></figure>
+<div class="callout"><b>What the simulation found</b>The first comparison showed two of the model’s shortcuts were off: queues behind a busy stage were overestimated (that stage spaces traffic out), and the tail of a dominant queue was underestimated. The model was corrected using standard queueing results and the comparison re-run under the same rule. The Checks tab shows the current outcome and lists every remaining miss.</div>
+<p>What the simulation does <i>not</i> check: the catalogue (memory bandwidths, link overheads, energies). It uses the model’s own figures for those; the published-figure rows on the Checks tab cover them.</p>
+</section>
+
+<section aria-labelledby="examples">
+<h2 id="examples"><span class="n">14</span>Three worked examples</h2>
+<h3>A. “Can one accelerator take 1 TB/s?”</h3>
+<ol class="steps">
+  <li>Pick <i>1 GB per ms stream (the 1 TB/s question)</i>: 1 TB/s processed from device DRAM, with every byte coming in and going out over the host link.</li>
+  <li>The headline is inverted: the host link is the bottleneck, many times over capacity. Device memory (two HBM3E stacks) is fine. The weakest-link strip shows the host’s own memory can’t feed it either.</li>
+  <li>Open <i>Minimum specs</i> and look at the link table: no PCIe generation or width comes close. The lesson is architectural: move less data over the link (keep it resident on the device, or filter it on the way in), not buy a faster link.</li>
+</ol>
+<h3>B. Serve a 70B model to thousands of users</h3>
+<ol class="steps">
+  <li>Pick <i>LLM serving from the model’s shape</i>. Open Inputs › LLM serving.</li>
+  <li>Double <i>Average context per user</i>. The rate rises, because each user’s KV cache grows, and the latency per step follows.</li>
+  <li>Raise <i>Users per copy</i>: weights are shared more, but the cache isn’t. Then turn on <i>Include prefill</i> and see compute become the limit, and <i>Split prefill and decode</i> to give prompts their own pool.</li>
+  <li>Check the cost per million tokens as you go, and pin the starting point with <i>Compare</i> to see what each change bought.</li>
+</ol>
+<h3>C. Diagnose a broken design</h3>
+<ol class="steps">
+  <li>Pick <i>GPU database join over PCIe ✗</i>. The latency figure reads <i>queue unstable</i>: a part is over 100 % on average.</li>
+  <li>The inverted block is the host link: every query ships its columns from host memory, and a join does only about 2 operations per byte, too little to make the trip worthwhile. Open <i>Notes</i> for the explanation and <i>Headroom</i> to see how far the rate would have to fall.</li>
+  <li>Try the link’s drawer (a newer PCIe generation, more links) and see how far it gets; then the real fix the example’s note suggests: keep the data resident on the device, or filter it on the way in.</li>
+</ol>
+</section>
+
+<section aria-labelledby="trust">
+<h2 id="trust"><span class="n">15</span>How far to trust it</h2>
+<p>Every figure comes from code that is tested, and the model is checked three ways:</p>
+<ul>
+  <li><b>Against published figures</b>: memory bandwidths of NVIDIA, AMD, Intel, Google and Apple parts, a STREAM result, measured PCIe copies, DGX and NVL72 power, and MLPerf LLM throughput. Known misses (such as MLPerf on B200 with FP4, +79 %) stay on the page, labelled.</li>
+  <li><b>Against a simulation</b> of its own queueing shortcuts (section 13).</li>
+  <li><b>By a regression suite</b> on every change: 32 examples against stored results, sums done by hand, links that round-trip, and an accessibility audit.</li>
+</ul>
+<p>It is first-order. Catalogue numbers are indicative, compute is one achievable fraction of peak, collectives are bandwidth plus a latency term, and cooling plant outside the rack isn’t counted. Use it to find the limit and the order of magnitude, then confirm a final design with vendor data and measurement. The <i>Model</i> tab lists every formula and value.</p>
+</section>
+
+<section aria-labelledby="a11y">
+<h2 id="a11y"><span class="n">16</span>Keyboard, screen readers and phones</h2>
+<ul>
+  <li><b>Keyboard:</b> everything is reachable with <kbd>Tab</kbd>, <kbd>Shift</kbd>+<kbd>Tab</kbd>, <kbd>Enter</kbd> and <kbd>Space</kbd>; sliders move with the arrow keys and <kbd>Page Up</kbd>/<kbd>Page Down</kbd>. Diagram blocks and headline figures are focusable. <kbd>Esc</kbd> closes a drawer or the spec sheet, and focus returns to where you were.</li>
+  <li><b>Screen readers:</b> status is in text as well as in shape (“Bottleneck”, “above the ceiling”). Tables that scroll sideways are labelled regions. Simulation progress is announced politely.</li>
+  <li><b>Vision:</b> text meets WCAG AA contrast, and nothing depends on colour.</li>
+  <li><b>Motion:</b> the diagram’s moving dashes and this guide’s animations respect your system’s reduce-motion setting; here, <i>Pause animations</i> also stops them.</li>
+  <li><b>Phones:</b> every view fits a 390-pixel screen; wide tables scroll inside their own frame.</li>
+</ul>
+<p>An automated audit (axe-core) checks the app’s pages, tabs, drawers, spec sheet and simulation states, and this guide, on every change, with no violations allowed. If something doesn’t work for you, please <a href="https://github.com/BrendanJamesLynskey/HW_System_Design_Explorer/issues">open an issue</a>.</p>
+</section>
+
+<section aria-labelledby="faq">
+<h2 id="faq"><span class="n">17</span>Questions</h2>
+<details><summary>Is my design or data sent anywhere?</summary><p>No. The app is a single static page and calculates everything in your browser. Only two optional features use the network: the assistant (to the AI provider you choose, with your key) and the in-browser simulation (to download Python and SimPy, not to send your design).</p></details>
+<details><summary>Why does the maximum rate show less than the target?</summary><p>A part is over 100 % at the peak. The system can then sustain the target ÷ that load. Fix the bottleneck, lower the peak-to-average ratio if your traffic allows, or add accelerators.</p></details>
+<details><summary>What is the difference between the utilisation ceiling and 100 %?</summary><p>100 % is the physical limit. The ceiling (80 % by default) is headroom you choose to keep, because queueing delay rises steeply near 100 % and real traffic has surprises. Parts above the ceiling are dashed; above 100 %, solid and bright.</p></details>
+<details><summary>Why is my latency “unbounded”?</summary><p>Some part is loaded to 100 % or more on average, so its queue grows without limit. The weakest-link strip shows which.</p></details>
+<details><summary>Should I use a soft or a hard deadline?</summary><p>Soft for services judged statistically (web requests, LLM tokens): p99 or p99.9. Hard where a single late result is a failure (trading, control loops, radio slots): the tolerance stack.</p></details>
+<details><summary>Can I add my own component?</summary><p>Most parts take custom values through their drawers (custom model shapes, compute, energies). New catalogue entries need a change to the page’s source, which is on GitHub.</p></details>
+<details><summary>How do I cite or keep a design?</summary><p>Use <i>Share</i> for a link, or <i>Spec sheet</i> › <i>Print or save as PDF</i>. The sheet carries the link, so a printed copy leads back to the live model.</p></details>
+</section>
+
+<section aria-labelledby="glossary">
+<h2 id="glossary"><span class="n">18</span>Glossary</h2>
+<dl class="gloss">
+  <dt>Accelerator</dt><dd>A chip that does the heavy arithmetic: a GPU, TPU, FPGA or custom ASIC.</dd>
+  <dt>Bottleneck</dt><dd>The part with the highest load; it caps the whole system.</dd>
+  <dt>Block</dt><dd>The unit of work that moves through the system together: one DMA transfer, frame, batch or step.</dd>
+  <dt>Coefficient of variation (CV)</dt><dd>Standard deviation ÷ mean. 0 means perfectly regular; 1 is as irregular as random (Poisson) arrivals.</dd>
+  <dt>Confidence interval</dt><dd>A range that, given the simulation’s randomness, very likely (here 95 %) contains the true value.</dd>
+  <dt>DRAM, HBM, GDDR, LPDDR, DDR</dt><dd>Kinds of memory chips. HBM stacks sit beside the processor on the same package for the highest bandwidth; DDR and LPDDR are cheaper and slower per pin.</dd>
+  <dt>Host, host link</dt><dd>The ordinary CPU computer that feeds the accelerators, and the connection to them (PCIe, or UCIe on the same package).</dd>
+  <dt>Kingman’s formula</dt><dd>An approximation for the average wait in a single queue from its load and the variability of arrivals and service.</dd>
+  <dt>KV cache</dt><dd>What a language model keeps for each user’s context so it doesn’t recompute it at every token.</dd>
+  <dt>Load (utilisation)</dt><dd>Demand ÷ usable capacity, at the peak.</dd>
+  <dt>NoC</dt><dd>Network-on-chip: the wiring that moves data between parts of one chip.</dd>
+  <dt>Peak-to-average ratio</dt><dd>How much higher the busiest moments are than the average rate.</dd>
+  <dt>Percentile (p99, p99.9)</dt><dd>The latency that 99 % (or 99.9 %) of blocks beat.</dd>
+  <dt>Prefill and decode</dt><dd>An LLM first reads the prompt (prefill, arithmetic-heavy), then generates one token at a time (decode, memory-heavy).</dd>
+  <dt>PPA</dt><dd>Power, performance and area: the three things chip design trades against each other.</dd>
+  <dt>Reticle</dt><dd>The largest area a lithography machine can expose at once, about 26 × 33 mm; bigger designs need several dies.</dd>
+  <dt>Scale-up and scale-out</dt><dd>Fast links between accelerators in one domain (NVLink, UALink), and the slower network between domains.</dd>
+  <dt>Tolerance stack</dt><dd>Adding every stage’s bad case together: a safe but pessimistic bound.</dd>
+  <dt>UCIe</dt><dd>A standard for links between chiplets in one package.</dd>
+</dl>
+</section>
+</main>
+</div>
+<footer>Hardware System Design Explorer · <a href="./">Open the app</a> · <a href="https://github.com/BrendanJamesLynskey/HW_System_Design_Explorer">Source on GitHub</a> · built by <a href="https://brendanjameslynskey.github.io/">Brendan Lynskey</a></footer>
+
+<script>
+'use strict';
+// one switch for every animation: the reader's reduce-motion setting starts it paused
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let paused = reduce;
+const motionBtn = document.getElementById('motion');
+function setPaused(p){ paused = p; document.documentElement.classList.toggle('paused', p); motionBtn.setAttribute('aria-pressed', p); motionBtn.textContent = p ? 'Play animations' : 'Pause animations'; }
+motionBtn.addEventListener('click', () => setPaused(!paused));
+setPaused(paused);
+
+// figure frames scroll sideways on a phone: reachable by keyboard and named after their diagram
+document.querySelectorAll('.fig').forEach(f => { const t = f.querySelector('svg title'); f.tabIndex = 0; f.setAttribute('role', 'region'); if(t) f.setAttribute('aria-label', t.textContent + ' (diagram; scrolls sideways on narrow screens)'); });
+
+// the contents marks the section in view
+const links = [...document.querySelectorAll('nav.toc a')];
+const io = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting){ links.forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + e.target.id)); } }), {rootMargin:'0px 0px -75% 0px'});
+document.querySelectorAll('main h2[id]').forEach(h => io.observe(h));
+// on a phone the contents starts folded
+if(matchMedia('(max-width:900px)').matches) document.getElementById('tocD').open = false;
+
+// load demo: an illustrative three-part system (not the app's catalogue)
+(() => {
+  const parts = [{name:'Host link', per:1, cap:256e9, unit:'B'}, {name:'Device DRAM', per:6, cap:2.4e12, unit:'B'}, {name:'Compute', per:40, cap:20e12, unit:'op'}];
+  const el = document.getElementById('loadBars'), out = document.getElementById('loadOut'), r = document.getElementById('rate'), rv = document.getElementById('rateV');
+  const peak = 1.2, ceil = 0.8, max = 1.6;
+  el.innerHTML = parts.map((p, i) => `<div class="bar" id="lb${i}"><span class="name">${p.name}</span><span class="track"><span class="fill"></span><span class="ceil" style="left:${ceil/max*100}%"></span><span class="full" style="left:${1/max*100}%"></span></span><span class="val"></span></div>`).join('');
+  function draw(){
+    const T = +r.value*1e9, loads = parts.map(p => T*peak*p.per/p.cap), w = loads.indexOf(Math.max(...loads));
+    rv.textContent = r.value + ' GB/s';
+    loads.forEach((u, i) => { const b = document.getElementById('lb'+i); b.querySelector('.fill').style.width = Math.min(100, u/max*100) + '%'; b.querySelector('.val').textContent = Math.round(u*100) + ' %';
+      b.classList.toggle('bott', i === w); b.classList.toggle('over', u > 1); });
+    const u = loads[w], maxT = T/u/1e9;
+    out.innerHTML = `Bottleneck: <b>${parts[w].name}</b> at <b>${Math.round(u*100)} %</b> of capacity at the peak (1.2 × average). ` +
+      (u > 1 ? `It can’t keep up: the most this system sustains is <b>${Math.round(maxT)} GB/s</b>.` : u > ceil ? `Above the 80 % ceiling: it works, with little headroom.` : `Within the ceiling. Maximum sustainable: <b>${Math.round(maxT)} GB/s</b>.`);
+  }
+  r.addEventListener('input', draw); draw();
+})();
+
+// queue demo: a single server, simulated event by event and drawn in real time
+(() => {
+  const svg = document.getElementById('qSvg'), NS = 'http://www.w3.org/2000/svg';
+  const load = document.getElementById('qLoad'), arr = document.getElementById('qArr');
+  const lv = document.getElementById('qLoadV'), qLen = document.getElementById('qLen'), qWait = document.getElementById('qWait'), qKing = document.getElementById('qKing');
+  svg.insertAdjacentHTML('beforeend', `<rect x="560" y="30" width="110" height="60" rx="8" fill="none" stroke="var(--t1)" stroke-width="2"/><text x="615" y="108" text-anchor="middle" font-size="12" class="t2">server</text><text x="10" y="108" font-size="12" class="t2">arrivals →</text><g id="qBlocks"></g>`);
+  const g = svg.querySelector('#qBlocks');
+  const S = 1;                       // service time (one unit)
+  let t = 0, nextArr = 0, queue = [], inSvc = null, waits = [], last = performance.now();
+  const reset = () => { t = 0; nextArr = 0; queue = []; inSvc = null; waits = []; };
+  const gap = () => { const m = S/(+load.value/100); return arr.value === '1' ? -Math.log(1 - Math.random())*m : m; };
+  const svc = () => S*(0.7 + 0.6*Math.random());   // a little jitter (CV about 0.17)
+  function step(dt){
+    const end = t + dt;
+    while(true){
+      const tNext = Math.min(nextArr, inSvc ? inSvc.done : Infinity);
+      if(tNext > end) break;
+      t = tNext;
+      if(inSvc && inSvc.done === t){ inSvc = null; }
+      if(nextArr === t){ queue.push({at:t}); nextArr = t + gap(); }
+      if(!inSvc && queue.length){ const b = queue.shift(); waits.push(t - b.at); if(waits.length > 400) waits.shift(); inSvc = {done:t + svc()}; }
+    }
+    t = end;
+  }
+  function draw(){
+    g.innerHTML = '';
+    const n = Math.min(queue.length, 22);
+    for(let i = 0; i < n; i++){ const r = document.createElementNS(NS, 'rect'); r.setAttribute('x', 530 - (i + 1)*23); r.setAttribute('y', 50); r.setAttribute('width', 18); r.setAttribute('height', 18); r.setAttribute('fill', 'var(--t3)'); g.appendChild(r); }
+    if(queue.length > 22){ const tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', 12); tx.setAttribute('y', 64); tx.setAttribute('font-size', 12); tx.textContent = '+' + (queue.length - 22) + ' more'; g.appendChild(tx); }
+    if(inSvc){ const r = document.createElementNS(NS, 'rect'); r.setAttribute('x', 596); r.setAttribute('y', 47); r.setAttribute('width', 26); r.setAttribute('height', 26); r.setAttribute('fill', 'var(--t1)'); g.appendChild(r); }
+    qLen.textContent = queue.length;
+    qWait.textContent = waits.length > 20 ? (waits.reduce((a, b) => a + b, 0)/waits.length).toFixed(1) : '–';
+    const u = +load.value/100, ca = +arr.value, cs = 0.6/Math.sqrt(12);
+    qKing.textContent = (u/(1 - u)*(ca*ca + cs*cs)/2).toFixed(1);
+  }
+  function tick(now){
+    const dt = Math.min(0.1, (now - last)/1000); last = now;
+    if(!paused){ step(dt*2.5); draw(); }   // 2.5 service times per second
+    requestAnimationFrame(tick);
+  }
+  load.addEventListener('input', () => { lv.textContent = load.value + ' %'; reset(); draw(); });
+  arr.addEventListener('change', () => { reset(); draw(); });
+  draw(); requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

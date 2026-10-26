@@ -87,18 +87,23 @@ confidence intervals.
 The agreement rule was committed before the first run: the model's figure must be inside the CI, widened by 2 % for
 ceilings and utilisation, 5 % for the mean, and 10 % for queue waits and the percentile.
 
-**Over the 32 examples, 210 of 234 checks agree.** Every ceiling, utilisation and unbounded design agrees. The 24
-misses stay on the page as findings:
-- **Kingman overestimates waits downstream of a busier or slower stage.** The model gives every stage the arrival
-  variability. A loaded stage spaces its departures out, so the next queue barely forms (the tandem-queue effect).
-  - 13 of 23 judged waits miss, all on the high side.
-  - With Poisson arrivals, the mean latency is 12 to 31 % high in five examples.
-- **Where one queue dominates, its tail is longer than the model's lognormal wait.** The CFD stencil's p99 is 17 %
-  low. The tolerance stack, meant as a bound, falls below the simulated p99 there (0.87 ×) and in single-accelerator
-  prefill (0.94 ×).
+**The first run, over the 32 examples, agreed on 210 of 234 checks.** The 24 misses showed two shortcuts were off:
+- **Waits downstream of a busier or slower stage were overestimated.** The model gave every stage the arrival
+  variability, but a loaded stage spaces its departures out (the tandem-queue effect). Mean latency was 12 to 31 %
+  high in five examples.
+- **A dominant queue's tail was underestimated.** The CFD stencil's p99 was 17 % low. The tolerance stack, meant as a
+  bound, fell below the simulated p99 in two examples.
 
-Both errors are named rather than tuned away. The first is conservative. The second is not, and it is the one to fix
-next: model the wait as a mass at zero plus an exponential tail.
+I fixed both with standard queueing results rather than by fitting. Each queue now sees the departures of the one
+before (Whitt's linking equation). A wait is zero with probability 1 − load and otherwise exponential. I committed
+the change before re-running, with the rule unchanged.
+
+**The second run again agreed on 210 of 234, but the misses changed character:**
+- **Unsafe errors gone:** no percentile comes out low, and the stack bounds the simulated percentile everywhere.
+- **What remains is conservative and named:**
+  - A fast stage behind a slower, steady one hardly ever queues, which a two-moment formula can't capture. The mean
+    is 6 to 11 % high in five examples.
+  - The exponential tail is heavier than near-regular queues have, so six percentiles are 14 to 33 % high.
 
 Behind that, a regression suite runs in GitHub Actions on every push:
 - **Regression:** all 32 examples against golden results within 2 %.

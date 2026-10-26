@@ -11,6 +11,8 @@ minimum specification of every component, and the power, performance and area (P
 
 **Case study:** [what it models, how it is checked, and five things it shows](CASE_STUDY.md)
 
+**User guide:** [how to use it, with diagrams and live demos](https://hw-system-design-explorer.vercel.app/guide) ([`guide.html`](guide.html); also from the *Guide* button in the app)
+
 ![System view](system.png)
 
 ## Layout
@@ -203,17 +205,29 @@ above cover.
     model's figure is inside the simulation's 95 % CI widened by 2 % (ceiling, utilisation), 5 % (mean) or 10 %
     (queue waits, the percentile). The stack must be at least the simulated percentile.
 
-Outcome: 210 of 234 checks agree.
-- **Agree everywhere:** every ceiling (33), every utilisation (94) and every design the model calls unbounded (6;
-  one more, overloaded only in its on-chip network, is unbounded in both by construction and not counted).
-- **24 misses**, kept as findings:
-  - **Kingman, fed the arrival variability at every stage, overestimates the waits behind a busier or slower
-    stage.** That stage spaces its departures out, so the next queue barely forms: the tandem-queue effect. 13 of 23
-    judged waits miss, all on the high side. With Poisson arrivals, the mean latency comes out 12 to 31 % high in
-    five examples (compression, correlator, FHE, genomics, NVMe scan), and the p99 is high in three.
-  - **Where one queue dominates the latency, its tail is longer than the model's lognormal (CV 1) wait.** The CFD
-    stencil's p99 is 17 % low. The tolerance stack, meant as a bound, falls below the simulated p99 in the stencil
-    (0.87 ×) and single-accelerator prefill (0.94 ×) examples.
+Outcome, in two runs under the same rule:
+
+1. **First run (901b1ac): 210 of 234 agree, 24 misses in two patterns.**
+   - Kingman, fed the arrival variability at every stage, overestimated the waits behind a busier or slower stage
+     (the tandem-queue effect). Mean latency was 12–31 % high in five examples.
+   - A lognormal (CV 1) wait understated a dominant queue's tail. The CFD stencil's p99 was 17 % low, and the
+     tolerance stack fell below the simulated p99 in two examples.
+2. **The model was changed for both**, with standard queueing results rather than fitted, and the change was
+   committed before the re-run (0df9bfc):
+   - each queue's arrival CV is the departure CV of the queue before it (Whitt's linking equation,
+     cd² = ρ²cs² + (1−ρ²)ca²);
+   - a queue wait is zero with probability 1 − ρ and otherwise exponential, with the same Kingman mean.
+
+   Golden latencies moved in 14 examples. Nothing else moved.
+3. **Second run: 210 of 234 agree, 23 misses, and the unsafe ones are gone.**
+   - No percentile comes out low.
+   - The stack now bounds the simulated percentile in all 26 bounded pools.
+   - Every ceiling (33), utilisation (94) and unbounded design (6) agrees.
+   - What remains errs on the safe side:
+     - **A fast stage behind a slower, steady one hardly ever queues.** A two-moment formula can't see this, so the
+       mean is still 6–11 % high in five examples, and 11 of 22 judged waits are high.
+     - **The exponential tail is heavier than near-regular queues have**, so six percentiles are 14–33 % high.
+     - The one low miss is a TLS link wait at 1 % of the latency (−20 %).
 
 ![Model vs simulation](sim.png)
 
@@ -228,6 +242,9 @@ Files:
 - `tools/sim_sync.js`: re-exports the specs and embeds `sim.py` and the results in the page; `--check` in
   `npm test`.
 - `test/sim.js`: the in-browser run end to end, at desktop and phone width (`npm run test:sim`).
+
+The user guide is `guide.html` (served at `/guide`, linked from the app's header), with screenshots in `guide-img/`
+made by `tools/guide_shots.js`; `test/guide.js` (in `npm test`) checks its links, images, demos and accessibility.
 
 ## Design optimiser
 
@@ -491,16 +508,17 @@ tolerances to a worst case that rarely happens. A collapsed *Variability & toler
 the alternative:
 
 - **Deadline: soft or hard.** A soft deadline is judged at a percentile (p99, p99.9 or p99.99) of a
-  Monte Carlo of the whole path. Each stage's delay is lognormal around its mean; long transfers average
-  out their jitter, compute keeps its data-dependent jitter, and queueing waits vary about as much as
-  their mean. A hard deadline (trading, triggers, 5G slots) keeps the worst-case stack of per-stage
+  Monte Carlo of the whole path. Fixed and transfer times are lognormal around their means; long transfers
+  average out their jitter, and compute keeps its data-dependent jitter. A queueing wait is zero with
+  probability 1 − load and otherwise exponential. A hard deadline (trading, triggers, 5G slots) keeps the worst-case stack of per-stage
   percentiles. The Latency tab shows the histogram with p50, the percentile, the worst-case stack and the
   budget, so the margin that stacking would waste is visible.
 - **Do peaks line up?** Independent or partly correlated bursts smooth out where many streams share a
   resource: a host serving eight accelerators is sized for a smaller peak than any one of them sees.
   Fully correlated reproduces the worst case.
 - **Arrival burstiness and jitter** feed Kingman's G/G/1 queueing formula. Clocked work such as LLM
-  decode steps and camera frames arrives regularly; random requests are Poisson.
+  decode steps and camera frames arrives regularly; random requests are Poisson. Each later queue sees the
+  departures of the one before, smoothed by its load (Whitt's linking equation).
 - **Catalogue tolerance** (±10–30 %) draws every capacity figure at random and reports how often the
   design stays under the ceiling, and which component turns out weakest.
 
@@ -547,7 +565,7 @@ would have to carry 4 TB/s to feed that link.
 - **PPA**: power broken down by component, a die-area estimate that switches to *pad-limited* when
   the memory and link PHYs need more edge than the logic provides, a reticle-limit check, and a DRAM
   design-space plot of power against PHY area.
-- **Latency budget**: one block through every stage (fixed cost, transfer, M/D/1 queueing), plus
+- **Latency budget**: one block through every stage (fixed cost, transfer, G/G/1 queueing), plus
   sweeps of latency and host-core load against block size.
 - **Headroom**: the utilisation of every component as the rate scales. The first line to cross
   100 % is the bottleneck, and the next line shows what fixing it buys.

@@ -19,9 +19,9 @@
   "warmup": 2000
  },
  "summary": {
-  "rows": 235,
+  "rows": 234,
   "pass": 210,
-  "miss": 24,
+  "miss": 23,
   "na": 1,
   "by_kind": {
    "ceiling": {
@@ -40,18 +40,18 @@
     "n/a": 0
    },
    "pct": {
-    "pass": 22,
-    "miss": 4,
+    "pass": 20,
+    "miss": 6,
     "n/a": 0
    },
    "stack": {
-    "pass": 24,
-    "miss": 2,
+    "pass": 26,
+    "miss": 0,
     "n/a": 0
    },
    "wait": {
     "pass": 10,
-    "miss": 13,
+    "miss": 12,
     "n/a": 0
    },
    "unbounded": {
@@ -66,7 +66,7 @@
    "id": "8k",
    "name": "8K60 broadcast encoder card",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -150,7 +150,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.006780527479769142,
+       "model": 0.006780200234631717,
        "sim": {
         "mean": 0.0067382165966348604,
         "lo": 0.006737901991271059,
@@ -165,7 +165,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.007039577900482972,
+       "model": 0.007291647444598132,
        "sim": {
         "mean": 0.006911211958713892,
         "lo": 0.006910310446689251,
@@ -180,7 +180,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.007197589211395381,
+       "model": 0.0075223532146003105,
        "sim": {
         "mean": 0.006911211958713892,
         "lo": 0.006910310446689251,
@@ -189,7 +189,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.04 \u00d7 the simulated p99."
+       "note": "Stack is 1.09 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -243,7 +243,7 @@
    "id": "adas",
    "name": "Autonomous-driving perception SoC",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -297,7 +297,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.0077971229584788545,
+       "model": 0.007797099630363509,
        "sim": {
         "mean": 0.007763597103604305,
         "lo": 0.007763046312761159,
@@ -312,7 +312,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.00819733035119125,
+       "model": 0.008415432574635272,
        "sim": {
         "mean": 0.008119328301691552,
         "lo": 0.008116364623145623,
@@ -327,7 +327,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.008393943513476774,
+       "model": 0.008746789359785397,
        "sim": {
         "mean": 0.008119328301691552,
         "lo": 0.008116364623145623,
@@ -336,7 +336,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.03 \u00d7 the simulated p99."
+       "note": "Stack is 1.08 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -390,7 +390,7 @@
    "id": "chiparray",
    "name": "GB200-class accelerator from its compute array: six chiplets at low voltage",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -459,7 +459,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.03079794133667649,
+       "model": 0.030807568481884786,
        "sim": {
         "mean": 0.030788257909568257,
         "lo": 0.03078549544440439,
@@ -474,7 +474,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.032275952313101784,
+       "model": 0.03230156522528292,
        "sim": {
         "mean": 0.032235564812560825,
         "lo": 0.03222010134991757,
@@ -489,7 +489,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.03261374085861635,
+       "model": 0.03274086545930728,
        "sim": {
         "mean": 0.032235564812560825,
         "lo": 0.03222010134991757,
@@ -498,7 +498,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.01 \u00d7 the simulated p99."
+       "note": "Stack is 1.02 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -552,7 +552,7 @@
    "id": "compress",
    "name": "Storage compression offload (zstd)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -636,7 +636,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.00021076604145585736,
+       "model": 0.00019602395584079307,
        "sim": {
         "mean": 0.00018528964586657292,
         "lo": 0.00018397420351298034,
@@ -666,7 +666,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Device DRAM",
        "part": "dram",
-       "model": 4.7017366999295246e-05,
+       "model": 3.734642014512421e-05,
        "sim": {
         "mean": 3.116302285293544e-05,
         "lo": 3.017918806509266e-05,
@@ -675,13 +675,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "22% of the mean latency; utilisation 64%."
+       "note": "19% of the mean latency; utilisation 64%."
       },
       {
        "kind": "wait",
        "check": "Queueing wait (Kingman): Compute",
        "part": "compute",
-       "model": 8.521875e-06,
+       "model": 4.1180040977868175e-06,
        "sim": {
         "mean": 2.5700061489122853e-10,
         "lo": 1.3086255443491705e-10,
@@ -690,13 +690,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "4% of the mean latency; utilisation 36%."
+       "note": "2% of the mean latency; utilisation 36%."
       },
       {
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.0004316798708992134,
+       "model": 0.0004644389444282881,
        "sim": {
         "mean": 0.00041969584734370403,
         "lo": 0.0004069442558685394,
@@ -711,7 +711,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.0005401470287286267,
+       "model": 0.000611653239882197,
        "sim": {
         "mean": 0.00041969584734370403,
         "lo": 0.0004069442558685394,
@@ -720,7 +720,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.29 \u00d7 the simulated p99."
+       "note": "Stack is 1.46 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -774,7 +774,7 @@
    "id": "correlator",
    "name": "Radio-telescope correlator (X-engine)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -873,7 +873,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.0048040218110122395,
+       "model": 0.004077186821738006,
        "sim": {
         "mean": 0.003672166378426206,
         "lo": 0.003631545286065395,
@@ -897,13 +897,13 @@
        },
        "w": 0.1,
        "verdict": "pass",
-       "note": "18% of the mean latency; utilisation 67%."
+       "note": "22% of the mean latency; utilisation 67%."
       },
       {
        "kind": "wait",
        "check": "Queueing wait (Kingman): Link H\u2192D",
        "part": "h2d",
-       "model": 0.00026001088748936664,
+       "model": 0.00014291103331020758,
        "sim": {
         "mean": 0.0,
         "lo": 0.0,
@@ -912,13 +912,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "5% of the mean latency; utilisation 47%."
+       "note": "4% of the mean latency; utilisation 47%."
       },
       {
        "kind": "wait",
        "check": "Queueing wait (Kingman): Compute",
        "part": "compute",
-       "model": 0.0010202020202020202,
+       "model": 0.00042809495966164584,
        "sim": {
         "mean": 0.00018181078602491694,
         "lo": 0.00017157465545787008,
@@ -927,13 +927,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "21% of the mean latency; utilisation 69%."
+       "note": "10% of the mean latency; utilisation 69%."
       },
       {
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.0108118895810135,
+       "model": 0.010097893768692084,
        "sim": {
         "mean": 0.008412302062020238,
         "lo": 0.007984579578032721,
@@ -948,7 +948,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.013730373431247122,
+       "model": 0.01249398745622247,
        "sim": {
         "mean": 0.008412302062020238,
         "lo": 0.007984579578032721,
@@ -957,7 +957,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.63 \u00d7 the simulated p99."
+       "note": "Stack is 1.49 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -1011,7 +1011,7 @@
    "id": "dlrm",
    "name": "Recommendation embeddings (DLRM lookups)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -1095,7 +1095,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 1.399377523813702e-05,
+       "model": 1.3924277485224864e-05,
        "sim": {
         "mean": 1.3870839824628193e-05,
         "lo": 1.3805597133055241e-05,
@@ -1110,7 +1110,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Device DRAM",
        "part": "dram",
-       "model": 2.560012325637326e-06,
+       "model": 2.5128361540923947e-06,
        "sim": {
         "mean": 2.5073815031989615e-06,
         "lo": 2.452732126175007e-06,
@@ -1125,7 +1125,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 2.8414045270722934e-05,
+       "model": 3.352784970445533e-05,
        "sim": {
         "mean": 2.9204281366858147e-05,
         "lo": 2.8861943613432048e-05,
@@ -1133,14 +1133,14 @@
         "n": 10
        },
        "w": 0.1,
-       "verdict": "pass",
+       "verdict": "miss",
        "note": ""
       },
       {
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 3.7848782722552226e-05,
+       "model": 4.51765776015762e-05,
        "sim": {
         "mean": 2.9204281366858147e-05,
         "lo": 2.8861943613432048e-05,
@@ -1149,7 +1149,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.30 \u00d7 the simulated p99."
+       "note": "Stack is 1.55 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -1203,7 +1203,7 @@
    "id": "fhe",
    "name": "FHE bootstrapping accelerator (CKKS)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -1287,7 +1287,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.0031791335894726393,
+       "model": 0.0030186610657259604,
        "sim": {
         "mean": 0.0028121169660174127,
         "lo": 0.002799668433687611,
@@ -1317,7 +1317,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Device DRAM",
        "part": "dram",
-       "model": 0.0005796099559755959,
+       "model": 0.0004950295231324673,
        "sim": {
         "mean": 0.0003935159067563641,
         "lo": 0.0003840884738459609,
@@ -1326,13 +1326,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "18% of the mean latency; utilisation 56%."
+       "note": "16% of the mean latency; utilisation 56%."
       },
       {
        "kind": "wait",
        "check": "Queueing wait (Kingman): Link D\u2192H",
        "part": "d2h",
-       "model": 0.00017473441285416013,
+       "model": 0.00010136398581681792,
        "sim": {
         "mean": 0.0,
         "lo": 0.0,
@@ -1341,13 +1341,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "5% of the mean latency; utilisation 38%."
+       "note": "3% of the mean latency; utilisation 38%."
       },
       {
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.005849180788129536,
+       "model": 0.006733384907602018,
        "sim": {
         "mean": 0.0059237859215476975,
         "lo": 0.005795738698296527,
@@ -1355,14 +1355,14 @@
         "n": 10
        },
        "w": 0.1,
-       "verdict": "pass",
+       "verdict": "miss",
        "note": ""
       },
       {
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.007052756971270517,
+       "model": 0.00881421338237866,
        "sim": {
         "mean": 0.0059237859215476975,
         "lo": 0.005795738698296527,
@@ -1371,7 +1371,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.19 \u00d7 the simulated p99."
+       "note": "Stack is 1.49 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -1425,7 +1425,7 @@
    "id": "gbms",
    "name": "1 GB per ms stream (the 1 TB/s question)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -1512,7 +1512,7 @@
    "id": "genomics",
    "name": "Genomic read alignment (FPGA card)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -1596,7 +1596,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.04171534735883676,
+       "model": 0.040786777665257894,
        "sim": {
         "mean": 0.037166196546467384,
         "lo": 0.03712553945065412,
@@ -1626,7 +1626,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Device DRAM",
        "part": "dram",
-       "model": 0.004634767430139108,
+       "model": 0.004526418111897799,
        "sim": {
         "mean": 0.004191728395700554,
         "lo": 0.004153649394000711,
@@ -1641,7 +1641,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Compute",
        "part": "compute",
-       "model": 0.004309333333333333,
+       "model": 0.003500558917956862,
        "sim": {
         "mean": 0.00022834917961824707,
         "lo": 0.00022275380449699285,
@@ -1650,13 +1650,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "10% of the mean latency; utilisation 40%."
+       "note": "9% of the mean latency; utilisation 40%."
       },
       {
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.06922496925479331,
+       "model": 0.09007947984156175,
        "sim": {
         "mean": 0.06755560467182704,
         "lo": 0.06688920918223314,
@@ -1664,14 +1664,14 @@
         "n": 10
        },
        "w": 0.1,
-       "verdict": "pass",
+       "verdict": "miss",
        "note": ""
       },
       {
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.08215241202397618,
+       "model": 0.11772348753851021,
        "sim": {
         "mean": 0.06755560467182704,
         "lo": 0.06688920918223314,
@@ -1680,7 +1680,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.22 \u00d7 the simulated p99."
+       "note": "Stack is 1.74 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -1734,7 +1734,7 @@
    "id": "gpudb",
    "name": "GPU database join over PCIe \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -1821,7 +1821,7 @@
    "id": "gpuhost",
    "name": "Training data loader starving an accelerator \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -1908,7 +1908,7 @@
    "id": "hft",
    "name": "Low-latency trading feed handler \u2717",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -1995,7 +1995,7 @@
    "id": "isp",
    "name": "Smartphone camera ISP + NPU",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -2049,7 +2049,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.010832798290364716,
+       "model": 0.010832728408758966,
        "sim": {
         "mean": 0.010761097789460834,
         "lo": 0.01076042957405749,
@@ -2064,7 +2064,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.011388629340652634,
+       "model": 0.01177678362847462,
        "sim": {
         "mean": 0.011197048336188686,
         "lo": 0.011193463400496548,
@@ -2079,7 +2079,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.011696223802523449,
+       "model": 0.012226336129761574,
        "sim": {
         "mean": 0.011197048336188686,
         "lo": 0.011193463400496548,
@@ -2088,7 +2088,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.04 \u00d7 the simulated p99."
+       "note": "Stack is 1.09 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -2142,7 +2142,7 @@
    "id": "linescan",
    "name": "Line-scan machine-vision inspection",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -2226,7 +2226,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.0007878762394529108,
+       "model": 0.00078772250099309,
        "sim": {
         "mean": 0.0007829319394468115,
         "lo": 0.0007828237279847838,
@@ -2241,7 +2241,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.0008658913791632871,
+       "model": 0.0008814268576110681,
        "sim": {
         "mean": 0.0008537046421190908,
         "lo": 0.0008530234224530909,
@@ -2256,7 +2256,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.0009130210346637086,
+       "model": 0.0009515501459979934,
        "sim": {
         "mean": 0.0008537046421190908,
         "lo": 0.0008530234224530909,
@@ -2265,7 +2265,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.07 \u00d7 the simulated p99."
+       "note": "Stack is 1.11 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -2319,7 +2319,7 @@
    "id": "llm",
    "name": "LLM decode on an edge accelerator (8B, INT4)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -2373,7 +2373,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.02244140949956313,
+       "model": 0.02244140963481275,
        "sim": {
         "mean": 0.022440432777742127,
         "lo": 0.022439420306603147,
@@ -2388,7 +2388,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.02285985225443115,
+       "model": 0.02286102410250259,
        "sim": {
         "mean": 0.022865002737935923,
         "lo": 0.02286168415787946,
@@ -2403,7 +2403,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.02298998214993216,
+       "model": 0.022993278199937153,
        "sim": {
         "mean": 0.022865002737935923,
         "lo": 0.02286168415787946,
@@ -2466,7 +2466,7 @@
    "id": "llmdc",
    "name": "LLM decode on an 8-accelerator server (70B, batch 32)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -2535,7 +2535,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.018448548155823835,
+       "model": 0.018448590696902845,
        "sim": {
         "mean": 0.018445070282799382,
         "lo": 0.01844324035316457,
@@ -2550,7 +2550,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.0192961921035498,
+       "model": 0.019302483832795602,
        "sim": {
         "mean": 0.019266781271846868,
         "lo": 0.019259910861554454,
@@ -2565,7 +2565,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.019518804429694444,
+       "model": 0.019551619884808698,
        "sim": {
         "mean": 0.019266781271846868,
         "lo": 0.019259910861554454,
@@ -2628,7 +2628,7 @@
    "id": "llmserve",
    "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -2697,7 +2697,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.04254458565375865,
+       "model": 0.04251143786796622,
        "sim": {
         "mean": 0.04202560759619496,
         "lo": 0.042012414312999555,
@@ -2712,7 +2712,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.048278353816406196,
+       "model": 0.04910465055962048,
        "sim": {
         "mean": 0.04706924161399258,
         "lo": 0.047024407034299866,
@@ -2727,7 +2727,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.04991330678743668,
+       "model": 0.0521572779704106,
        "sim": {
         "mean": 0.04706924161399258,
         "lo": 0.047024407034299866,
@@ -2736,7 +2736,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.06 \u00d7 the simulated p99."
+       "note": "Stack is 1.11 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -2790,7 +2790,7 @@
    "id": "llmsplit",
    "name": "Prefill and decode on separate pools (Llama 3.1 70B, 3,600-token prompts)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "decode pool",
@@ -2874,7 +2874,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.04412411851441048,
+       "model": 0.04409068659838859,
        "sim": {
         "mean": 0.04361516598475472,
         "lo": 0.04360655779768782,
@@ -2889,7 +2889,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.049896434127098606,
+       "model": 0.05069743634038797,
        "sim": {
         "mean": 0.04870799659537397,
         "lo": 0.04866331607745696,
@@ -2904,7 +2904,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.0515969884269168,
+       "model": 0.053865045541336885,
        "sim": {
         "mean": 0.04870799659537397,
         "lo": 0.04866331607745696,
@@ -2913,7 +2913,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.06 \u00d7 the simulated p99."
+       "note": "Stack is 1.11 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -3043,7 +3043,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.1153361208895838,
+       "model": 0.11514820051047474,
        "sim": {
         "mean": 0.11180806668132792,
         "lo": 0.11177580620696975,
@@ -3058,7 +3058,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Compute",
        "part": "compute",
-       "model": 0.003272657999748627,
+       "model": 0.003270663253208727,
        "sim": {
         "mean": 0.00033690203196165655,
         "lo": 0.0003192241420156762,
@@ -3073,7 +3073,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.13953753251002343,
+       "model": 0.14322868702363128,
        "sim": {
         "mean": 0.130383107293909,
         "lo": 0.13019977964893525,
@@ -3088,7 +3088,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.14792661721208028,
+       "model": 0.15327711513462522,
        "sim": {
         "mean": 0.130383107293909,
         "lo": 0.13019977964893525,
@@ -3097,7 +3097,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.13 \u00d7 the simulated p99."
+       "note": "Stack is 1.18 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -3151,7 +3151,7 @@
    "id": "moenoc",
    "name": "Mixture-of-experts layer on an 8 \u00d7 8 mesh \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -3238,7 +3238,7 @@
    "id": "nvl72",
    "name": "Rack-scale LLM inference (72 accelerators, one NVLink domain)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -3307,7 +3307,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.03400888018755859,
+       "model": 0.03403466626667854,
        "sim": {
         "mean": 0.03397582112899037,
         "lo": 0.033971255697386155,
@@ -3322,7 +3322,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.03632438478492226,
+       "model": 0.036395064040026424,
        "sim": {
         "mean": 0.03621096562260604,
         "lo": 0.03619569342429014,
@@ -3337,7 +3337,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.036726186389168844,
+       "model": 0.03700524049806373,
        "sim": {
         "mean": 0.03621096562260604,
         "lo": 0.03619569342429014,
@@ -3346,7 +3346,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.01 \u00d7 the simulated p99."
+       "note": "Stack is 1.02 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -3400,7 +3400,7 @@
    "id": "oran",
    "name": "5G O-RAN distributed unit (L1 offload)",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -3499,7 +3499,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.00018212461552511718,
+       "model": 0.0001818543051560489,
        "sim": {
         "mean": 0.00017754652182756577,
         "lo": 0.00017752026815515072,
@@ -3529,7 +3529,7 @@
        "kind": "pct",
        "check": "Latency p99.9",
        "part": null,
-       "model": 0.00022858442630870965,
+       "model": 0.00024079686771950976,
        "sim": {
         "mean": 0.00020951593912413858,
         "lo": 0.0002081973348775046,
@@ -3537,14 +3537,14 @@
         "n": 10
        },
        "w": 0.1,
-       "verdict": "pass",
+       "verdict": "miss",
        "note": ""
       },
       {
        "kind": "stack",
        "check": "Tolerance stack bounds the p99.9",
        "part": null,
-       "model": 0.0002458540536593192,
+       "model": 0.00026732166847073536,
        "sim": {
         "mean": 0.00020951593912413858,
         "lo": 0.0002081973348775046,
@@ -3553,7 +3553,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.17 \u00d7 the simulated p99.9."
+       "note": "Stack is 1.28 \u00d7 the simulated p99.9."
       }
      ],
      "sim": {
@@ -3607,7 +3607,7 @@
    "id": "prefill",
    "name": "LLM prefill on one accelerator (70B FP8, 2k-token prompts)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -3661,7 +3661,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.31206723308333745,
+       "model": 0.31132209052477716,
        "sim": {
         "mean": 0.31181908087597615,
         "lo": 0.3082885742016387,
@@ -3676,7 +3676,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Compute",
        "part": "compute",
-       "model": 0.1723928742387908,
+       "model": 0.17164775704753318,
        "sim": {
         "mean": 0.17218004797122682,
         "lo": 0.16862720678247872,
@@ -3691,7 +3691,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 1.0100027241687415,
+       "model": 1.1738157178963495,
        "sim": {
         "mean": 1.0827080564711309,
         "lo": 1.0491297769090093,
@@ -3706,7 +3706,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 1.0193670490030111,
+       "model": 1.1944896425817595,
        "sim": {
         "mean": 1.0827080564711309,
         "lo": 1.0491297769090093,
@@ -3714,8 +3714,8 @@
         "n": 10
        },
        "w": null,
-       "verdict": "miss",
-       "note": "Stack is 0.94 \u00d7 the simulated p99."
+       "verdict": "pass",
+       "note": "Stack is 1.10 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -3769,7 +3769,7 @@
    "id": "radar",
    "name": "Radar / SDR front end over 400 GbE",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -3868,7 +3868,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 1.181488753995478e-05,
+       "model": 1.1801976239791278e-05,
        "sim": {
         "mean": 1.1882533574830772e-05,
         "lo": 1.1875969280042828e-05,
@@ -3883,7 +3883,7 @@
        "kind": "pct",
        "check": "Latency p99.9",
        "part": null,
-       "model": 1.4987650066827778e-05,
+       "model": 1.502486948732345e-05,
        "sim": {
         "mean": 1.5179791234825289e-05,
         "lo": 1.5110266577983603e-05,
@@ -3898,7 +3898,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99.9",
        "part": null,
-       "model": 1.7147599242388956e-05,
+       "model": 1.713462021851645e-05,
        "sim": {
         "mean": 1.5179791234825289e-05,
         "lo": 1.5110266577983603e-05,
@@ -3961,7 +3961,7 @@
    "id": "scan",
    "name": "NVMe scan / filter offload",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -4060,7 +4060,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.0003543796105023193,
+       "model": 0.0002914421979217151,
        "sim": {
         "mean": 0.00027165168707659986,
         "lo": 0.00026912774415244374,
@@ -4084,13 +4084,13 @@
        },
        "w": 0.1,
        "verdict": "pass",
-       "note": "13% of the mean latency; utilisation 71%."
+       "note": "16% of the mean latency; utilisation 71%."
       },
       {
        "kind": "wait",
        "check": "Queueing wait (Kingman): Link H\u2192D",
        "part": "h2d",
-       "model": 6.242218902610742e-05,
+       "model": 3.297681212164801e-05,
        "sim": {
         "mean": 2.266771481807844e-05,
         "lo": 2.156199134570503e-05,
@@ -4099,13 +4099,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "18% of the mean latency; utilisation 76%."
+       "note": "11% of the mean latency; utilisation 76%."
       },
       {
        "kind": "wait",
        "check": "Queueing wait (Kingman): Device DRAM",
        "part": "dram",
-       "model": 4.3920568232931696e-05,
+       "model": 1.0588832539798089e-05,
        "sim": {
         "mean": 2.0486992700195915e-06,
         "lo": 2.0159204069938968e-06,
@@ -4114,13 +4114,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "12% of the mean latency; utilisation 71%."
+       "note": "4% of the mean latency; utilisation 71%."
       },
       {
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.000844784394616412,
+       "model": 0.0006920230609005299,
        "sim": {
         "mean": 0.0005771526988279874,
         "lo": 0.0005572064864189993,
@@ -4135,7 +4135,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.0011520706726486796,
+       "model": 0.0009324585880427938,
        "sim": {
         "mean": 0.0005771526988279874,
         "lo": 0.0005572064864189993,
@@ -4144,7 +4144,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 2.00 \u00d7 the simulated p99."
+       "note": "Stack is 1.62 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -4198,7 +4198,7 @@
    "id": "stencil",
    "name": "CFD stencil on a GPU-class part",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -4237,7 +4237,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.002573883195612893,
+       "model": 0.0025738798753202727,
        "sim": {
         "mean": 0.002596795645027396,
         "lo": 0.002572249636959317,
@@ -4252,7 +4252,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Device DRAM",
        "part": "dram",
-       "model": 0.001246147956411713,
+       "model": 0.0012461479559670245,
        "sim": {
         "mean": 0.001269128973406807,
         "lo": 0.0012445737573405858,
@@ -4267,7 +4267,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.007178469714505008,
+       "model": 0.00901687080955395,
        "sim": {
         "mean": 0.008622346431758032,
         "lo": 0.008351873902650887,
@@ -4275,14 +4275,14 @@
         "n": 10
        },
        "w": 0.1,
-       "verdict": "miss",
+       "verdict": "pass",
        "note": ""
       },
       {
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.0075434256109585375,
+       "model": 0.009387158154405401,
        "sim": {
         "mean": 0.008622346431758032,
         "lo": 0.008351873902650887,
@@ -4290,8 +4290,8 @@
         "n": 10
        },
        "w": null,
-       "verdict": "miss",
-       "note": "Stack is 0.87 \u00d7 the simulated p99."
+       "verdict": "pass",
+       "note": "Stack is 1.09 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -4345,7 +4345,7 @@
    "id": "tls",
    "name": "400 GbE inline TLS / IPsec offload",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -4429,7 +4429,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 8.376913595052328e-06,
+       "model": 8.044178305791242e-06,
        "sim": {
         "mean": 8.110957115020296e-06,
         "lo": 8.09613426187179e-06,
@@ -4459,7 +4459,7 @@
        "kind": "wait",
        "check": "Queueing wait (Kingman): Link H\u2192D",
        "part": "h2d",
-       "model": 2.8553941864948597e-07,
+       "model": 1.204990197052326e-07,
        "sim": {
         "mean": 1.5117287860022248e-07,
         "lo": 1.4937765268025847e-07,
@@ -4468,28 +4468,13 @@
        },
        "w": 0.1,
        "verdict": "miss",
-       "note": "3% of the mean latency; utilisation 76%."
-      },
-      {
-       "kind": "wait",
-       "check": "Queueing wait (Kingman): Link D\u2192H",
-       "part": "d2h",
-       "model": 2.0675961534263905e-07,
-       "sim": {
-        "mean": 6.863461809569267e-08,
-        "lo": 6.815618182141541e-08,
-        "hi": 6.911305436996992e-08,
-        "n": 10
-       },
-       "w": 0.1,
-       "verdict": "miss",
-       "note": "2% of the mean latency; utilisation 72%."
+       "note": "1% of the mean latency; utilisation 76%."
       },
       {
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 1.4727358313467963e-05,
+       "model": 1.408711784462097e-05,
        "sim": {
         "mean": 1.3182833226209844e-05,
         "lo": 1.3128726947575314e-05,
@@ -4497,14 +4482,14 @@
         "n": 10
        },
        "w": 0.1,
-       "verdict": "miss",
+       "verdict": "pass",
        "note": ""
       },
       {
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 1.81952732574233e-05,
+       "model": 1.696330280338531e-05,
        "sim": {
         "mean": 1.3182833226209844e-05,
         "lo": 1.3128726947575314e-05,
@@ -4513,7 +4498,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.38 \u00d7 the simulated p99."
+       "note": "Stack is 1.29 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -4567,7 +4552,7 @@
    "id": "tp8pcie",
    "name": "Tensor-parallel prefill on 8 PCIe cards \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -4654,7 +4639,7 @@
    "id": "train1k",
    "name": "LLM training cluster (1,024 accelerators, 64 racks)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -4738,7 +4723,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.026639586640456205,
+       "model": 0.026667283406275666,
        "sim": {
         "mean": 0.026563592946822933,
         "lo": 0.02656012339955381,
@@ -4753,7 +4738,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.028823110054178876,
+       "model": 0.028952458411002982,
        "sim": {
         "mean": 0.02861024841646298,
         "lo": 0.02858260307880236,
@@ -4768,7 +4753,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.029394024836062054,
+       "model": 0.02969898770034557,
        "sim": {
         "mean": 0.02861024841646298,
         "lo": 0.02858260307880236,
@@ -4777,7 +4762,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.03 \u00d7 the simulated p99."
+       "note": "Stack is 1.04 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -4831,7 +4816,7 @@
    "id": "trainllm",
    "name": "LLM training from the model\u2019s shape (Llama 3.1 70B, BF16, 1,024 accelerators)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -4915,7 +4900,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 4.830335049836811,
+       "model": 4.8305509948461625,
        "sim": {
         "mean": 4.801944300377732,
         "lo": 4.800582120247327,
@@ -4930,7 +4915,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 5.846142451631658,
+       "model": 5.857460132102918,
        "sim": {
         "mean": 5.764099778663876,
         "lo": 5.751399589475399,
@@ -4945,7 +4930,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 5.906503469455629,
+       "model": 5.964425009686358,
        "sim": {
         "mean": 5.764099778663876,
         "lo": 5.751399589475399,
@@ -4954,7 +4939,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.02 \u00d7 the simulated p99."
+       "note": "Stack is 1.03 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -5008,7 +4993,7 @@
    "id": "trigger",
    "name": "Particle-detector trigger board \u2717",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -5095,7 +5080,7 @@
    "id": "ultrasound",
    "name": "Ultrasound beamformer (128 channels)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -5194,7 +5179,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.00045164605630266234,
+       "model": 0.0004511383866690934,
        "sim": {
         "mean": 0.0004460415925330779,
         "lo": 0.0004459291543202907,
@@ -5209,7 +5194,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.0005206378184115141,
+       "model": 0.0005301119512391112,
        "sim": {
         "mean": 0.0005072043788220016,
         "lo": 0.0005067178297269406,
@@ -5224,7 +5209,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.0005675882631176653,
+       "model": 0.0005899121623777753,
        "sim": {
         "mean": 0.0005072043788220016,
         "lo": 0.0005067178297269406,
@@ -5233,7 +5218,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.12 \u00d7 the simulated p99."
+       "note": "Stack is 1.16 \u00d7 the simulated p99."
       }
      ],
      "sim": {
@@ -5287,7 +5272,7 @@
    "id": "video",
    "name": "4 \u00d7 4K60 video analytics at the edge",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:09ae6119",
+   "model_hash": "fnv1a32:42c6d3a6",
    "pools": [
     {
      "name": "system",
@@ -5371,7 +5356,7 @@
        "kind": "mean",
        "check": "Mean latency",
        "part": null,
-       "model": 0.003630688286491526,
+       "model": 0.0036268144268007817,
        "sim": {
         "mean": 0.0035796236013814903,
         "lo": 0.003579341026814912,
@@ -5386,7 +5371,7 @@
        "kind": "pct",
        "check": "Latency p99",
        "part": null,
-       "model": 0.003861507841939475,
+       "model": 0.00397257529481875,
        "sim": {
         "mean": 0.0037113724881104202,
         "lo": 0.003710486657724782,
@@ -5401,7 +5386,7 @@
        "kind": "stack",
        "check": "Tolerance stack bounds the p99",
        "part": null,
-       "model": 0.004013843179372033,
+       "model": 0.004179151340457689,
        "sim": {
         "mean": 0.0037113724881104202,
         "lo": 0.003710486657724782,
@@ -5410,7 +5395,7 @@
        },
        "w": null,
        "verdict": "pass",
-       "note": "Stack is 1.08 \u00d7 the simulated p99."
+       "note": "Stack is 1.13 \u00d7 the simulated p99."
       }
      ],
      "sim": {
