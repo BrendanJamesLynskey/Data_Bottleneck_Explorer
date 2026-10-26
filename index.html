@@ -418,6 +418,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   <div class="dhead"><h2>Inputs</h2><button class="x" data-close aria-label="Close">×</button></div>
   <div class="dbody">
     <details class="sec" id="llmSec"><summary>LLM serving</summary><div id="llmIn"></div></details>
+    <details class="sec" id="trainSec"><summary>LLM training</summary><div id="trainIn"></div></details>
     <details class="sec" open><summary>Requirements</summary><div id="req"></div></details>
     <details class="sec"><summary>Workload</summary><div id="wl"></div></details>
     <details class="sec"><summary>Scale: accelerators &amp; racks</summary><div id="sc"></div></details>
@@ -549,8 +550,10 @@ const LLM_MODELS = {
   mix:   {name:'Mixtral 8×7B (MoE)', params:46.7, active:12.9, layers:32, dModel:4096, kv:2048},
   dsv3:  {name:'DeepSeek-V3 (MoE, MLA)', params:671, active:37, layers:61, dModel:7168, kv:576},
 };
-// the inputs the LLM workload sets while it is on
+// the inputs the LLM serving or training workload sets while it is on
 const LLM_OWNS = ['T', 'lat', 'block', 'resident', 'ops', 'xR', 'xW', 'inR', 'outR', 'scale.xUp'];
+const TRAIN_OWNS = [...LLM_OWNS, 'scale.xOut'];
+const ownedBy = s => s.llm && s.llm.on ? LLM_OWNS : s.train && s.train.on ? TRAIN_OWNS : [];
 /* Cost: first-order build cost of each part, then running cost. Sources for the defaults:
    wafer — Epoch AI assumes $17k for a TSMC 4NP wafer (press estimates $18–20k for 4 nm after the 2025 rises);
    d0 — effective defect density after spare cores, chosen so an 800 mm² die yields about 67 % (Epoch 40–70 %, Silicon Analysts 70–75 %);
@@ -629,6 +632,7 @@ const BASE = {
   noc:{topo:'mesh', tiles:64, width:512, ghz:2, hopNs:1.5, pattern:'local', xNoc:1, banks:64, bankB:64, pj:0.15, ports:8},
   vary:{deadline:'soft', pct:0.99, ca:1, jitter:'typical', corr:'partial', tol:0},
   llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500, prefill:false, prompt:2000, reply:500},
+  train:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, prec:2, tps:7e5, seq:8192, gbatch:4194304, micro:1, tp:8, pp:4, vpp:1, recompute:false, zero:true, total:15e12},
   cost:{basis:'build', margin:0.75, years:4, kwh:0.08, duty:1},
 };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -661,6 +665,12 @@ const PRESETS = [
     host:{dram:'ddr5_4800', units:16, cores:112, cpuUs:10, base:1250}, acc:{tops:1979, util:0.5, pj:0.29, topsMm2:2.43, sram:50}, vary:{ca:0.2}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:8, nodes:2, racks:1, domain:'node', xOut:0, fabric:'nvl4', nic:'e400', nics:1, rackKW:40},
     llm:{on:true, prefill:false, prompt:3600, reply:1000}}},
+  {g:'AI & LLMs', id:'trainllm', name:'LLM training from the model’s shape (Llama 3.1 70B, BF16, 1,024 accelerators)',
+   d:'The workload comes from the LLM training inputs: tensor parallel 8 inside each node, pipeline parallel 4, data parallel 32, 8k-token sequences and a 4M-token global batch. Compute dominates; the pipeline bubble adds a fifth; the gradient all-reduce crosses the network once a step. Change the parallelism and watch memory per accelerator, the bubble and the network move, and see the time and cost of a 15T-token run.', p:{
+    burst:1, pattern:'stream', dev:{dram:'hbm3e_80', units:6}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_4800', units:16, cores:112, cpuUs:10, base:1250}, acc:{tops:1979, util:0.6, pj:0.29, topsMm2:2.43, sram:50}, vary:{ca:0}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
+    scale:{perNode:8, nodes:4, racks:32, domain:'node', fabric:'nvl4', nic:'e400', nics:1, rackKW:40},
+    train:{on:true}}},
   {g:'AI & LLMs', id:'llmdc', name:'LLM decode on an 8-accelerator server (70B, batch 32)',
    d:'A DGX H100-style node: eight H100-class accelerators (5 × HBM3 at 5.2 Gb/s, 3.35 TB/s each) with NVLink 4. Each decode step streams a shard of the weights from HBM, so HBM bandwidth sets the token rate; the tensor-parallel traffic is light.', p:{
     T:8*2.3e12, lat:50e-3, block:4e10, burst:1, resident:60, inR:0.00001, outR:0.00001, xR:1, xW:0.05, ops:64,
@@ -972,8 +982,41 @@ function llmApply(s){
   s.T = i.T; s.lat = 1/L.tps; s.block = i.T/tp.nA/L.tps; s.resident = (i.copies*i.W + i.kvAll)/tp.nA/1e9;
   s.ops = i.ops/i.T; s.xR = 1; s.xW = i.writes/i.T; s.inR = s.outR = (i.tokens + i.pre)*4/i.T; s.scale.xUp = i.xUp;
 }
+/* LLM training → the model's workload, per accelerator, for tensor (tp) × pipeline (pp) × data (dp) parallelism, with
+   dp = accelerators ÷ (tp × pp). Arithmetic is 6 × active parameters per token plus attention (Kaplan et al.), in
+   8-bit-equivalent operations (BF16 costs twice), raised by the pipeline bubble (pp − 1) ÷ (micro-batches × v) for 1F1B with
+   v interleaved stages per accelerator. Full activation recomputation keeps only each layer's input and adds a forward pass.
+   DRAM: each micro-batch reads the weight shard three times (forward, both backward passes) and reads and writes the
+   FP32 gradient accumulators; activations are written forward and read back (34 × hidden bytes per token per layer,
+   Korthikanti et al., with sequence parallelism); once a step the optimiser reads and writes its state.
+   Memory: BF16 weights, FP32 gradients, 12 bytes of FP32 master weights and Adam moments per parameter (sharded over
+   dp with ZeRO-1), and the activations of pp micro-batches in flight on the first stage.
+   Peer traffic: four all-reduces of the activations per layer per token across tp; activations and their gradients
+   across pipeline stages; the gradient all-reduce across dp once a step. Each goes over the scale-up fabric if its
+   group fits in the domain, otherwise over the network. */
+function trainInfo(s){
+  const R = s.train, tp = topo(s), nA = tp.nA, dom = tp.dom;
+  const TP = Math.min(R.tp, nA), PP = Math.min(R.pp, Math.max(1, Math.floor(nA/TP))), dp = Math.max(1, nA/(TP*PP));
+  const N = R.params*1e9, Ns = N/(TP*PP), d = R.dModel, L = R.layers, tokS = R.tps;
+  const seqs = R.seq*R.micro, micro = R.gbatch/(dp*seqs), bubble = PP>1 ? (PP-1)/(Math.max(1, micro)*(R.vpp||1)) : 0;
+  const passes = R.recompute ? 8 : 6;                                                         // forward 2, backward 4, recompute another 2
+  const opsTok = (passes*R.active*1e9 + passes*L*R.seq*d)*R.prec, ops = tokS*opsTok*(1+bubble);   // system, per second
+  const microS = tokS/(dp*seqs), stepS = tokS/R.gbatch;                                       // per replica, and steps per second
+  const zd = R.zero ? dp : 1, act = (R.recompute ? 2 : 34)*d/TP;                              // activation bytes per token per layer per accelerator
+  const rd = microS*(3*2*Ns + 4*Ns) + (tokS/dp)*(L/PP)*act + stepS*Ns*(12/zd + 4);            // reads per accelerator per second
+  const wr = microS*4*Ns + (tokS/dp)*(L/PP)*act + stepS*Ns*(12/zd + 2);
+  const tpB = TP>1 ? tokS*(TP-1)*L*16*d/nA : 0, ppB = PP>1 ? tokS*PP*4*d/nA : 0, dpB = dp>1 ? stepS*2*(dp-1)/dp*2*Ns : 0;
+  const inUp = g => g<=dom, up = (inUp(TP)?tpB:0) + (inUp(TP*PP)?ppB:0) + (inUp(nA)?dpB:0), out = tpB+ppB+dpB-up;
+  const states = Ns*(2 + 4 + 12/zd), acts = seqs*PP*(L/PP)*act;
+  return {TP, PP, dp, N, Ns, micro, bubble, opsTok, ops, rd, wr, tpB, ppB, dpB, up, out, states, acts, stepT:1/stepS, T:rd*nA, days:R.total/tokS/86400};
+}
+function trainApply(s){
+  const i = trainInfo(s), nA = topo(s).nA, per = i.rd;
+  s.T = i.T; s.lat = i.stepT; s.block = per*i.stepT; s.resident = (i.states + i.acts)/1e9;
+  s.ops = i.ops/i.T; s.xR = 1; s.xW = i.wr/per; s.inR = s.outR = 1e-6; s.scale.xUp = i.up/per; s.scale.xOut = i.out/per;
+}
 function model(s){
-  if(s.llm && s.llm.on) llmApply(s);
+  if(s.llm && s.llm.on) llmApply(s); else if(s.train && s.train.on) trainApply(s);
   const T = s.T, Tb = T*s.burst;
   const tp = topo(s);
   const Ta = T/tp.nA, Tba = Tb/tp.nA;                                       // per accelerator
@@ -1199,9 +1242,10 @@ function costOf(s, m){
   const hw = parts.acc + parts.dram + parts.fabric + parts.nic + parts.host, capex = hw + parts.facility;
   const pue = COST.pue[cool.name], energy = m.Ptot*pue*c.duty*YEAR_S/3.6e6*c.kwh;   // kWh × $/kWh
   const year = {hw:hw/c.years, facility:parts.facility/COST.facYears, energy}, perYear = year.hw + year.facility + year.energy;
-  const llm = s.llm && s.llm.on, work = (llm ? s.llm.users*s.llm.tps : m.T)*c.duty*YEAR_S;
-  const unit = perYear/work*(llm ? 1e6 : 1e15);
-  return {acc, mark, parts, hw, capex, pue, year, perYear, unit, unitName: llm ? 'per million tokens' : 'per PB processed', unitShort: llm ? '/M tok' : '/PB'};
+  const llm = s.llm && s.llm.on, tr = !llm && s.train && s.train.on, tok = llm || tr;
+  const work = (llm ? s.llm.users*s.llm.tps : tr ? s.train.tps : m.T)*c.duty*YEAR_S;
+  const unit = perYear/work*(tok ? 1e6 : 1e15);
+  return {acc, mark, parts, hw, capex, pue, year, perYear, unit, unitName: llm ? 'per million tokens' : tr ? 'per million training tokens' : 'per PB processed', unitShort: tok ? '/M tok' : '/PB'};
 }
 const fmtUSD = v => !isFinite(v) ? '∞' : v>=1e9 ? '$'+sig(v/1e9)+'B' : v>=1e6 ? '$'+sig(v/1e6)+'M' : v>=1e4 ? '$'+sig(v/1e3)+'k' : v>=100 ? '$'+fmtN(Math.round(v)) : '$'+sig(v);
 
@@ -1458,7 +1502,7 @@ function ctl(host, c){
   if(c.type==='toggle'){
     wrap.innerHTML = `<label class="tog"><span>${c.label}</span><input type="checkbox"><span class="k"></span></label>${c.hint?`<div class="c" style="margin-top:-6px"><div class="hint">${c.hint}</div></div>`:''}`;
     const inp = wrap.querySelector('input'); inp.checked = !!get(c.k);
-    inp.addEventListener('change', ()=>{ set(c.k, inp.checked); c.rebuild ? buildAll() : update(); });
+    inp.addEventListener('change', ()=>{ set(c.k, inp.checked); if(c.after) c.after(inp.checked); c.rebuild ? buildAll() : update(); });
     ctlUpdaters.push(()=>{ inp.checked = !!get(c.k); });
     host.appendChild(wrap); return;
   }
@@ -1478,7 +1522,7 @@ function ctl(host, c){
     <input type="range" aria-label="${esc(c.label||c.k)}" min="${log?0:c.min}" max="${log?1000:c.max}" step="${log?1:(c.step||1)}">${c.hint?`<div class="hint">${c.hint}</div>`:''}`;
   const r = wrap.querySelector('input'), val = wrap.querySelector('.val');
   const paint = () => { const v = get(c.k); r.value = toPos(v); val.textContent = c.fmt ? c.fmt(v) : v;
-    const own = S.llm.on && LLM_OWNS.includes(c.k); r.disabled = own; wrap.classList.toggle('owned', own);
+    const own = ownedBy(S).includes(c.k); r.disabled = own; wrap.classList.toggle('owned', own);
     r.style.setProperty('--p', ((r.value-r.min)/(r.max-r.min)*100)+'%'); };
   r.addEventListener('input', ()=>{ let v = fromPos(+r.value); if(c.snap) v = c.snap(v); set(c.k, v); if(c.after) c.after(v); paint(); c.rebuild ? buildAll() : update(); });
   ctlUpdaters.push(paint); paint();
@@ -1498,7 +1542,7 @@ function buildReq(){
   const tNum = tw.querySelector('#tNum'), tU = tw.querySelector('#tUnit');
   tU.value = tUnit;
   const paintT = () => { tNum.value = +(S.T/TUNITS[tUnit]).toPrecision(4); document.getElementById('tAlt').textContent = fmtBps(S.T);
-    tNum.disabled = S.llm.on; tw.classList.toggle('owned', S.llm.on); };
+    const own = ownedBy(S).length>0; tNum.disabled = own; tw.classList.toggle('owned', own); };
   tNum.addEventListener('change', ()=>{ const v = parseFloat(tNum.value); if(v>0){ S.T = v*TUNITS[tUnit]; update(); ctlUpdaters.forEach(f=>f()); } });
   tU.addEventListener('change', ()=>{ tUnit = tU.value; paintT(); });
   ctlUpdaters.push(paintT); paintT();
@@ -1546,7 +1590,7 @@ function buildScale(){
 function buildLlm(){
   const el = document.getElementById('llmIn'); el.innerHTML = '';
   document.getElementById('llmSec').open = S.llm.on || document.getElementById('llmSec').open;
-  ctl(el, {k:'llm.on', label:'Derive the workload from an LLM', type:'toggle', rebuild:true,
+  ctl(el, {k:'llm.on', label:'Derive the workload from an LLM', type:'toggle', rebuild:true, after:v=>{ if(v) S.train.on = false; },
     hint:'Decode serving: set the model, users and tokens per second, and the rate, latency budget, op/B, resident data and peer traffic follow.'});
   if(!S.llm.on) return;
   ctl(el, {k:'llm.model', label:'Model', type:'select', options:{...Object.fromEntries(Object.entries(LLM_MODELS).map(([k,v])=>[k, v.name])), custom:'Custom shape'}, rebuild:true,
@@ -1578,6 +1622,36 @@ function paintLlm(){
     At most <b>${fmtN(Math.round(i.tokens*M.maxT/M.T))}</b> tokens/s on this hardware, with the most loaded part at 100 %.
     ${S.llm.prefill ? `Prefill adds <b>${fmtN(Math.round(i.pre))}</b> prompt tokens/s (${fmtPct(i.pre*i.preOpsTok/i.ops)} of the arithmetic); a prompt alone on one copy takes at least <b>${fmtT(i.ttft)}</b> before its first token.` : 'Prefill (reading the prompts) is not included.'}
     ${i.copies>topo(S).nA ? ' <i>More copies than accelerators: add accelerators or raise the batch.</i>' : ''}`;
+}
+function buildTrain(){
+  const el = document.getElementById('trainIn'); el.innerHTML = '';
+  document.getElementById('trainSec').open = S.train.on || document.getElementById('trainSec').open;
+  ctl(el, {k:'train.on', label:'Derive the workload from LLM training', type:'toggle', rebuild:true, after:v=>{ if(v) S.llm.on = false; },
+    hint:'Pre-training with tensor, pipeline and data parallelism: compute, DRAM traffic, memory per accelerator and fabric and network traffic follow.'});
+  if(!S.train.on) return;
+  ctl(el, {k:'train.model', label:'Model', type:'select', options:{...Object.fromEntries(Object.entries(LLM_MODELS).map(([k,v])=>[k, v.name])), custom:'Custom shape'}, rebuild:true,
+    after:v=>{ const md = LLM_MODELS[v]; if(md) Object.assign(S.train, {params:md.params, active:md.active, layers:md.layers, dModel:md.dModel}); }});
+  ctl(el, {k:'train.prec', label:'Compute precision', type:'select', num:true, options:{2:'BF16', 1:'FP8'}});
+  ctl(el, {k:'train.tps', label:'Training tokens per second (whole system)', type:'log', min:1e3, max:1e9, snap:snapLog, fmt:v=>fmtN(Math.round(v))+' tok/s'});
+  ctl(el, {k:'train.seq', label:'Sequence length', type:'log', min:512, max:131072, snap:v=>Math.round(snapLog(v)), fmt:v=>fmtN(v)+' tokens'});
+  ctl(el, {k:'train.gbatch', label:'Global batch', type:'log', min:65536, max:1.6e8, snap:snapLog, fmt:v=>fmtN(Math.round(v))+' tokens', hint:'Tokens per optimiser step across every data-parallel copy.'});
+  ctl(el, {k:'train.micro', label:'Micro-batch', type:'log', min:1, max:64, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:v=>v+' sequence'+(v>1?'s':'')});
+  ctl(el, {k:'train.tp', label:'Tensor parallel', type:'select', num:true, options:{1:'1', 2:'2', 4:'4', 8:'8', 16:'16', 32:'32', 64:'64', 72:'72'}});
+  ctl(el, {k:'train.pp', label:'Pipeline parallel', type:'select', num:true, options:{1:'1', 2:'2', 4:'4', 8:'8', 16:'16', 32:'32'}});
+  ctl(el, {k:'train.vpp', label:'Interleaved stages per accelerator', type:'select', num:true, options:{1:'1 (plain 1F1B)', 2:'2', 4:'4', 8:'8'}, hint:'Cuts the pipeline bubble by this factor.'});
+  ctl(el, {k:'train.recompute', label:'Recompute activations', type:'toggle', hint:'Keeps only each layer’s input: far less memory, a third more arithmetic.'});
+  ctl(el, {k:'train.zero', label:'Shard optimiser state across data parallel (ZeRO-1)', type:'toggle'});
+  ctl(el, {k:'train.total', label:'Tokens to train on', type:'log', min:1e9, max:1e14, snap:snapLog, fmt:v=>sig(v/1e12)+' T', hint:'For the time and cost of the whole run.'});
+  const out = document.createElement('div'); out.className = 'derived'; out.id = 'trainOut'; el.appendChild(out);
+}
+function paintTrain(){
+  const el = document.getElementById('trainOut'); if(!el || !S.train.on) return;
+  const i = trainInfo(S), c = costOf(S, M);
+  el.innerHTML = `Tensor <b>${i.TP}</b> × pipeline <b>${i.PP}</b> × data <b>${+sig(i.dp)}</b> · <b>${+sig(i.micro)}</b> micro-batches a step, pipeline bubble <b>${fmtPct(i.bubble)}</b> ·
+    memory per accelerator <b>${fmtB(i.states)}</b> of weights, gradients and optimiser state + <b>${fmtB(i.acts)}</b> of activations · a step every <b>${fmtT(i.stepT)}</b> ·
+    peer traffic per accelerator <b>${fmtBps(i.up)}</b> on the fabric, <b>${fmtBps(i.out)}</b> on the network.
+    At most <b>${fmtN(Math.round(S.train.tps*M.maxT/M.T))}</b> tokens/s on this hardware. ${sig(S.train.total/1e12)} T tokens at the target take <b>${sig(i.days)}</b> days and cost about <b>${fmtUSD(c.perYear*i.days/365.25/S.cost.duty)}</b>.
+    ${i.dp<1 || !Number.isInteger(+sig(i.dp)) ? '<i>Data parallel is not a whole number: make the accelerator count a multiple of tensor × pipeline.</i>' : ''}`;
 }
 function buildCost(){
   const el = document.getElementById('co'); el.innerHTML = '';
@@ -1924,11 +1998,11 @@ function whyHTML(k, m){
       <p>Fans and conversion: ${(OH*100).toFixed(1)} % for ${coolOf(S).name} cooling, read from the ${S.scale.rackKW} kW rack limit. Full-load power (${fmtW(fullPower(S).total)}) runs every part at its peak instead.</p>`;
   }
   if(k==='cost'){
-    const c = costOf(S, m), llm = S.llm.on, work = (llm ? S.llm.users*S.llm.tps : m.T)*S.cost.duty*YEAR_S;
+    const c = costOf(S, m), llm = S.llm.on || S.train.on, tokS = S.llm.on ? S.llm.users*S.llm.tps : S.train.tps, work = (llm ? tokS : m.T)*S.cost.duty*YEAR_S;
     const big = v => v>=1e4 ? fmtN(Math.round(v)) : sig(v);
     return `<h2>Cost ${c.unitName} = cost a year ÷ work a year</h2>
       ${eq(`<i>a year</i> = ${fmtUSD(c.hw)} hardware ÷ ${S.cost.years} + ${fmtUSD(c.parts.facility)} facility ÷ ${COST.facYears} + ${fmtUSD(c.year.energy)} electricity = ${fmtUSD(c.perYear)}`)}
-      ${eq(`<i>work</i> = ${llm ? fmtN(Math.round(S.llm.users*S.llm.tps))+' tokens/s' : fmtBps(m.T)} × ${fmtPct(S.cost.duty)} of ${fmtN(Math.round(YEAR_S))} s = ${llm ? big(work/1e6)+' M tokens' : big(work/1e15)+' PB'}`)}
+      ${eq(`<i>work</i> = ${llm ? fmtN(Math.round(tokS))+' tokens/s' : fmtBps(m.T)} × ${fmtPct(S.cost.duty)} of ${fmtN(Math.round(YEAR_S))} s = ${llm ? big(work/1e6)+' M tokens' : big(work/1e15)+' PB'}`)}
       ${eq(`${fmtUSD(c.perYear)} ÷ ${llm ? big(work/1e6)+' M tokens' : big(work/1e15)+' PB'} = <b>${fmtUSD(c.unit)}</b>`)}
       <p>${S.cost.basis==='buy' ? 'Purchase prices' : 'Build cost'}: one accelerator ${fmtUSD(c.acc.total*c.mark)} (dies, DRAM, package, yield loss, board). <a href="#" data-tab="cost">Open the Cost tab</a> for the breakdown and the prices used.</p>`;
   }
@@ -1958,7 +2032,7 @@ function paintSummary(m){
     <div class="kpi ${m.maxT>=m.T?'ok':'bad'}" ${whyAttr('max')}><div class="l">Max sustainable</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target</div></div>
     <div class="kpi ${latSt}" ${whyAttr('lat')}><div class="l">Latency, ${latLabel()}</div><div class="v">${fmtT(lh)}</div><div class="s">${ls.unbounded?'queue unstable':S.vary.deadline==='hard'?'hard deadline · budget '+fmtT(S.lat):'worst-case stack '+fmtT(ls.stack)+' · budget '+fmtT(S.lat)}</div></div>
     <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}" ${whyAttr('power')}><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${fmtW(fullPower(S).total)} at full load${tp.nA>1?' · '+fmtW(fullPower(S).rack)+'/rack':' · '+sig(m.Ptot/m.T*1e12)+' pJ/B'}</div></div>
-    <div class="kpi" ${whyAttr('cost')}><div class="l">Cost ${S.llm.on ? 'per M tokens' : 'per PB'}</div><div class="v">${fmtUSD(cost.unit)}</div><div class="s">${fmtUSD(cost.capex)} · ${fmtUSD(cost.perYear)}/yr</div></div>`;
+    <div class="kpi" ${whyAttr('cost')}><div class="l">Cost ${S.llm.on || S.train.on ? 'per M tokens' : 'per PB'}</div><div class="v">${fmtUSD(cost.unit)}</div><div class="s">${fmtUSD(cost.capex)} · ${fmtUSD(cost.perYear)}/yr</div></div>`;
   const p = PRESETS.find(x=>x.id===S.preset);
   const L = S.llm, lm = L.on ? `${esc(LLM_MODELS[L.model] ? LLM_MODELS[L.model].name : 'Custom LLM')} · ${fmtN(L.users)} users × ${L.tps} tok/s · ` : '';
   document.getElementById('reqLine').innerHTML = `<span>${lm}${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
@@ -2077,7 +2151,7 @@ const SWEEP_LINES = ['DDR5','LPDDR5X','LPDDR6','GDDR7','HBM3E','HBM4'];
 const SWEEP_STYLE = {DDR5:['#6b6b6b','6 3'], LPDDR5X:['#a3a3a3','2 3'], LPDDR6:['#a3a3a3',''], GDDR7:['#cfcfcf','8 4'], HBM3E:['#ededed',''], HBM4:['#ededed','12 3 2 3']};
 const FAM_FILL = {DDR:'#3a3a3a', LPDDR:'#6b6b6b', LPDDR6:'#6b6b6b', GDDR:'#a3a3a3', HBM:'#ededed'};
 const sweepXs = T => Array.from({length:25}, (_,i)=>T*Math.pow(10, -2+i/6));   // a hundredth to a hundred times the target
-const atRate = (s, T) => { const c = clone(s); if(c.llm.on) c.llm.users *= T/s.T; else c.T = T; return c; };   // an LLM's rate follows its users (linear in users)
+const atRate = (s, T) => { const c = clone(s); if(c.llm.on) c.llm.users *= T/s.T; else if(c.train.on) c.train.tps *= T/s.T; else c.T = T; return c; };   // an LLM's rate follows its users (linear in users)
 function cheapestDram(s){ return sizeDram(s, model(s)).filter(r=>r.feas==='ok').sort((a,b)=>a.power-b.power)[0] || null; }
 function dramSweep(s){
   const xs = sweepXs(s.T), lines = Object.fromEntries(SWEEP_LINES.map(l=>[l, {ok:[], st:[]}])), win = [];
@@ -2349,13 +2423,13 @@ function panePPA(m){
 
 function paneCost(m){
   const c = costOf(S, m), a = c.acc, tp = m.tp, P = c.parts, mk = c.mark;
-  const llm = S.llm.on, per = llm ? `<b>${fmtUSD(c.unit)}</b> per million tokens` : `<b>${fmtUSD(c.unit)}</b> per PB processed`;
+  const llm = S.llm.on, per = `<b>${fmtUSD(c.unit)}</b> ${c.unitName}`;
   const capItems = [['Accelerators', P.acc], ['Device DRAM', P.dram], ['Scale-up fabric', P.fabric], ['Network', P.nic], ['Hosts', P.host], ['Facility', P.facility]].filter(x=>x[1]>0);
   const yrItems = [['Hardware, written off', c.year.hw], ['Facility, over '+COST.facYears+' years', c.year.facility], ['Electricity', c.year.energy]];
   const accItems = [[a.n>1?`${a.n} dies`:'Die', a.die], ['Device DRAM', a.dram], ['Package', a.pkg], ['Package yield loss', a.loss], ['Board and test', a.aux]];
   return `<div class="answer">${per}, from ${fmtUSD(c.perYear)} a year. Capital is ${fmtUSD(c.capex)}: ${fmtUSD(c.hw)} of hardware, written off over ${S.cost.years} years, and ${fmtUSD(c.parts.facility)} of facility. Electricity is ${fmtUSD(c.year.energy)} a year.
       ${S.cost.basis==='build' ? 'At build cost: what the parts cost to make, without vendor margins.' : `At purchase prices: a ${fmtPct(S.cost.margin)} gross margin on the accelerators.`}
-      ${fmtPct(S.cost.duty)} of the time at the target rate${llm ? `, ${fmtN(Math.round(S.llm.users*S.llm.tps))} tokens/s` : ''}. <button class="link" data-open="left">Cost assumptions</button></div>
+      ${fmtPct(S.cost.duty)} of the time at the target rate${llm ? `, ${fmtN(Math.round(S.llm.users*S.llm.tps))} tokens/s` : S.train.on ? `, ${fmtN(Math.round(S.train.tps))} training tokens/s` : ''}. <button class="link" data-open="left">Cost assumptions</button></div>
     <div class="cols">
     <div class="card"><h3>Capital · <span>${fmtUSD(c.capex)}</span></h3>${stackOf(capItems, fmtUSD)}
       <p class="note">${fmtN(tp.nA)} accelerator${tp.nA>1?'s':''} at ${fmtUSD((P.acc+P.dram)/tp.nA)} each${tp.nN>0?`, ${fmtN(tp.nN)} host${tp.nN>1?'s':''}`:''}. The facility is sized for full-load power, ${fmtW(fullPower(S).total)}, at $${COST.facility[coolOf(S).name]} per watt (${coolOf(S).name} cooling).</p></div>
@@ -2507,7 +2581,7 @@ function update(){
   S.mod = isModified();
   const m = model(S); M = m;
   paintSummary(m); paintCompare(m); paintDiagram(m); paintInspector(m);
-  if(S.llm.on){ ctlUpdaters.forEach(f=>f()); paintLlm(); }   // the derived inputs follow the LLM workload
+  if(ownedBy(S).length){ ctlUpdaters.forEach(f=>f()); paintLlm(); paintTrain(); }   // the derived inputs follow the LLM workload
   const el = document.getElementById('p_'+tab); if(el) el.innerHTML = PANES[tab](m);
   const nb = considerations(m).filter(c=>c.lvl==='bad').length;
   const n = document.getElementById('n_cons'); if(n){ n.hidden = !nb; n.className = 'n bad'; n.textContent = nb; }
@@ -2524,7 +2598,7 @@ new MutationObserver(()=>document.querySelectorAll('.tbl-wrap:not([tabindex])').
   .observe(document.body, {childList:true, subtree:true});
 function buildAll(){
   ctlUpdaters.length = 0;
-  buildLlm(); buildReq(); buildWl(); buildScale(); buildVary(); buildCost(); buildInspector(); buildDiagram(); update();
+  buildLlm(); buildTrain(); buildReq(); buildWl(); buildScale(); buildVary(); buildCost(); buildInspector(); buildDiagram(); update();
 }
 document.addEventListener('change', e=>{ const k = e.target.dataset && e.target.dataset.opt; if(!k) return;
   optState[k] = e.target.type==='checkbox' ? e.target.checked : e.target.value; optResult = null; update(); });
@@ -2575,7 +2649,7 @@ const valTxt = v => typeof v==='number' ? numTxt(v) : typeof v==='boolean' || v=
 const txtVal = t => { t = decodeURIComponent(t); if(t[0]==='~') return t.slice(1); if(t[0]==='!') return JSON.parse(t.slice(1));
   if(t==='true' || t==='false' || t==='null') return JSON.parse(t); const n = Number(t); return t!=='' && !isNaN(n) ? n : t; };
 // what differs from the example, leaving out what the LLM workload derives (it is recomputed on load)
-const changedFrom = (s, id) => diffOf(s, refOf(id)).filter(([k])=>!(s.llm.on && LLM_OWNS.includes(k)));
+const changedFrom = (s, id) => diffOf(s, refOf(id)).filter(([k])=>!ownedBy(s).includes(k));
 function packS(s){
   const id = PRESETS.some(p=>p.id===s.preset) ? s.preset : '_';
   return [id, ...changedFrom(s, id).map(([k,v])=>k+':'+valTxt(v))].join(',');
@@ -2636,7 +2710,7 @@ function specHTML(){
     <div class="sh-verdict ${ok?'':'bad'}">${ok ? `${st==='warn' ? `Meets the rate, but above the ${fmtPct(S.ceil)} utilisation ceiling` : 'Meets the requirement'}. Most loaded: ${m.worst.name} at ${fmtPct(m.worst.U)}; it runs up to ${sig(m.maxT/m.T)}× the target rate.${fails.length ? ` ${fails.length} check${fails.length>1?'s fail':' fails'}: see open issues.` : ''}`
       : `Does not meet the requirement: ${[st==='bad' ? `${m.worst.name} is ${fmtPct(m.worst.U)} loaded` : '', latOk ? '' : `latency ${fmtT(lh)} against a ${fmtT(S.lat)} budget`].filter(Boolean).join('; ')}.`}</div>
     <div class="sh-cols">
-      <div><h3>Requirement</h3>${kv([S.llm.on && ['LLM decode', `${esc(LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom model')}, ${fmtN(S.llm.users)} users × ${S.llm.tps} tok/s, ${S.llm.prefill ? `${fmtN(S.llm.prompt)}-token prompts, ${fmtN(S.llm.reply)}-token replies` : fmtN(S.llm.ctx)+'-token context, decode only'}, ${S.llm.wBytes*8}-bit weights`], ['Rate', fmtBps(S.T)], ['Latency budget', `${fmtT(S.lat)} per block, ${S.vary.deadline==='hard' ? 'hard deadline' : 'p'+sig(S.vary.pct*100)+', soft'}`],
+      <div><h3>Requirement</h3>${kv([S.train.on && ['LLM training', (i=>`${esc(LLM_MODELS[S.train.model] ? LLM_MODELS[S.train.model].name : 'custom model')}, ${fmtN(Math.round(S.train.tps))} tokens/s, ${S.train.prec===2?'BF16':'FP8'}, tensor ${i.TP} × pipeline ${i.PP} × data ${+sig(i.dp)}, ${sig(S.train.total/1e12)} T tokens in ${sig(i.days)} days`)(trainInfo(S))], S.llm.on && ['LLM decode', `${esc(LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom model')}, ${fmtN(S.llm.users)} users × ${S.llm.tps} tok/s, ${S.llm.prefill ? `${fmtN(S.llm.prompt)}-token prompts, ${fmtN(S.llm.reply)}-token replies` : fmtN(S.llm.ctx)+'-token context, decode only'}, ${S.llm.wBytes*8}-bit weights`], ['Rate', fmtBps(S.T)], ['Latency budget', `${fmtT(S.lat)} per block, ${S.vary.deadline==='hard' ? 'hard deadline' : 'p'+sig(S.vary.pct*100)+', soft'}`],
         ['Block', fmtB(S.block)], ['Compute', sig(S.ops)+' op/B'], ['Host link per byte', `in ${sig(S.inR)} · out ${sig(S.outR)}`], ['Extra DRAM per byte', `read ${sig(S.xR)} · write ${sig(S.xW)}`],
         ['Resident per accelerator', fmtB(S.resident*1e9)], ['Data arrives from', m.srcName || 'host memory'], ['Utilisation ceiling', fmtPct(S.ceil)]])}</div>
       <div><h3>Result</h3>${kv([['Max sustainable', `${fmtBps(m.maxT)} (${sig(m.maxT/m.T)}×)`], ['Most loaded', `${m.worst.name}, ${fmtPct(m.worst.U)}`], ['Latency, '+latLabel(), `${fmtT(lh)} of ${fmtT(S.lat)}`],
@@ -3020,13 +3094,13 @@ function runTool(name, input){
   if(name==='set_llm_workload'){
     const md = LLM_MODELS[input.model]; if(md){ Object.assign(S.llm, {model:input.model, params:md.params, active:md.active, layers:md.layers, dModel:md.dModel, kv:md.kv}); }
     const r = applyMap(LLM_MAP, input); if(!md && r.applied.some(x=>/parameters|layers|hidden|KV numbers/.test(x))) S.llm.model = 'custom';
-    S.llm.on = true; buildAll();
+    S.llm.on = true; S.train.on = false; buildAll();
     chatAdd('act', '↳ LLM workload: '+esc([md ? md.name : '', ...r.applied].filter(Boolean).join(' · ')));
     return {applied:r.applied, rejected:r.rejected, evaluation:agentSummary()};
   }
   if(name==='set_requirements'){
-    const owned = S.llm.on && Object.keys(input||{}).some(k=>REQ_MAP[k] && LLM_OWNS.includes(REQ_MAP[k][0]));
-    if(owned) S.llm.on = false;   // setting a derived input directly takes over from the LLM workload
+    const owned = Object.keys(input||{}).some(k=>REQ_MAP[k] && ownedBy(S).includes(REQ_MAP[k][0]));
+    if(owned){ S.llm.on = false; S.train.on = false; }   // setting a derived input directly takes over from the LLM workload
     const r = applyMap(REQ_MAP, input); buildAll();
     if(r.applied.length) chatAdd('act', '↳ '+esc(r.applied.join(' · ')));
     if(input.assumptions && input.assumptions.length) chatAdd('act dim', 'assumed: '+esc(input.assumptions.join('; ')));

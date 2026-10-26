@@ -111,6 +111,16 @@ const update = process.argv.includes('--update');
     }
     whyKey = null; paintSummary(M); return bad;
   });
+  // LLM training: arithmetic and memory against the formulas by hand; follows the sweep; serving and training exclude each other
+  const train = await page.evaluate(() => {
+    applyPreset('trainllm'); model(S); const i = trainInfo(S), R = S.train;
+    const micro = R.gbatch / (32 * R.seq), bubble = 3 / micro;                                   // tp 8 × pp 4 × dp 32 = 1,024
+    const ops = R.tps * (6 * R.active * 1e9 + 6 * R.layers * R.seq * R.dModel) * 2 * (1 + bubble); // BF16 = twice 8-bit
+    const states = R.params * 1e9 / 32 * (2 + 4 + 12 / 32);                                      // per accelerator, ZeRO-1 over dp 32
+    const T0 = S.T, T2 = model(atRate(S, 2 * T0)).T;
+    document.querySelector('#llmIn input[type=checkbox]').click(); const excl = S.llm.on && !S.train.on;   // the real toggle
+    return {ops: S.ops === undefined ? 0 : (applyPreset('trainllm'), model(S), S.ops * S.T / ops), states: i.states / states, dp: i.dp, sweep: T2 / T0, excl, limit: model(S).worst.k};
+  });
   // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
   await page.setViewport({width: 711, height: 1039}); await page.emulateMediaType('print');
   const spec = await page.evaluate(ids => {
@@ -152,6 +162,8 @@ const update = process.argv.includes('--update');
   else console.log(`ok   cost: parts add up to the capital cost ($${llm.unit.toFixed(3)} per million tokens); the cost goal returns the cheapest design`);
   if (why.length) fail(`explanations: ${why.slice(0, 3).join('; ')}`);
   else console.log('ok   explanations: load, max rate, power and cost each work out to the figure shown, in every example');
+  if (!(near(train.ops, 1) && near(train.states, 1) && train.dp === 32 && near(train.sweep, 2) && train.excl && train.limit === 'compute')) fail(`training: ${JSON.stringify(train)}`);
+  else console.log('ok   training: arithmetic and memory match the formulas by hand, follow the sweep, and exclude the serving workload');
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
   else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
   if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);

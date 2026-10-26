@@ -151,8 +151,8 @@ model no longer pay for a network they don't use.
 checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
-spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM workload matches a hand calculation, that the cost parts add up and the
-cost goal finds the cheapest design, and that all 29 examples match their golden results within 2 %. An axe-core
+spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM serving and training workloads match hand calculations, that the cost parts add up and the
+cost goal finds the cheapest design, and that all 30 examples match their golden results within 2 %. An axe-core
 audit then checks the page, all 13 tabs, the drawers, the spec sheet and an explanation panel for accessibility
 violations, with none allowed. Text meets WCAG AA contrast. Tables that scroll sideways, the headline figures and
 the diagram's blocks are reachable by keyboard. Focus moves into a drawer when it opens and back when it closes,
@@ -258,6 +258,33 @@ arithmetic, and the example becomes compute-bound.
 
 The new example *LLM serving from the model's shape* starts here, and the assistant has a matching
 `set_llm_workload` tool.
+
+## LLM training
+
+*LLM training* (in Inputs, below serving) derives the workload for pre-training from the model's shape, the precision
+(BF16 or FP8), training tokens per second, sequence length, global batch, micro-batch, and tensor and pipeline
+parallelism. Data parallelism is whatever the accelerator count leaves.
+
+- **Arithmetic:** 6 × active parameters per token plus attention (Kaplan et al.), 8 with activation recomputation,
+  raised by the pipeline bubble (pp − 1) ÷ (micro-batches × interleaved stages).
+- **DRAM:** the weight shard read three times per micro-batch, FP32 gradient accumulation, activations written
+  forward and read back (34 × hidden bytes per token per layer, Korthikanti et al.; 2 with recomputation), and the
+  optimiser's state once a step.
+- **Memory per accelerator:** BF16 weights, FP32 gradients and 12 bytes of FP32 master weights and Adam moments per
+  parameter (sharded over data parallel with ZeRO-1), plus the activations of the micro-batches in flight.
+- **Peer traffic:** four all-reduces per layer per token across tensor parallel, activations across pipeline stages,
+  and the gradient all-reduce across data parallel once a step. Each goes over the scale-up fabric if its group fits
+  in the domain, otherwise over the network.
+
+The summary gives the parallel layout, the bubble, memory, traffic, the maximum tokens/s on the hardware, and the
+days and cost of a whole run (15T tokens by default). Cost is per million training tokens. The new example *LLM
+training from the model's shape* (Llama 3.1 70B, BF16, 1,024 accelerators) is compute-bound at 62 % with a 19 %
+bubble. Tests check the arithmetic and memory against the formulas by hand.
+
+The training model is not checked against a published run. The public ones don't give enough detail to make it a
+real test: Meta's Llama 3.1 405B run used interleaved pipeline schedules and memory settings that aren't fully
+published, and its 70B run's parallelism isn't published at all. Choosing those settings until the GPU-hours match
+would be fitting, not checking.
 
 ## Cost
 
@@ -379,11 +406,11 @@ would have to carry 4 TB/s to feed that link.
   full-duplex links, access-pattern efficiency, capacity, PCIe TLP efficiency, outstanding read tags
   (Little's law), DRAM concurrency, CPU cost per block, host memory on the data path, queueing,
   on-chip buffering, data-movement power, beachfront, HBM packaging and ECC.
-- **29 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
+- **30 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
   deliberately broken designs that illustrate a classic bottleneck:
   - *AI & LLMs*: rack-scale inference on 72 accelerators in one NVLink domain, a 1,024-accelerator
     training cluster over 32 racks, tensor-parallel prefill on 8 PCIe cards ✗, a mixture-of-experts
-    layer that overloads its mesh ✗, LLM serving derived from Llama 3.1 70B's shape, LLM decode on an
+    layer that overloads its mesh ✗, LLM serving and LLM training derived from Llama 3.1 70B's shape, LLM decode on an
     8-accelerator server and at the edge, prefill on one accelerator, DLRM embedding lookups, and a data
     loader starving an accelerator ✗.
   - *Fundamentals*: the 1 TB/s question.
