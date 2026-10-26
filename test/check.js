@@ -48,6 +48,8 @@ const update = process.argv.includes('--update');
 
   // rate sweep: the DRAM band covers the whole range and the optimiser finds a design at every rate in the LLM example
   const sweep = await page.evaluate(async () => {
+    // the demo's optimise call leaves its own settings (count fixed, one reticle) in the Optimise tab; sweep with the defaults
+    optState = {goal: 'balanced', practical: true, reticle: false, scale: true, onPackage: false};
     applyPreset('llm'); tab = 'sweep'; buildTabs(); update();
     for (let i = 0; i < 100 && document.getElementById('p_sweep').textContent.includes('Running the optimiser'); i++) await new Promise(r => setTimeout(r, 100));
     const ds = dramSweep(S), rows = sweepMemo.rows;
