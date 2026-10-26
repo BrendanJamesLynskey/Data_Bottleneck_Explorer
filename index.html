@@ -574,9 +574,31 @@ const YEAR_S = 365.25*24*3600;
    are counted in 8-bit equivalents, so a 16-bit PE delivers two per MAC and a 4-bit PE half of one. */
 const PE8 = {um2:2*1.8e9*1e-12/2.43*1e6, pj:2*0.29}, CTRL_EFF = 0.9;   // CTRL_EFF: issue, sync and control losses beyond mapping
 const peScale = b => 0.6*(b/8)**2 + 0.4*(b/8);
-const CHIP_OWNS = ['acc.tops', 'acc.topsMm2', 'acc.pj', 'acc.util'];
+const CHIP_OWNS = ['acc.tops', 'acc.topsMm2', 'acc.pj', 'acc.util', 'acc.leak'];
 /* Die-to-die links between chiplets: UCIe on an advanced (2.5D) package at 32 GT/s, from the consortium's published
    figures: about 1,317 GB/s per mm of die edge, 1,350 GB/s per mm² of PHY, 0.3 pJ/bit, under 2 ns. */
+/* Voltage, frequency and heat. Clock follows the alpha-power law f ∝ (V − Vth)^α ÷ V (Sakurai–Newton), with the array's
+   clock taken as its frequency at a nominal 0.75 V. Dynamic energy scales with V²; leakage with about V³ and doubles every
+   25 °C, from the model's 0.02 W/mm² at 85 °C. Junction temperature = inlet + θ × die power, solved with the leakage it
+   causes. θ and inlet by cooling are inferred from published TDPs at typical junction temperatures (H100 at 700 W on air,
+   about 87 °C from 35 °C air, so 0.075 K/W; B200 at 1,000 W on liquid, about 85 °C from 40 °C coolant, so 0.045 K/W).
+   All first-order assumptions, not datasheet values. A quarter of the DRAM interface energy is counted on the logic die. */
+const VF = {vnom:0.75, vth:0.30, alpha:1.3};
+const fRatio = v => ((v - VF.vth)**VF.alpha/v)/((VF.vnom - VF.vth)**VF.alpha/VF.vnom);
+const chipF = c => c.ghz*fRatio(c.vdd ?? VF.vnom);          // the array's clock at its supply voltage, GHz
+const THERM = {cool:{air:{theta:0.075, tin:35}, 'rear-door / hybrid':{theta:0.06, tin:35}, 'direct liquid':{theta:0.045, tin:40}},
+  tjMax:95, tref:85, leak0:0.02, dT2:25, vExp:3, phyShare:0.25};
+const leakAt = (T, v) => THERM.leak0*(v/VF.vnom)**THERM.vExp*2**((T - THERM.tref)/THERM.dT2);
+/* Memory controller, per channel (an HBM pseudo-channel, a DDR5 subchannel): typical JEDEC-class timings in ns, banks,
+   burst and refresh overhead for each family; first-order, not a particular part. */
+const MC_FAM = {
+  DDR:    {chans:d=>2,         burst:64, banks:32, tRCD:16, tRP:16, tRAS:32, tRRD:3.3, tFAW:13.3, tWTR:10, tRTW:5, ref:0.075, note:'DDR5: two 32-bit subchannels, BL16, 32 banks, all-bank refresh (tRFC 295 ns every 3.9 µs)'},
+  LPDDR:  {chans:d=>1,         burst:32, banks:16, tRCD:18, tRP:21, tRAS:42, tRRD:5,   tFAW:20,   tWTR:12, tRTW:6, ref:0.04,  note:'LPDDR5/5X: one x16 channel, BL16, 16 banks, per-bank refresh'},
+  LPDDR6: {chans:d=>1,         burst:32, banks:16, tRCD:18, tRP:21, tRAS:42, tRRD:5,   tFAW:20,   tWTR:12, tRTW:6, ref:0.04,  note:'LPDDR6: one x24 channel (two sub-channels), 16 banks, per-bank refresh'},
+  GDDR:   {chans:d=>2,         burst:32, banks:16, tRCD:12, tRP:12, tRAS:28, tRRD:3,   tFAW:12,   tWTR:6,  tRTW:4, ref:0.035, note:'GDDR6/7: two x16 channels per device, BL16, 16 banks'},
+  HBM:    {chans:d=>d.width/32, burst:32, banks:16, tRCD:14, tRP:14, tRAS:28, tRRD:2,  tFAW:12,   tWTR:8,  tRTW:4, ref:0.035, note:'HBM: 32-bit pseudo-channels, BL8, 16 banks each, per-bank refresh'},
+};
+const MC_HIT = {stream:0.9, block:0.6, random:0.05};       // row-buffer hit rate when left on auto, by access pattern
 const D2D = {name:'UCIe advanced package, 32 GT/s', shoreBps:1317e9, areaBps:1350e9, pj:0.3, latNs:2, eff:0.9};
 /* on-chip interconnect, networks-on-chip and AMBA. kind: grid (router per tile), axi (crossbar of masters and
    memory-side slave ports, separate read and write channels), stream (point-to-point pipelines), bus (shared,
@@ -647,7 +669,8 @@ const BASE = {
   llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500, prefill:false, prompt:2000, reply:500, disagg:false, ttft:2, pre:{perNode:8, nodes:1, racks:1}},
   train:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, prec:2, tps:7e5, seq:8192, gbatch:4194304, micro:1, tp:8, pp:4, vpp:1, recompute:false, zero:true, total:15e12},
   cost:{basis:'build', margin:0.75, years:4, kwh:0.08, duty:1},
-  chip:{on:false, cores:64, rows:32, cols:32, ghz:1.8, bits:8, flow:'ws', gsrc:'auto', M:4096, N:4096, K:4096, dies:0},
+  chip:{on:false, cores:64, rows:32, cols:32, ghz:1.8, vdd:0.75, bits:8, flow:'ws', gsrc:'auto', M:4096, N:4096, K:4096, dies:0},
+  mc:{on:false, hit:-1, req:64, q:32, batch:16},
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const merge = (a,b) => { for(const k in b){ if(b[k] && typeof b[k]==='object' && !Array.isArray(b[k])) { a[k]=merge(a[k]||{}, b[k]); } else a[k]=b[k]; } return a; };
@@ -826,11 +849,11 @@ const PRESETS = [
     pattern:'stream', dev:{dram:'hbm3_64', units:2}, link:{id:'pcie5', lanes:16, count:1},
     host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:4}, acc:{tops:20, util:0.6, pj:0.5, topsMm2:3, sram:256}}},
 ];
-// a GB200-class accelerator built from its compute array, as four chiplets: the rack example's
-// hardware with peak compute, area and energy derived from 1,356 cores of 32 × 32 8-bit PEs at 1.8 GHz
-PRESETS.splice(1, 0, {g:'AI & LLMs', id:'chiparray', name:'GB200-class accelerator from its compute array, as four chiplets',
-  d:'The rack-scale inference example with the accelerator designed rather than given: 1,356 cores of 32 × 32 8-bit processing elements at 1.8 GHz make its 5 PFLOPS. At the H100-class density the array is calibrated to, that is about 2,600 mm² of silicon, so it is split into four chiplets joined by UCIe, each within the reticle (B200 reaches the same compute in two dies on a denser process). Open the Chip tab for the floorplan, the package and the chiplet sweep, and try output-stationary dataflow or a smaller array.',
-  p:merge(clone(PRESETS[0].p), {chip:{on:true, cores:1356, rows:32, cols:32, ghz:1.8, bits:8, flow:'ws', gsrc:'custom', M:4096, N:4096, K:4096, dies:4}})});
+// a GB200-class accelerator built from its compute array, as six chiplets: the rack example's hardware with peak compute,
+// area and energy derived from 1,747 cores of 32 × 32 8-bit PEs at 0.62 V (1.4 GHz), which keeps the junction under 95 °C
+PRESETS.splice(1, 0, {g:'AI & LLMs', id:'chiparray', name:'GB200-class accelerator from its compute array: six chiplets at low voltage',
+  d:'The rack-scale inference example with the accelerator designed rather than given. At the nominal 0.75 V, H100-class circuits would need 1,356 cores of 32 × 32 8-bit processing elements for 5 PFLOPS, put about 1,670 W on the die and run at 115 °C. So it runs 1,747 cores at 0.62 V (1.4 GHz) instead: the same 5 PFLOPS at about 91 °C, in about 3,300 mm² of silicon split into six chiplets joined by UCIe. B200 does it in two dies on a denser process. Open the Chip tab for the voltage sweep, the floorplan, the package and the chiplet sweep.',
+  p:merge(clone(PRESETS[0].p), {chip:{on:true, cores:1747, rows:32, cols:32, ghz:1.8, vdd:0.62, bits:8, flow:'ws', gsrc:'custom', M:4096, N:4096, K:4096, dies:6}})});
 let S = clone(BASE);
 let selected = 'dram';
 
@@ -867,6 +890,23 @@ function dramEff(d, pattern, r, w, ecc){
   const inline = ecc && (d.fam==='LPDDR' || d.fam==='GDDR') ? 0.85 : 1;
   return PATTERNS[pattern].eff*rw*inline;
 }
+/* device DRAM efficiency from the controller: the data bus is busy except when row misses outrun what the banks, the
+   four-activate window and activate spacing allow, when too few requests are queued to cover the latency (Little's law),
+   when the bus turns between reads and writes (once per batch of writes), during refresh, and in the unused part of a burst */
+function mcEff(d, mc, pattern, r, w, ecc){
+  const F = MC_FAM[d.fam], ch = F.chans(d), chBW = dramUnitBW(d)/ch, h = mc.hit>=0 ? mc.hit : MC_HIT[pattern];
+  const bursts = Math.ceil(mc.req/F.burst), useful = mc.req/(bursts*F.burst), tB = bursts*F.burst/chBW;            // seconds per request
+  const actMax = Math.min(Math.min(F.banks, mc.q)/((F.tRAS + F.tRP)*1e-9), 4/(F.tFAW*1e-9), 1/(F.tRRD*1e-9)), actNeed = (1 - h)/tB;
+  const uAct = actNeed>0 ? Math.min(1, actMax/actNeed) : 1;
+  const lat = (d.lat + (1 - h)*(F.tRP + F.tRCD))*1e-9, uQ = Math.min(1, mc.q*mc.req/(chBW*lat));
+  const wf = (r + w)>0 ? w/(r + w) : 0, turn = wf>0 && wf<1 ? wf/mc.batch*(F.tWTR + F.tRTW)*1e-9 : 0, uTurn = tB/(tB + turn);
+  const uRef = 1 - F.ref, inline = ecc && (d.fam==='LPDDR' || d.fam==='GDDR') ? 0.85 : 1;
+  const parts = {'Row misses (banks, activate window)':uAct, 'Queue depth (Little’s law)':uQ, 'Read/write turnaround':uTurn, 'Refresh':uRef, 'Burst use':useful};
+  const bind = Object.entries(parts).sort((a,b)=>a[1]-b[1])[0][0];
+  return {eff:uRef*Math.min(uAct, uQ)*uTurn*useful*inline, F, ch, chBW, h, tB, actMax, actNeed, uAct, uQ, uTurn, uRef, useful, inline, lat, bind, parts};
+}
+// device DRAM efficiency: the controller model when it is on, otherwise the access-pattern table
+const devEff = (d, s, r, w) => s.mc && s.mc.on ? mcEff(d, s.mc, s.pattern, r, w, s.ecc).eff : dramEff(d, s.pattern, r, w, s.ecc);
 function dramCapPerUnit(d, ecc){ return d.cap*(ecc && (d.fam==='LPDDR'||d.fam==='GDDR') ? 0.875 : 1); }
 function linkRaw(L, lanes, count){                                          // B/s per direction
   if(L.kind==='pcie') return L.gt*1e9*lanes/8*(L.flit?1:128/130)*count;
@@ -1092,20 +1132,36 @@ function gemmMap(s, g, devBW){
     if(!best || t < best.t) best = {Tm, Tn, Tk, t};
   }
   const minT = g.bytes*(g.M*g.K + g.K*g.N + g.M*g.N), traffic = best ? best.t : Infinity;
-  const tCompute = cycles/(c.ghz*1e9), tMem = traffic/devBW, time = Math.max(tCompute, tMem);
+  const tCompute = cycles/(chipF(c)*1e9), tMem = traffic/devBW, time = Math.max(tCompute, tMem);
   return {R, C, ws, a, b, stream, ks, ta, tb, tiles, rounds, spatial, temporal, parallel, util, cycles, macs, tile:best, traffic, minT,
-    intensity:2*macs/traffic, ridge:2*c.cores*R*C*c.ghz*1e9/devBW, tCompute, tMem, time, bound: tMem>tCompute ? 'DRAM' : 'compute', achieved:2*macs/time};
+    intensity:2*macs/traffic, ridge:2*c.cores*R*C*chipF(c)*1e9/devBW, tCompute, tMem, time, bound: tMem>tCompute ? 'DRAM' : 'compute', achieved:2*macs/time};
 }
 // derive peak compute, its area and energy from the array; utilisation from mapping the representative GEMM
 function chipApply(s){
   const c = s.chip, f = c.bits/8, pes = c.cores*c.rows*c.cols;
-  s.acc.tops = pes*2*c.ghz*1e9*f/1e12;
+  s.acc.tops = pes*2*chipF(c)*1e9*f/1e12;
   s.acc.topsMm2 = s.acc.tops/(pes*PE8.um2*peScale(c.bits)/1e6);
-  s.acc.pj = PE8.pj*peScale(c.bits)/(2*f);
-  const dev = DRAMS[s.dev.dram], bw = s.dev.units*dramUnitBW(dev)*0.9;
+  s.acc.pj = PE8.pj*peScale(c.bits)/(2*f)*((c.vdd ?? VF.vnom)/VF.vnom)**2;   // dynamic energy ∝ V²
+  const dev = DRAMS[s.dev.dram], bw = s.dev.units*dramUnitBW(dev)*devEff(dev, s, 1, 0);
   s.acc.util = gemmMap(s, gemmOf(s), bw).util*CTRL_EFF;
 }
+/* junction temperature at full load: inlet + θ × die power, where the die's leakage depends on the temperature it causes */
+function thermalOf(s, m){
+  const cool = coolOf(s), th = THERM.cool[cool.name], v = s.chip.vdd ?? VF.vnom;
+  const comp = s.acc.tops*1e12*s.acc.pj*1e-12, sram = m.devBW*8*SRAM_PJ*1e-12, phy = THERM.phyShare*m.devBW*8*m.dev.pj*1e-12;
+  const rest = (m.multi && m.tp.dom>1 ? m.fab.w : 0) + m.d2dBps*D2D.eff*8*D2D.pj*1e-12, P0 = comp + sram + phy + rest;
+  let T = th.tin + th.theta*P0, runaway = false;
+  for(let i=0; i<60; i++){ const Tn = th.tin + th.theta*(P0 + m.die*leakAt(T, v)); if(Math.abs(Tn - T) < 1e-3){ T = Tn; break; } T = Tn; if(T > 250){ runaway = true; break; } }
+  const leak = leakAt(Math.min(T, 250), v), Pleak = m.die*leak, Pdie = P0 + Pleak, compArea = m.area.compute;
+  return {T, runaway, leak, comp, sram, phy, rest, P0, Pleak, Pdie, theta:th.theta, tin:th.tin, cool:cool.name, v, f:chipF(s.chip),
+    density:Pdie/m.die, compDensity:comp/compArea, over:runaway || T > THERM.tjMax};
+}
 function modelOne(s){
+  if(!(s.chip && s.chip.on)) return modelCore(s);
+  let m = modelCore(s), th = thermalOf(s, m);        // leakage follows the temperature; one more pass settles it (the rest doesn't depend on leakage)
+  s.acc.leak = th.leak; m = modelCore(s); m.thermal = thermalOf(s, m); return m;
+}
+function modelCore(s){
   if(s.llm && s.llm.on) llmApply(s); else if(s.train && s.train.on) trainApply(s);
   if(s.chip && s.chip.on) chipApply(s);
   const T = s.T, Tb = T*s.burst;
@@ -1126,7 +1182,7 @@ function modelOne(s){
   // host DRAM: input arrives (write) and is DMA-read; output is DMA-written and consumed (read)
   const hIn = viaHost ? s.inR : 0, hR = hIn + s.outR, hW = hIn + s.outR;
 
-  const devE = dramEff(dev, s.pattern, dR, dW, s.ecc), devBW = s.dev.units*dramUnitBW(dev)*devE;
+  const devE = devEff(dev, s, dR, dW), devBW = s.dev.units*dramUnitBW(dev)*devE;
   const hostE = dramEff(hd, 'block', hR, hW, false), hostBW = s.host.units*dramUnitBW(hd)*hostE;
   const lk = linkSpec(s);
   const ops = s.acc.tops*1e12*s.acc.util;
@@ -1395,6 +1451,9 @@ const REFS = [
   {id:'genoa', name:'EPYC Genoa STREAM Triad, per socket', tests:'DRAM efficiency model (refresh, row misses, turnaround)', pub:376e9, f:fmtBps, tol:0.10,
    src:['Dell: 752 GB/s Triad on a dual-socket Genoa 9354 (halved)','https://infohub.delltechnologies.com/en-au/p/16g-poweredge-platform-bios-characterization-for-hpc-with-amd-genoa-9354'],
    run:()=>12*dramUnitBW(DRAMS.ddr5_4800)*dramEff(DRAMS.ddr5_4800,'stream',2,1,false), how:'12 × DDR5-4800, Triad = 2 reads : 1 write'},
+  {id:'genoamc', name:'EPYC Genoa STREAM Triad, per socket, from the memory-controller model', tests:'controller model: row misses, queue depth, turnaround, refresh', pub:376e9, f:fmtBps, tol:0.10,
+   src:['Dell: 752 GB/s Triad on a dual-socket Genoa 9354 (halved)','https://infohub.delltechnologies.com/en-au/p/16g-poweredge-platform-bios-characterization-for-hpc-with-amd-genoa-9354'],
+   run:()=>12*dramUnitBW(DRAMS.ddr5_4800)*mcEff(DRAMS.ddr5_4800, BASE.mc, 'stream', 2, 1, false).eff, how:'12 × DDR5-4800, Triad 2 reads : 1 write, default controller settings (stream hit rate 0.9, 64 B, 32 queued, writes in batches of 16); ±10 % fixed before the run'},
   {id:'pcieh2d', name:'PCIe 5.0 x16 host → device, pinned', tests:'PCIe protocol overheads (device-pulled reads)', pub:56.2e9, f:fmtBps, tol:0.10,
    src:['MiTAC/TYAN H100 server: 56.2 GB/s H→D','https://www.mitaccomputing.com/en/industryinsight/Redefining_Server_Performance_Introducing_TYAN_Transport_HX_FT65TB8050_equipped_with_NVIDIA_H100_GPU'],
    run:()=>linkSpec(cfgOf({link:{id:'pcie5', lanes:16, count:1, mps:256, cpl:256}})).h2d, how:'256 B completions'},
@@ -1560,7 +1619,7 @@ function paneOpt(m){
 function sizeDram(s, m){
   const need = m.Tba*(m.dR+m.dW)/s.ceil;
   return Object.entries(DRAMS).map(([id,d])=>{
-    const per = dramUnitBW(d)*dramEff(d, s.pattern, m.dR, m.dW, s.ecc);
+    const per = dramUnitBW(d)*devEff(d, s, m.dR, m.dW);
     const nBW = need>0 ? Math.ceil(need/per) : 0;
     const nCap = Math.ceil(s.resident/dramCapPerUnit(d, s.ecc));
     const n = Math.max(1, nBW, nCap);
@@ -1771,7 +1830,8 @@ function buildChip(){
     ctl(el, {k:'chip.cores', label:'Cores', type:'log', min:1, max:4096, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:fmtN});
     ctl(el, {k:'chip.rows', label:'Array rows per core', type:'select', num:true, options:{8:'8', 16:'16', 32:'32', 64:'64', 128:'128', 256:'256'}});
     ctl(el, {k:'chip.cols', label:'Array columns per core', type:'select', num:true, options:{8:'8', 16:'16', 32:'32', 64:'64', 128:'128', 256:'256'}});
-    ctl(el, {k:'chip.ghz', label:'Clock', type:'range', min:0.3, max:3, step:0.05, fmt:v=>v.toFixed(2)+' GHz'});
+    ctl(el, {k:'chip.ghz', label:'Clock at the nominal 0.75 V', type:'range', min:0.3, max:3, step:0.05, fmt:v=>v.toFixed(2)+' GHz'});
+    ctl(el, {k:'chip.vdd', label:'Supply voltage', type:'range', min:0.5, max:1.0, step:0.01, fmt:v=>v.toFixed(2)+' V', hint:'Sets the clock along the voltage–frequency curve; energy per operation scales with V², leakage with temperature.'});
     ctl(el, {k:'chip.bits', label:'Processing-element precision', type:'select', num:true, options:{4:'4-bit', 8:'8-bit', 16:'16-bit'}});
     ctl(el, {k:'chip.flow', label:'Dataflow', type:'select', options:{ws:'Weight-stationary (weights held, rows stream)', os:'Output-stationary (outputs held, depth streams)'}});
   }
@@ -1779,6 +1839,13 @@ function buildChip(){
   if(S.chip.gsrc==='custom' || !(S.llm.on || S.train.on)){
     for(const [k, l] of [['M','M (rows of A and C)'], ['N','N (columns of B and C)'], ['K','K (depth)']])
       ctl(el, {k:'chip.'+k, label:l, type:'log', min:1, max:131072, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:fmtN});
+  }
+  ctl(el, {k:'mc.on', label:'Model the device DRAM controller', type:'toggle', rebuild:true, hint:'Efficiency from banks, timings, queue depth, read/write turnaround and refresh, instead of the access-pattern table.'});
+  if(S.mc.on){
+    ctl(el, {k:'mc.hit', label:'Row-buffer hit rate', type:'select', num:true, options:{'-1':'Auto, from the access pattern', 0.05:'5 % (random)', 0.25:'25 %', 0.5:'50 %', 0.75:'75 %', 0.9:'90 % (streaming)', 0.98:'98 %'}});
+    ctl(el, {k:'mc.req', label:'Request size', type:'select', num:true, options:{32:'32 B', 64:'64 B', 128:'128 B', 256:'256 B'}});
+    ctl(el, {k:'mc.q', label:'Requests queued per channel', type:'log', min:1, max:256, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:fmtN});
+    ctl(el, {k:'mc.batch', label:'Writes per batch (turnaround)', type:'range', min:1, max:64, step:1, fmt:v=>v});
   }
   ctl(el, {k:'chip.dies', label:'Chiplets per accelerator', type:'select', num:true, options:{0:'Auto (as before: split for cost only)', 1:'1 (monolithic)', 2:'2', 3:'3', 4:'4', 6:'6', 8:'8'},
     hint:'With a count set, traffic between dies crosses UCIe links that cost area, power and latency; smaller dies yield better and have more edge.'});
@@ -2396,11 +2463,55 @@ function paneChip(m){
       <p class="note">The tiling is the one with the least DRAM traffic that fits; below the ridge point the matrix multiply waits on DRAM however busy the array could be.</p></div>
     <div class="card span"><h3>Utilisation against M</h3>${uChart}
       <p class="note">With N = ${fmtN(g.N)} and K = ${fmtN(g.K)} held. At small M both waste the array: weight-stationary on fill and drain (it needs M well above rows + columns, ${map.R + map.C}), output-stationary on the empty rows of each output block. That is why decode at small batches is memory-bound on any systolic design.</p></div>
+    ${(([a,b],[c,d])=>a+c+b+d)(vfCard(m), mcCard(m))}
     <div class="card span"><h3>Floorplan · ${m.nDies>1 ? `${m.nDies} chiplets of ${fmtA(m.dieEach)}` : fmtA(m.die)}</h3>${floorplanSvg(m)}
       <p class="note">Schematic, to scale by area. PHYs sit on the edges in proportion to the edge they need${m.padArea>m.coreArea?'; the hatched area is filler, there only because the PHYs need more edge than the logic provides':''}.</p></div>
     <div class="card span"><h3>Package</h3>${packageSvg(m)}</div>
     <div class="card span"><h3>Chiplets: 1 to 8 dies</h3>${chipletSweep(m)}</div>
     </div>`;
+}
+// voltage, frequency and heat: the operating point, the junction temperature it reaches, and a sweep across voltage
+function vfCard(m){
+  if(!S.chip.on || !m.thermal) return [`<div class="card"><h3>Voltage, frequency and heat</h3><p class="note">Switch on “Derive the accelerator from its compute array” under Chip micro-architecture in Inputs: the voltage–frequency curve and the thermal model work from the array.</p></div>`, ''];
+  const t = m.thermal, vs = [0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0];
+  const pts = vs.map(v=>{ const s2 = clone(S); s2.chip.vdd = v; const m2 = model(s2), fp = fullPower(s2); return {v, f:chipF(s2.chip), P:fp.acc, eff:s2.acc.tops/fp.acc, T:m2.thermal.runaway ? 250 : m2.thermal.T, run:m2.thermal.runaway}; });
+  const b = pts.find(p=>p.v===0.75);
+  // the highest voltage that stays under the junction limit, by bisection (temperature rises with voltage)
+  const hot = v => { const s2 = clone(S); s2.chip.vdd = v; const t2 = model(s2).thermal; return t2.runaway || t2.T > THERM.tjMax; };
+  let safe = null; if(!hot(0.5)){ let lo = 0.5, hi = 1.0; if(!hot(hi)) lo = hi; else for(let i=0;i<14;i++){ const mid = (lo+hi)/2; if(hot(mid)) hi = mid; else lo = mid; }
+    const s2 = clone(S); s2.chip.vdd = lo; safe = {v:lo, f:chipF(s2.chip)}; }
+  const chart = lineChart({xs:vs.map(v=>v*100), xticks:[50,60,70,75,80,90], xfmt:v=>(v/100).toFixed(2)+' V', yfmt:v=>fmtPct(v), ymin:0.2, ymax:20, h:220, legend:true,
+    vlines:[{x:t.v*100, col:'#a3a3a3', name:'this voltage'}], label:'Clock, full-load power and efficiency against supply voltage, relative to 0.75 V',
+    series:[{ys:pts.map(p=>p.f/b.f), col:'#ededed', name:'clock'}, {ys:pts.map(p=>p.P/b.P), col:'#8a8a8a', name:'full-load power'}, {ys:pts.map(p=>p.eff/b.eff), col:'#a3a3a3', name:'TOPS per watt', w:1}]});
+  const tchart = lineChart({xs:vs.map(v=>v*100), xticks:[50,60,70,75,80,90], xfmt:v=>(v/100).toFixed(2)+' V', yfmt:v=>Math.round(v)+' °C', ymin:20, ymax:260, h:180,
+    hlines:[{y:THERM.tjMax, col:'#ededed', name:THERM.tjMax+' °C limit'}], vlines:[{x:t.v*100, col:'#a3a3a3', name:''}], label:'Junction temperature at full load against supply voltage',
+    series:[{ys:pts.map(p=>p.T), col:'#ededed', name:'junction temperature'}]});
+  return [`<div class="card"><h3>Voltage, frequency and heat · <span>${Math.round(t.T)} °C</span></h3>
+      ${stat('Supply · clock', `${t.v.toFixed(2)} V · ${t.f.toFixed(2)} GHz`)}${stat('Energy per 8-bit operation', sig(S.acc.pj)+' pJ')}
+      ${stat('Die power at full load', `${fmtW(t.Pdie)}: compute ${fmtW(t.comp)}, leakage ${fmtW(t.Pleak)} (${fmtPct(t.Pleak/t.Pdie)})`)}
+      ${stat('Power density · in the compute', `${sig(t.density)} · ${sig(t.compDensity)} W/mm²`)}
+      ${stat('Junction', t.runaway ? '<b>thermal runaway</b>' : `${Math.round(t.T)} °C = ${t.tin} °C + ${t.theta} K/W × ${fmtW(t.Pdie)}`)}
+      ${stat('Highest voltage under '+THERM.tjMax+' °C', safe ? `${safe.v.toFixed(3)} V, ${safe.f.toFixed(2)} GHz` : 'none in 0.5–1.0 V')}
+      <p class="note">Leakage rises with temperature and temperature with leakage, so the junction is solved as a fixed point; past a point the loop runs away. θ and the inlet temperature come from the ${t.cool} cooling, inferred from published TDPs at typical junction temperatures. The curve shape and slopes are first-order assumptions.</p></div>`,
+    `<div class="card span"><h3>Across supply voltage</h3>${chart}${tchart}
+      <p class="note">Lower voltage costs clock but gains energy efficiency faster: the wide-and-slow trade. ${safe ? (safe.v<1 ? `Above ${safe.v.toFixed(3)} V this design overheats.` : 'It stays under the limit across the range.') : 'It overheats across the whole range.'}</p></div>`];
+}
+// the memory controller: what limits the device DRAM's efficiency, per channel
+function mcCard(m){
+  const d = m.dev, mc = S.mc, x = mcEff(d, mc, S.pattern, m.dR, m.dW, S.ecc), table = dramEff(d, S.pattern, m.dR, m.dW, S.ecc), F = x.F;
+  const miss = [0.01,0.02,0.05,0.1,0.2,0.5,1];
+  const series = [8, 32, 128].map((q,i)=>({ys:miss.map(r=>mcEff(d, {...mc, q, hit:1-r}, S.pattern, m.dR, m.dW, S.ecc).eff), col:['#6b6b6b','#ededed','#a3a3a3'][i], name:`${q} queued`}));
+  const chart = lineChart({xs:miss, xticks:miss, xfmt:v=>fmtPct(v), yfmt:v=>fmtPct(v), ymin:0.05, ymax:1.2, h:220, legend:true, vlines:[{x:Math.max(0.01, 1-x.h), col:'#a3a3a3', name:'this'}],
+    label:'DRAM efficiency against row-miss rate for three queue depths', series});
+  const rows = Object.entries(x.parts).map(([k,v])=>stat(k, `${fmtPct(v)}${k===x.bind?' ← binds':''}`)).join('');
+  return [`<div class="card"><h3>Memory controller · <span>${fmtPct(x.eff)}</span></h3>
+      ${stat('Channels per '+d.unit, `${x.ch} × ${fmtBps(x.chBW)}, ${F.banks} banks each`)}
+      ${stat('Row-buffer hit rate', fmtPct(x.h)+(mc.hit<0?' (auto, '+PATTERNS[S.pattern].name.toLowerCase()+')':''))}
+      ${stat('Activates needed · allowed', `${sig(x.actNeed/1e6)} · ${sig(x.actMax/1e6)} M/s`)}
+      ${rows}${stat('<b>Efficiency</b>', `<b>${fmtPct(x.eff)}</b> (pattern table: ${fmtPct(table)})`)}
+      <p class="note">${esc(F.note)}. ${mc.on ? 'This is driving the model’s device DRAM.' : 'Not driving the model: switch on “Model the device DRAM controller” under Chip micro-architecture to use it instead of the pattern table.'} On EPYC Genoa’s STREAM Triad, with its default settings, it gives ${(g=>(g>=0?'+':'−')+Math.abs(g*100).toFixed(1))(12*dramUnitBW(DRAMS.ddr5_4800)*mcEff(DRAMS.ddr5_4800, BASE.mc, 'stream', 2, 1, false).eff/376e9 - 1)} % against the measured figure (see Checks).</p></div>`,
+    `<div class="card span"><h3>Row misses and queue depth</h3>${chart}
+      <p class="note">Each row miss costs an activate. Banks, the four-activate window and activate spacing cap how many fit, and a short queue can’t keep enough requests in flight to cover the latency.</p></div>`];
 }
 // one die (or chiplet), drawn to scale by area: PHY strips on the edges, then compute cores, SRAM and the rest inside
 function floorplanSvg(m){
@@ -2729,6 +2840,8 @@ function considerations(m){
   { const ts = tolStats(m); if(ts) add(ts.pCeil<0.9?'warn':'ok', 'Catalogue tolerance', `<p>With capacities uncertain by ±${(S.vary.tol*100).toFixed(0)} %, the design stays under the utilisation ceiling in <b>${fmtPct(ts.pCeil)}</b> of draws and under 100 % in <b>${fmtPct(ts.pFull)}</b>. Most often weakest: ${ts.per.filter(c=>c.weak>0.005).sort((a,b)=>b.weak-a.weak).slice(0,3).map(c=>c.name+' '+fmtPct(c.weak)).join(', ')}.</p>`); }
   add(m.sramNeed>S.acc.sram*1e6?'warn':'ok', 'On-chip buffering', `<p>Hiding link and DRAM latency needs about <b>${fmtB(m.sramNeed)}</b> double-buffered; the accelerator has <b>${sig(S.acc.sram)} MB</b>.</p>`);
   add(m.Pmove/m.Ptot>0.5?'warn':'info', 'Power: moving data vs computing', `<p>Data movement is <b>${fmtPct(m.Pmove/m.Ptot)}</b> of <b>${fmtW(m.Ptot)}</b>. A ${d.name} bit costs ${d.pj} pJ, a PCIe bit ${L.pj} pJ, an operation ${S.acc.pj} pJ.</p>`);
+  if(m.thermal){ const t = m.thermal;
+    add(t.over ? 'bad' : t.T > THERM.tjMax - 10 ? 'warn' : 'ok', 'Junction temperature', `<p>${t.runaway ? '<b>Thermal runaway</b>: leakage heats the die faster than the cooling removes it.' : `About <b>${Math.round(t.T)} °C</b> at full load against a ${THERM.tjMax} °C limit`}: ${fmtW(t.Pdie)} on the die (${fmtPct(t.Pleak/t.Pdie)} leakage) through ${t.theta} K/W from ${t.tin} °C (${t.cool} cooling), at ${t.v.toFixed(2)} V and ${t.f.toFixed(2)} GHz. Lower the voltage, or improve the cooling.</p>`); }
   add(m.dieEach>830?'bad':m.padArea>m.coreArea?'warn':'ok', 'Area and die edge', `<p>Die estimate <b>${fmtA(m.die)}</b>; PHYs need <b>${sig(m.shoreNeed)} mm</b> of edge. ${m.padArea>m.coreArea?'Pad-limited. ':''}${m.die>830?'Beyond one reticle: chiplets.':''}</p>`);
   if(d.fam==='HBM') add('info', 'HBM packaging and thermals', `<p>HBM needs an interposer or bridge, known-good-die test and careful thermals; refresh doubles above 85 °C.</p>`);
   add('info', 'Reliability (ECC)', `<p>${S.ecc ? (d.fam==='DDR'?'DDR ECC adds 8 bits per 64 side-band.' : d.fam==='HBM'?'HBM carries ECC side-band.' : d.fam==='LPDDR6'?'LPDDR6 carries metadata in every burst.':'Inline ECC costs about 12.5 % capacity and ~15 % bandwidth here.') : 'ECC is off; long-running systems normally need it.'}</p>`);

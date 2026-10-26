@@ -116,6 +116,7 @@ The *Checks* tab (under More) compares the model with published figures:
 | AMD MI300X: 5.3 TB/s · MI355X: 8 TB/s | HBM3 and HBM3E, 8 stacks | +0.5 %, +2.4 % (AMD rounds 8.19) |
 | Intel Gaudi 3: 3.7 TB/s · Google TPU v5p: 2,765 GB/s | HBM2E, 8 and 6 stacks | −0.4 %, 0.0 % |
 | EPYC Genoa STREAM Triad: about 376 GB/s per socket | DRAM efficiency model (refresh, row misses, turnaround) | +5.2 % |
+| The same, from the memory-controller model | Banks, timings, queue depth, turnaround, refresh | +3.6 % |
 | PCIe 5.0 x16 pinned copies: 56.2 GB/s H→D, 55.1 GB/s D→H | PCIe protocol overheads | −0.2 %, +0.4 % |
 | DGX H100: 10.2 kW maximum | System composition: accelerators, hosts, switches, NICs, fans, power supplies | −18 % (a planning maximum) |
 | GB200 NVL72: about 120 kW per rack | Rack composition, liquid cooled | −5.0 % |
@@ -267,9 +268,32 @@ The *Chip* tab goes below the accelerator's headline numbers.
   - Left on *Auto*, the model behaves as before.
 
 The tests check the array formulas, an exactly divisible weight-stationary case against M ÷ (M + rows + columns),
-and that chiplets add die-to-die power for the crossing traffic and split the silicon. Still to come on this tab:
-voltage, frequency and heat (a V–f curve, leakage against temperature, power density), and memory-controller
-detail.
+and that chiplets add die-to-die power for the crossing traffic and split the silicon.
+
+- **Voltage, frequency and heat** (with the array on):
+  - A supply-voltage setting moves the clock along an alpha-power-law curve (f ∝ (V − Vth)^α ÷ V, with the array's
+    clock taken at a nominal 0.75 V).
+  - Energy per operation scales with V².
+  - Leakage rises with about V³ and doubles every 25 °C.
+  - The junction temperature is solved as a fixed point, inlet + θ × die power including the leakage it causes, with
+    θ and the inlet set by the cooling type. Past a point the loop runs away.
+  - The card gives the operating point, die power and its leakage share, power density, and the highest voltage
+    under 95 °C (by bisection).
+  - Charts sweep clock, power, TOPS/W and temperature across 0.5–1.0 V. Temperatures over 95 °C fail a note.
+  - The parameters are first-order assumptions: θ is inferred from H100 on air and B200 on liquid at typical junction
+    temperatures.
+  - This reshaped the chiplet example. At 0.75 V, 5 PFLOPS of H100-class circuits puts about 1,670 W on the die and
+    reaches 115 °C, so the example runs 1,747 cores at 0.62 V instead: the same compute at 91 °C, as six chiplets.
+- **Memory controller** (optional, under Chip micro-architecture): device DRAM efficiency from first principles
+  instead of the access-pattern table.
+  - Channels (HBM pseudo-channels, DDR5 subchannels) with banks and typical JEDEC-class timings.
+  - Row misses limited by bank cycling, the four-activate window and activate spacing.
+  - Queue depth against latency (Little's law), read/write turnaround per batch of writes, refresh, and burst use.
+  - The card names the binding limit, and a chart sets efficiency against row-miss rate for three queue depths.
+  - With its default settings it predicts EPYC Genoa's STREAM Triad within 3.6 % (±10 % fixed before the run), and it
+    is now one of the validations.
+  - It also shows that HBM pseudo-channels need deep queues: 32 requests of 64 B cover only about 57 % of the latency
+    at 32 GB/s per channel.
 
 ## LLM serving: from the model to the workload
 

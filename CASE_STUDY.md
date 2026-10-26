@@ -52,9 +52,9 @@ bottleneck.
 
 This is the part I care most about. The Checks tab compares the model with published figures:
 
-- **14 validations, all within tolerance:**
+- **15 validations, all within tolerance:**
   - HBM, LPDDR and DDR bandwidths for NVIDIA, AMD, Intel, Google and Apple parts;
-  - a STREAM Triad result;
+  - a STREAM Triad result, from the access-pattern model and again from a first-principles memory-controller model;
   - measured PCIe 5.0 copies in both directions;
   - DGX H100, GB200 NVL72 rack and NVL72 compute-tray power;
   - MLPerf Inference v5.0 Llama 2 70B throughput on 8 × H200: +11.5 % against a ±25 % tolerance fixed before the run.

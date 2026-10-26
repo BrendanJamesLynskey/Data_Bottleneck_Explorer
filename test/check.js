@@ -138,6 +138,18 @@ const update = process.argv.includes('--update');
     return {kept, peak: S.acc.tops / peak, dens: S.acc.topsMm2 * 1.8 / c.ghz / 2.43, pj: S.acc.pj / 0.29, ws: g.util / (4096 / (4096 + 64)),
       d2d: m.A.d2d / (m.d2dBps * D2D.eff / S.burst * 8 * D2D.pj * 1e-12), each: m.dieEach * 4 / m.die, dies: accCost(S, m).n, d2dOn: m.A.d2d > 0};
   });
+  // voltage and heat: the junction satisfies inlet + θ × die power with the leakage it causes; the clock follows the
+  // alpha-power law and energy per operation V². Memory controller: with every row hit, reads only and a deep queue,
+  // efficiency is refresh × burst use; queue depth binds exactly where Little's law says
+  const heat = await page.evaluate(() => {
+    applyPreset('chiparray'); const m = model(S), t = m.thermal, v = S.chip.vdd;
+    const resid = t.T - (t.tin + t.theta * (t.P0 + m.die * leakAt(t.T, v)));
+    const f = chipF(S.chip) / (1.8 * ((v - 0.3) ** 1.3 / v) / ((0.45) ** 1.3 / 0.75)), pj = S.acc.pj / (0.29 * (v / 0.75) ** 2);
+    const d = DRAMS.hbm3e_80, F = MC_FAM.HBM, chBW = dramUnitBW(d) / F.chans(d);
+    const ideal = mcEff(d, {hit: 1, req: 64, q: 4096, batch: 16}, 'stream', 1, 0, false).eff / (1 - F.ref);
+    const lat = d.lat * 1e-9, q = 8, little = mcEff(d, {hit: 1, req: 64, q, batch: 16}, 'stream', 1, 0, false).uQ / (q * 64 / (chBW * lat));
+    return {resid, f, pj, ideal, little, T: t.T, over: t.over};
+  });
   // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
   await page.setViewport({width: 711, height: 1039}); await page.emulateMediaType('print');
   const spec = await page.evaluate(ids => {
@@ -185,6 +197,8 @@ const update = process.argv.includes('--update');
   else console.log(`ok   prefill and decode pools: arithmetic splits exactly, power and capital add up, KV caches cross the network (most loaded: ${pools.pool})`);
   if (!(Math.abs(chip.kept - 1) < 0.01 && near(chip.peak, 1) && near(chip.dens, 1) && near(chip.pj, 1) && near(chip.ws, 1) && near(chip.d2d, 1) && near(chip.each, 1) && chip.dies === 4 && chip.d2dOn)) fail(`chip: ${JSON.stringify(chip)}`);
   else console.log('ok   chip: array peak, density and energy by formula; exact weight-stationary utilisation; chiplets add die-to-die power and split the silicon');
+  if (!(Math.abs(heat.resid) < 0.01 && near(heat.f, 1) && near(heat.pj, 1) && near(heat.ideal, 1) && near(heat.little, 1) && !heat.over)) fail(`voltage, heat, controller: ${JSON.stringify(heat)}`);
+  else console.log(`ok   voltage and heat: junction solves its own leakage (${Math.round(heat.T)} °C in the chiplet example), clock and energy follow V; controller limits match their formulas`);
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
   else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
   if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);
