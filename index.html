@@ -1229,10 +1229,14 @@ function modelCore(s){
   let worst = comps[0];
   let maxT = T/worst.U, maxTceil = maxT*s.ceil;
 
-  // latency of one block (per accelerator) through every stage, with M/D/1 queueing
+  // latency of one block (per accelerator) through every stage, with G/G/1 queueing
   const B = s.block, Ua = k => U[k]/(['src','host','cpu'].includes(k) ? bHost : s.burst);
-  // Kingman (G/G/1): wait ≈ (ca² + cs²)/2 · ρ/(1−ρ) · service; ca = arrival burstiness, cs = the stage's own jitter
-  const q = (svc, u, k) => u>=1 ? Infinity : svc*u/(1-u)*(s.vary.ca**2 + svcCv(k, svc, s)**2)/2;
+  // Kingman (G/G/1): wait ≈ (ca² + cs²)/2 · ρ/(1−ρ) · service; cs = the stage's own jitter. ca starts as the arrival
+  // burstiness; each queued stage then passes on its departures' CV, cd² = ρ²·cs² + (1−ρ²)·ca² (Whitt's linking
+  // equation): a busy, steady stage spaces blocks out, so the queue after it forms less (found by the simulation)
+  let caq = s.vary.ca; const qin = {};
+  const q = (svc, u, k) => { const cs = svcCv(k, svc, s); qin[k] = {ca:caq, u};
+    if(u>=1) return Infinity; const w = svc*u/(1-u)*(caq**2 + cs**2)/2; caq = Math.sqrt(u*u*cs*cs + (1-u*u)*caq*caq); return w; };
   const stages = [];
   if(dem.src!==undefined){
     const svc = B*s.inR/srcBW, base = s.src.startsWith('net') ? 5e-6 : 80e-6;
@@ -1274,7 +1278,10 @@ function modelCore(s){
   const nD = s.chip && s.chip.dies>0 ? s.chip.dies : 0, xFrac = nD>1 ? 1 - 1/nD : 0;
   const d2dBps = xFrac*((inT + outT) + localT*(nc.pattern==='uniform' ? 1 : 0.3))*s.burst/D2D.eff;
   { const fixed = 2*nocHops*nc.hopNs*1e-9 + 64/nocLink + xFrac*D2D.latNs*1e-9, u = U.noc/s.burst;
+    // the network's packets queue among all its traffic, which arrives with the workload's own burstiness
+    qin.noc = {ca:s.vary.ca, u};
     stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip interconnect', fixed, svc:0, q:u>=1?Infinity:fixed*u/(1-u)*(s.vary.ca**2 + stageJit('noc', s)**2)/2});
+    stages.forEach(st=>{ if(qin[st.k]){ st.ca = qin[st.k].ca; st.u = qin[st.k].u; } });
     stages.forEach(st=>st.t = st.fixed+st.svc+st.q); latency = stages.reduce((a,st)=>a+st.t,0); }
 
   // area of one accelerator die
@@ -1311,11 +1318,17 @@ function modelCore(s){
     noc:{N, k:kk, S:nq.S, kind:nq.kind, link:nocLink, inT, outT, localT, hopsEdge, hopsLocal, hops:nocHops, dem:nocDem, cap:nocCap, U:nocU, worst:nocWorst}};
 }
 
-/* Latency distribution: each stage is lognormal around its mean (service CV from the jitter level, queueing
-   wait CV ≈ 1), stages correlated as chosen. A seeded generator keeps the figures steady while you drag. */
+/* Latency distribution: each stage's fixed and transfer times are lognormal around their means (CV from the jitter
+   level); a queueing wait is zero with probability 1 − ρ and otherwise exponential, keeping its Kingman mean (the
+   shape of an M/G/1 wait, whose tail a lognormal understated, as the simulation showed). Stages are correlated as
+   chosen. A seeded generator keeps the figures steady while you drag. */
 function rng(seed){ return ()=>{ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed>>>15, 1 | seed); t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t; return ((t ^ t>>>14) >>> 0)/4294967296; }; }
 function normals(r){ const u = Math.max(1e-12, r()), v = r(); const m = Math.sqrt(-2*Math.log(u)); return [m*Math.cos(2*Math.PI*v), m*Math.sin(2*Math.PI*v)]; }
 const lnParams = cv => { const sg = Math.sqrt(Math.log(1+cv*cv)); return [-sg*sg/2, sg]; };   // mean 1
+// standard normal CDF (Abramowitz and Stegun 7.1.26, error below 1.5e-7), to carry the stage correlation to the waits
+const PhiN = x => { const t = 1/(1 + 0.3275911*Math.abs(x)/Math.SQRT2), y = 1 - t*(0.254829592 + t*(-0.284496736 + t*(1.421413741 + t*(-1.453152027 + t*1.061405429))))*Math.exp(-x*x/2); return x>=0 ? (1 + y)/2 : (1 - y)/2; };
+// a wait with mean q at load p: zero below 1 − p, else exponential with mean q ÷ p; its value at cumulative probability f
+const waitAt = (q, p, f) => f > 1 - p ? q/p*Math.log(p/Math.max(1e-300, 1 - f)) : 0;
 function latencyStats(m){
   if(m._ls) return m._ls;
   const pct = S.vary.pct, z = Z[pct], rho = CORR[S.vary.corr];
@@ -1324,16 +1337,16 @@ function latencyStats(m){
   for(const st of m.stages){
     if(st.fixed>0) parts.push({mean:st.fixed, ln:lnParams(stageJit(st.k, S)), name:st.name});
     if(st.svc>0) parts.push({mean:st.svc, ln:lnParams(svcCv(st.k, st.svc, S)), name:st.name+' (transfer)'});
-    if(st.q>0) parts.push({mean:st.q, ln:lnParams(1), name:st.name+' (queue)'});
+    if(st.q>0) parts.push({mean:st.q, wait:Math.min(1, st.u), name:st.name+' (queue)'});
   }
   // tolerance stack: every part at its own percentile, as if the bad cases all coincide
-  const stack = parts.reduce((a,p)=>a + p.mean*Math.exp(p.ln[0]+p.ln[1]*z), 0);
+  const stack = parts.reduce((a,p)=>a + (p.wait ? waitAt(p.mean, p.wait, pct) : p.mean*Math.exp(p.ln[0]+p.ln[1]*z)), 0);
   const N = pct>=0.9999 ? 40000 : pct>=0.999 ? 20000 : 10000, r = rng(12345), xs = new Float64Array(N), sr = Math.sqrt(rho), si = Math.sqrt(1-rho);
   let spare = null; const nz = () => { if(spare!==null){ const v = spare; spare = null; return v; } const [a,b] = normals(r); spare = b; return a; };
-  const P = parts.length, mu = parts.map(p=>p.ln[0]), sg = parts.map(p=>p.ln[1]), mean = parts.map(p=>p.mean);
+  const P = parts.length, mu = parts.map(p=>p.wait ? 0 : p.ln[0]), sg = parts.map(p=>p.wait ? 0 : p.ln[1]), mean = parts.map(p=>p.mean), wt = parts.map(p=>p.wait || 0);
   for(let i=0;i<N;i++){
     const z0 = nz(); let sum = 0;
-    for(let j=0;j<P;j++){ sum += sg[j]>0 ? mean[j]*Math.exp(mu[j]+sg[j]*(sr*z0 + si*nz())) : mean[j]; }
+    for(let j=0;j<P;j++){ sum += wt[j]>0 ? waitAt(mean[j], wt[j], PhiN(sr*z0 + si*nz())) : sg[j]>0 ? mean[j]*Math.exp(mu[j]+sg[j]*(sr*z0 + si*nz())) : mean[j]; }
     xs[i] = sum;
   }
   xs.sort();
@@ -2349,7 +2362,7 @@ function whyHTML(k, m, plain){
   if(k==='lat'){
     const ls = latencyStats(m);
     return `<h2>Latency = one block (${fmtB(S.block)}) through every stage: fixed delay + transfer + queueing</h2><table>${m.stages.map(st=>row(esc(st.name), `${fmtT(st.fixed)} + ${fmtT(st.svc)} + ${isFinite(st.q)?fmtT(st.q):'∞'} = ${fmtT(st.t)}`)).join('')}${row('<b>Mean</b>', `<b>${fmtT(m.latency)}</b>`)}</table>
-      <p>Transfer = block ÷ that stage’s usable rate. Queueing is Kingman’s G/G/1 wait at the stage’s load. The headline ${latLabel()} (${ls.unbounded?'unbounded':fmtT(latHead(m))}) comes from ${S.vary.deadline==='hard' ? 'stacking each stage’s own worst case' : `a Monte Carlo of lognormal stage delays with ${S.vary.jitter} jitter`}; the Latency tab shows the distribution.</p>`;
+      <p>Transfer = block ÷ that stage’s usable rate. Queueing is Kingman’s G/G/1 wait at the stage’s load, with each stage’s arrivals smoothed by the busy stage before it. The headline ${latLabel()} (${ls.unbounded?'unbounded':fmtT(latHead(m))}) comes from ${S.vary.deadline==='hard' ? 'stacking each stage’s own worst case' : `a Monte Carlo of stage delays (lognormal times with ${S.vary.jitter} jitter, exponential-tailed queue waits)`}; the Latency tab shows the distribution.</p>`;
   }
   if(k==='power'){
     const A = m.A, H = m.H, OH = overhead(S), accW = m.pAcc*tp.nA, hostW = m.pNodeHost*tp.nN;
@@ -2871,7 +2884,7 @@ function paneLatency(m){
     : `<div class="answer"><b>Unbounded.</b> At least one stage is above 100 % utilisation on average, so its queue grows without limit.</div>`;
   const dist = ls.unbounded ? '' : `<div class="card span"><h3>Distribution of one block's latency · ${S.vary.deadline==='hard'?'hard deadline':'soft deadline'}</h3>${histogram(ls)}
     <div class="rackstat" style="margin:12px 0 0">${[['Mean',ls.mean],['p50',ls.p50],['p99',ls.p99],['p99.9',ls.p999],['Worst-case stack',ls.stack],['Budget',S.lat]].map(([l,v])=>`<div class="${l!=='Budget'&&v>S.lat?'bad':''}"><div class="l">${l}</div><div class="v">${fmtT(v)}</div></div>`).join('')}</div>
-    <p class="note">${fmtN(ls.xs.length)} Monte Carlo draws. Each stage is lognormal around its mean (${S.vary.jitter} jitter; long transfers average out their jitter), queueing waits vary about as much as their mean, and stages are ${({full:'fully correlated',partial:'partly correlated',indep:'independent'})[S.vary.corr]}. The worst-case stack puts every stage at its own ${pctName(S.vary.pct)} together; ${S.vary.corr==='full'?'with full correlation the two agree':'the gap to the '+latLabel()+' line is the margin that tolerance stacking would waste'}.</p></div>`;
+    <p class="note">${fmtN(ls.xs.length)} Monte Carlo draws. Each stage is lognormal around its mean (${S.vary.jitter} jitter; long transfers average out their jitter), a queueing wait is zero with probability 1 − load and otherwise exponential, and stages are ${({full:'fully correlated',partial:'partly correlated',indep:'independent'})[S.vary.corr]}. The worst-case stack puts every stage at its own ${pctName(S.vary.pct)} together; ${S.vary.corr==='full'?'with full correlation the two agree':'the gap to the '+latLabel()+' line is the margin that tolerance stacking would waste'}.</p></div>`;
   const rows = m.stages.map(s=>`<tr><td>${s.name}</td><td class="n">${fmtT(s.fixed)}</td><td class="n">${fmtT(s.svc)}</td><td class="n">${fmtT(s.q)}</td><td class="n">${sig(stageJit(s.k,S))} / ${sig(s.svc>0?svcCv(s.k,s.svc,S):0)}</td><td class="n">${fmtT(s.t)}</td></tr>`).join('');
   const xs = [], ys = [], cores = [];
   for(let i=0;i<=60;i++){ const b = Math.pow(10, 3+i/60*8); const mm = model({...S, block:b}); xs.push(b); ys.push(mm.latency); cores.push(mm.dem.cpu); }
@@ -3032,7 +3045,7 @@ function paneModel(){
   <div class="card span"><h3>Scale-up fabrics (per accelerator, per direction)</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Fabric</th><th class="n">Raw</th><th class="n">Efficiency</th><th class="n">pJ/bit</th><th class="n">Switch W/acc.</th><th class="n">Max domain</th></tr></thead><tbody>${fb}</tbody></table></div>
   <p class="note">Scale-out traffic is charged 15 pJ/bit (NIC, optics, switches) plus NIC power per port.</p></div>
   <div class="card span"><h3>Overheads in this configuration</h3><div class="cols">${['h2d','d2h','dram','noc'].concat(M&&M.tp.dom>1&&M.xUp>0?['fabric']:[]).concat(M&&M.xOut>0?['nic']:[]).concat(S.src.startsWith('net')?['eth']:[]).map(k=>`<div>${ohTable(overheads(k, M))}</div>`).join('')}</div></div>
-  <div class="card span"><h3>Variability</h3><p style="margin:0;color:var(--t2)">Sizing uses the peak-to-average ratio, except that a resource shared by n independent streams sees a smoothed peak: the excess over the mean shrinks by √(ρ + (1−ρ)/n), where ρ is the chosen correlation (1 = peaks coincide, the worst case). Queueing waits use Kingman's G/G/1 approximation, (c<sub>a</sub>² + c<sub>s</sub>²)/2 · ρ/(1−ρ) · service time, with arrival burstiness c<sub>a</sub> and each stage's jitter c<sub>s</sub>. Latency is sampled by Monte Carlo (10,000 to 40,000 draws depending on the percentile; lognormal stage delays, correlated as chosen). Fixed latencies carry the full jitter; long transfers average it out, their CV shrinking as √(duration ÷ 10 µs), while compute keeps its full, data-dependent jitter; a soft deadline is judged at the chosen percentile, a hard one at the worst-case stack of per-stage percentiles. Catalogue tolerance draws every capacity independently within ±tol (2σ) and reports how often the design holds and which component is weakest. Jitter CVs (low / typical / high): ${Object.entries(JIT).map(([k,v])=>k+' '+v.join('/')).join(', ')}.</p></div>
+  <div class="card span"><h3>Variability</h3><p style="margin:0;color:var(--t2)">Sizing uses the peak-to-average ratio, except that a resource shared by n independent streams sees a smoothed peak: the excess over the mean shrinks by √(ρ + (1−ρ)/n), where ρ is the chosen correlation (1 = peaks coincide, the worst case). Queueing waits use Kingman's G/G/1 approximation, (c<sub>a</sub>² + c<sub>s</sub>²)/2 · ρ/(1−ρ) · service time, with each stage's jitter c<sub>s</sub>. The first queue sees the arrival burstiness c<sub>a</sub>; each later one sees the departures of the queue before it, c<sub>d</sub>² = ρ²c<sub>s</sub>² + (1−ρ²)c<sub>a</sub>² (Whitt's linking equation), so a busy, steady stage smooths the traffic after it. Latency is sampled by Monte Carlo (10,000 to 40,000 draws depending on the percentile; lognormal fixed and transfer times, and queue waits that are zero with probability 1 − ρ and otherwise exponential, all correlated as chosen). A discrete-event simulation checks these shortcuts on the Checks tab. Fixed latencies carry the full jitter; long transfers average it out, their CV shrinking as √(duration ÷ 10 µs), while compute keeps its full, data-dependent jitter; a soft deadline is judged at the chosen percentile, a hard one at the worst-case stack of per-stage percentiles. Catalogue tolerance draws every capacity independently within ±tol (2σ) and reports how often the design holds and which component is weakest. Jitter CVs (low / typical / high): ${Object.entries(JIT).map(([k,v])=>k+' '+v.join('/')).join(', ')}.</p></div>
   <div class="card span"><h3>On-chip interconnect</h3><p style="margin:0;color:var(--t2)">Traffic entering or leaving the die (DRAM, host link, peers) meets the interconnect at the edge; tile-to-tile traffic follows the chosen pattern. Networks-on-chip (mesh, torus, ring, crossbar, and AMBA CHI as a coherent mesh) are checked at the edge channels (4k for a k × k grid), the bisection (k channels per direction for a mesh, 2k for a torus, 2 for a ring, with 1/16 of edge traffic and a pattern-dependent share of tile traffic crossing) and each tile's port. AMBA AXI and ACE are crossbars of masters and memory-side slave ports with independent read and write channels, checked at the memory ports, the master ports and tile-to-tile traffic through the crossbar. AXI4-Stream is a set of parallel pipelines, checked at their entries and busiest link. AHB and APB are shared buses: every transfer in either direction takes the one bus. Usable share of a link: ${Object.values(NOC_TOPO).map(t=>t.name.replace(/ \(.*\)/,'')+' '+(t.eff*100).toFixed(0)+' %').join(', ')}. Energy ${BASE.noc.pj} pJ/bit per hop plus ${SRAM_PJ} pJ/bit per SRAM access.</p></div></div>`;
 }
 
@@ -3243,7 +3256,7 @@ function specHTML(){
     <h3>Parts, power and cost</h3><table><thead><tr><th>Part</th><th>Specification</th><th class="n">Qty</th><th class="n">Power</th><th class="n">${S.cost.basis==='buy'?'Price':'Build cost'}</th></tr></thead><tbody>${partRows}</tbody></table>
     <h3>Load on every limit at the target</h3><table><thead><tr><th>Limit</th><th class="n">Needs</th><th class="n">Has</th><th class="n">Load</th></tr></thead><tbody>${loadRows}</tbody></table>
     <h3>Open issues</h3>${issues.length ? `<ul>${issues.map(c=>`<li>${c.lvl==='bad'?'<b>Fails:</b> ':'Tight: '}${c.title}</li>`).join('')}</ul>` : '<p>None: every check in the Notes tab passes.</p>'}
-    <div class="sh-foot">First-order model: throughput, M/D/1 and G/G/1 queueing, Monte Carlo latency and power from pJ/bit and pJ/op. It reproduces ${chk.filter(x=>x.pass).length} of ${chk.length} published reference figures within tolerance. Decimal units. Power excludes cooling plant outside the rack; costs are first-order ${S.cost.basis==='buy'?'purchase prices':'build costs'} from published 2025–26 estimates.</div>`;
+    <div class="sh-foot">First-order model: throughput, G/G/1 queueing, Monte Carlo latency and power from pJ/bit and pJ/op. It reproduces ${chk.filter(x=>x.pass).length} of ${chk.length} published reference figures within tolerance. Decimal units. Power excludes cooling plant outside the rack; costs are first-order ${S.cost.basis==='buy'?'purchase prices':'build costs'} from published 2025–26 estimates.</div>`;
 }
 let specFrom = null;
 function openSpec(){ specFrom = document.activeElement; document.getElementById('sheet').innerHTML = specHTML(); document.getElementById('spec').hidden = false; document.getElementById('page').inert = true; document.getElementById('specPrint').focus({preventScroll:true}); }
@@ -3460,7 +3473,7 @@ How the model reads its inputs:
 - rate_bytes_per_s is bytes of input processed per second by the whole system. Everything else is per byte processed: link bytes in and out (host ↔ accelerator), extra DRAM reads and writes (weights, tables, intermediates, multiple passes), arithmetic in operations per byte, tile-to-tile bytes on the on-chip network, and peer bytes exchanged between accelerators inside the scale-up domain or across the network.
 - The rate splits evenly over accelerators (accelerators_per_node × nodes_per_rack × racks) and over nodes for host-side work. block_bytes is the unit of work per accelerator (a frame, a batch, a decode step); latency is one block through every stage.
 - A component is fine below the utilisation ceiling (default 80 %), tight between the ceiling and 100 %, failing above 100 %. Units are decimal.
-- Variability: a soft deadline is judged at a latency percentile (p99 by default) from a Monte Carlo of lognormal stage delays; a hard deadline uses the worst-case stack of per-stage percentiles. peak_correlation full means peaks coincide everywhere (worst case); independent or partial lets shared resources such as the host be sized for a smoothed peak. If a latency target is tight and it is unclear whether missing it is a failure (hard) or a quality issue (soft), ask.
+- Variability: a soft deadline is judged at a latency percentile (p99 by default) from a Monte Carlo of stage delays (lognormal times, exponential-tailed queue waits); a hard deadline uses the worst-case stack of per-stage percentiles. peak_correlation full means peaks coincide everywhere (worst case); independent or partial lets shared resources such as the host be sized for a smoothed peak. If a latency target is tight and it is unclear whether missing it is a failure (hard) or a quality issue (soft), ask.
 
 Useful conversions:
 - For LLM training, use set_training_workload in the same way. To design inside the accelerator (compute array, voltage, chiplets, DRAM controller), use set_chip; check junction_c and overheats in the evaluation and lower the voltage or add cores if it runs hot.

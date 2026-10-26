@@ -1,7 +1,7 @@
 {
  "schema": "hw-explorer-sim/1",
  "explorer": {
-  "model_hash": "fnv1a32:09ae6119",
+  "model_hash": "fnv1a32:42c6d3a6",
   "url": "https://hw-system-design-explorer.vercel.app/"
  },
  "design": {
@@ -63,7 +63,7 @@
      "svc_cv": 0.04261769531214714,
      "extra_s": 0,
      "util": 0.49552159864801393,
-     "wait_s": 0.00024380392055063963
+     "wait_s": 0.00024380044441106827
     },
     {
      "k": "noc",
@@ -87,7 +87,7 @@
      "svc_cv": 0.1,
      "extra_s": 0,
      "util": 0.8,
-     "wait_s": 0.0016160000000000005
+     "wait_s": 0.001223829661054649
     },
     {
      "k": "d2h",
@@ -99,7 +99,7 @@
      "svc_cv": 0.15,
      "extra_s": 1.4877319335937513e-7,
      "util": 0.0037647883097330728,
-     "wait_s": 6.986219585472346e-9
+     "wait_s": 2.054267455906497e-9
     },
     {
      "k": "cpu2",
