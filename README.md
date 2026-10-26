@@ -142,7 +142,11 @@ checks that every overhead breakdown multiplies out to the model's capacities, t
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
 spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM workload matches a hand calculation, that the cost parts add up and the
-cost goal finds the cheapest design, and that all 29 examples match their golden results within 2 %.
+cost goal finds the cheapest design, and that all 29 examples match their golden results within 2 %. An axe-core
+audit then checks the page, all 13 tabs, the drawers, the spec sheet and an explanation panel for accessibility
+violations, with none allowed. Text meets WCAG AA contrast. Tables that scroll sideways, the headline figures and
+the diagram's blocks are reachable by keyboard. Focus moves into a drawer when it opens and back when it closes,
+and closed drawers are out of the tab order. Every view fits a 390 px phone screen without sideways scrolling.
 
 ## Design optimiser
 

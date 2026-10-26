@@ -25,7 +25,7 @@
 :root{
   --bg:#0a0a0a; --s1:#111111; --s2:#171717; --s3:#1f1f1f;
   --l1:#232323; --l2:#323232; --l3:#4a4a4a;
-  --t1:#ededed; --t2:#a3a3a3; --t3:#6b6b6b;
+  --t1:#ededed; --t2:#a3a3a3; --t3:#808080;
   --ok:#8a8a8a; --warn:#cfcfcf; --bad:#ffffff;
   --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
@@ -40,6 +40,7 @@ a:hover{text-decoration-color:var(--t1)}
 button,select,input{font:inherit; color:inherit}
 .mono{font-family:var(--mono)}
 :focus-visible{outline:1px solid var(--t1); outline-offset:2px}
+.sr{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
 
 /* ---------- page shell; drawers push it aside on wide screens ---------- */
 #page{transition:padding .25s ease}
@@ -68,7 +69,7 @@ select option, select optgroup{background:var(--s1); color:var(--t1)}
 .kpi .l{font-size:11px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em}
 .kpi[data-why]{cursor:pointer} .kpi[data-why]:hover .l,.kpi[aria-expanded="true"] .l{color:var(--t1)} .kpi[aria-expanded="true"]{box-shadow:inset 0 -2px 0 var(--t1)}
 .why{margin-top:10px; border-left:2px solid var(--t1); padding:6px 0 6px 14px; font-size:13px; color:var(--t2); line-height:1.6}
-.why:empty{display:none} .why h4{margin:0 0 4px; font-size:13px; font-weight:600; color:var(--t1)}
+.why:empty{display:none} .why h2{margin:0 0 4px; font-size:13px; font-weight:600; color:var(--t1)}
 .why .eq{font-family:var(--mono); font-size:12.5px; color:var(--t1); overflow-wrap:anywhere} .why .eq i{font-style:normal; color:var(--t3)}
 .why table{border-collapse:collapse; margin:4px 0; font-size:12.5px} .why td{padding:1px 14px 1px 0} .why td.n{text-align:right; font-family:var(--mono); color:var(--t1)}
 .why .x{float:right; background:none; border:none; color:var(--t3); cursor:pointer; font-size:16px; line-height:1}
@@ -131,7 +132,7 @@ select option, select optgroup{background:var(--s1); color:var(--t1)}
 .card h3 span{text-transform:none; letter-spacing:.02em}
 .card h3{margin:0 0 10px; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--t2)}
 .span{grid-column:1 / -1}
-.tbl-wrap{overflow-x:auto}
+.tbl-wrap{overflow-x:auto; position:relative}   /* relative: hidden labels (.sr) inside stay clipped */
 table.t{width:100%; border-collapse:collapse; font-size:13px}
 table.t th{text-align:left; font-weight:500; color:var(--t3); font-size:11px; letter-spacing:.06em; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid var(--l2); white-space:nowrap}
 table.t td{padding:6px 8px; border-bottom:1px solid var(--l1); white-space:nowrap}
@@ -153,7 +154,7 @@ table.t tr:hover td{background:var(--s1)}
 .cons{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px}
 .con{border:1px solid var(--l1); border-radius:8px; padding:12px 14px}
 .con.bad{border-color:var(--t1)} .con.warn{border-style:dashed; border-color:var(--warn)}
-.con h4{margin:0 0 6px; font-size:13.5px; font-weight:600; display:flex; gap:10px; align-items:center; justify-content:space-between}
+.con h3{margin:0 0 6px; font-size:13.5px; font-weight:600; display:flex; gap:10px; align-items:center; justify-content:space-between}
 .con p{margin:4px 0; font-size:13px; color:var(--t2)}
 .con p b{color:var(--t1); font-family:var(--mono); font-weight:500}
 svg.chart{width:100%; height:auto; display:block}
@@ -374,6 +375,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   </div>
 </header>
 
+<main id="main">
 <section class="summary">
   <form class="ask" id="askForm"><input id="askInput" autocomplete="off" aria-label="Describe the system"
     placeholder="Describe what the system has to do, e.g. “serve a 70B model at 3,000 tokens/s, under 50 ms per token”"><button class="btn">Design it</button><button type="button" class="btn demo" id="demoBtn">Watch a demo</button></form>
@@ -386,7 +388,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 </section>
 
 <section class="stage">
-  <div class="dwrap"><svg id="diagram" viewBox="0 0 1000 460" role="img" aria-label="System block diagram with data flow"></svg></div>
+  <div class="dwrap"><svg id="diagram" viewBox="0 0 1000 460" role="group" aria-label="System block diagram with data flow; each block opens its details"></svg></div>
   <details class="legend-d"><summary>Legend</summary><div class="legend">
     <span><i class="sw"></i>within the utilisation ceiling</span>
     <span><i class="sw warn"></i>above the ceiling</span>
@@ -398,10 +400,12 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 </section>
 
 <section class="tabs">
-  <nav class="tabbar" id="tabbar" role="tablist"></nav>
+  <h2 class="sr">Analysis</h2>
+  <nav class="tabbar" id="tabbar" aria-label="Analysis views"></nav>
   <div id="panes"></div>
 </section>
 
+</main>
 <footer>
   <p class="checked" id="checkedLine"></p>
   A first-order sizing model; every catalogue value is an indicative figure (see the Model tab).
@@ -433,7 +437,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   <form class="chatin" id="chatForm"><textarea id="chatInput" rows="2" placeholder="Describe the system, or answer the questions…" aria-label="Message"></textarea><button class="btn">Send</button></form>
 </aside>
 <div class="toast" id="toast"></div>
-<div class="spec" id="spec" hidden role="dialog" aria-label="Spec sheet"><div class="spec-bar"><button class="btn" id="specPrint">Print or save as PDF</button><button class="btn" id="specClose">Close</button></div><article class="sheet" id="sheet"></article></div>
+<div class="spec" id="spec" hidden role="dialog" aria-modal="true" aria-label="Spec sheet"><div class="spec-bar"><button class="btn" id="specPrint">Print or save as PDF</button><button class="btn" id="specClose">Close</button></div><article class="sheet" id="sheet"></article></div>
 
 <script>
 'use strict';
@@ -1288,7 +1292,7 @@ const isValidation = r => !r.fitted && !r.info;   // calibration points and indi
 function paneChecks(){
   const res = runChecks(), val = res.filter(isValidation), np = val.filter(r=>r.pass).length, nf = res.filter(r=>r.fitted).length, ni = res.filter(r=>r.info).length;
   return `<div class="answer">The model is checked against <b>${val.length}</b> published figures; <b>${np} of ${val.length}</b> fall within their tolerance. ${nf} more are calibration points, where a parameter (energy per operation, or a price) was set with a published figure in view, so they show the fit rather than validate it. ${ni} are indicative: one vendor’s energy per operation applied to another’s part, which shows how far that figure carries (about ±25 %) rather than passing or failing. The same checks run in CI on every change.</div>
-    <div class="card"><div class="tbl-wrap"><table class="t wrap"><thead><tr><th>Reference</th><th>What it tests</th><th class="n">Published</th><th class="n">Model</th><th class="n">Error</th><th class="n">Tolerance</th><th></th></tr></thead><tbody>${
+    <div class="card"><div class="tbl-wrap"><table class="t wrap"><thead><tr><th>Reference</th><th>What it tests</th><th class="n">Published</th><th class="n">Model</th><th class="n">Error</th><th class="n">Tolerance</th><th><span class="sr">Action</span></th></tr></thead><tbody>${
       res.map(r=>`<tr><td>${r.name}<br><span class="note" style="margin:0">${esc(r.how)} · <a href="${r.src[1]}" target="_blank" rel="noopener">${esc(r.src[0])}</a></span></td><td style="white-space:normal">${r.tests}</td><td class="n">${r.f(r.pub)}</td><td class="n">${r.f(r.v)}</td><td class="n">${(r.err>=0?'+':'')+(r.err*100).toFixed(1)} %</td><td class="n">${r.info?'—':'±'+(r.tol*100).toFixed(0)+' %'}</td><td>${r.fitted?tag('ok','calibration'):r.info?tag('ok','indicative'):tag(r.pass?'ok':'bad', r.pass?'within':'outside')}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 
@@ -1365,7 +1369,7 @@ function optimise(base, opt){
 const designLine = s => `${s.dev.units} × ${DRAMS[s.dev.dram].name} · ${LINKS[s.link.id].kind==='pcie' ? (s.link.count>1?s.link.count+' × ':'')+LINKS[s.link.id].name+' x'+s.link.lanes : s.link.count+' × UCIe'} · ${NOC_TOPO[s.noc.topo].name.replace(/ \(.*\)/,'')} ${s.noc.width}-bit`;
 let optState = {goal:'balanced', practical:true, reticle:false, scale:true, onPackage:false}, optResult = null;
 function paneOpt(m){
-  const o = optState, sel = (k, opts) => `<select data-opt="${k}">${Object.entries(opts).map(([v,t])=>`<option value="${v}"${String(o[k])===v?' selected':''}>${t}</option>`).join('')}</select>`;
+  const o = optState, sel = (k, opts) => `<select data-opt="${k}" aria-label="${k==='goal'?'Optimise for':k}">${Object.entries(opts).map(([v,t])=>`<option value="${v}"${String(o[k])===v?' selected':''}>${t}</option>`).join('')}</select>`;
   const box = (k, label) => `<label class="tog" style="display:inline-flex; margin:0 16px 0 0"><span>${label}</span><input type="checkbox" data-opt="${k}"${o[k]?' checked':''}><span class="k"></span></label>`;
   let res = '';
   if(optResult){
@@ -1374,7 +1378,7 @@ function paneOpt(m){
     else res = `<div class="answer">Best ${({balanced:'balanced',power:'lowest-power',area:'smallest',cost:'lowest-cost'})[o.goal]} design: <b>${esc(designLine(r.best.s))}</b>${r.best.s.scale.fabric!==S.scale.fabric&&r.best.m.xUp>0?' · '+FABRICS[r.best.s.scale.fabric].name.split(' (')[0]:''}${r.tops?` · peak compute raised to ${sig(r.tops)} TOPS`:''}${r.host?` · host widened to ${r.host.units} × ${DRAMS[r.host.dram].name}, ${r.host.cores} cores`:''}${r.scaled?` · ${fmtN(r.best.m.tp.nA)} accelerators`:''}.
       System ${fmtW(r.best.P)}, die ${fmtA(r.best.A)}, ${fmtUSD(r.best.C)} a year, most loaded: ${r.best.worst.name} at ${fmtPct(r.best.worst.U)}. <button class="use" data-optuse="0">use this design</button><br>
       <span class="note">${r.feasible} of ${r.tried} combinations meet every limit; ${r.evals} model evaluations in ${Math.round(r.ms)} ms. The table is the power-against-area${o.goal==='cost'?'-against-cost':''} trade-off: no design in it is beaten on ${o.goal==='cost'?'all three':'both'}.</span></div>
-      <div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Design</th><th class="n">System power</th><th class="n">Die</th><th class="n">Cost a year</th><th class="n">Most loaded</th><th class="n">Latency</th><th></th></tr></thead><tbody>${
+      <div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Design</th><th class="n">System power</th><th class="n">Die</th><th class="n">Cost a year</th><th class="n">Most loaded</th><th class="n">Latency</th><th><span class="sr">Action</span></th></tr></thead><tbody>${
         r.front.map((x,i)=>`<tr class="${i===0?'cur':''}"><td>${esc(designLine(x.s))}</td><td class="n">${fmtW(x.P)}</td><td class="n">${fmtA(x.A)}</td><td class="n">${fmtUSD(x.C)}</td><td class="n">${esc(x.worst.name)} ${fmtPct(x.worst.U)}</td><td class="n">${fmtT(x.m.latency)}</td><td><button class="use" data-optuse="${i}">use</button></td></tr>`).join('')}</tbody></table></div></div>`;
   }
   return `<div class="card" style="margin-bottom:16px"><h3>Find a design that meets the requirement</h3>
@@ -1692,7 +1696,10 @@ function paintInspector(m){
 /* =====================================================================
    DRAWERS
    ===================================================================== */
+let drawerFrom = null;   // the control that opened a drawer gets focus back when it closes
 function openDrawer(which){
+  const was = document.querySelector('.drawer.open');
+  if(which && !was) drawerFrom = document.activeElement;
   document.body.classList.toggle('open-left', which==='left');
   document.body.classList.toggle('open-right', which==='right' || which==='assist');
   document.getElementById('dInputs').classList.toggle('open', which==='left');
@@ -1700,7 +1707,12 @@ function openDrawer(which){
   document.getElementById('dAssist').classList.toggle('open', which==='assist');
   document.getElementById('openInputs').classList.toggle('on', which==='left');
   document.getElementById('openAssist').classList.toggle('on', which==='assist');
+  const d = {left:'dInputs', right:'dComp', assist:'dAssist'}[which];
+  for(const id of ['dInputs', 'dComp', 'dAssist']) document.getElementById(id).inert = id!==d;   // closed drawers sit off-screen: keep focus out
+  if(d){ const x = which==='assist' ? document.getElementById('chatInput') : document.querySelector('#'+d+' .x'); if(x && !document.getElementById(d).contains(document.activeElement)) x.focus({preventScroll:true}); }
+  else if(was && drawerFrom && document.contains(drawerFrom)){ drawerFrom.focus({preventScroll:true}); drawerFrom = null; }
 }
+for(const id of ['dInputs', 'dComp', 'dAssist']) document.getElementById(id).inert = true;
 document.getElementById('openInputs').onclick = ()=> openDrawer(document.body.classList.contains('open-left') ? null : 'left');
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick = ()=>openDrawer(null));
 document.getElementById('scrim').onclick = ()=>openDrawer(null);
@@ -1868,22 +1880,22 @@ function whyHTML(k, m){
     const unit = c.k==='compute' ? 'op' : c.k==='cpu' ? 'core·s' : 'B';
     const cap = c.k==='dram' ? `${S.dev.units} × ${fmtBps(dramUnitBW(m.dev))} peak × ${fmtPct(m.devE)} efficiency`
       : c.k==='compute' ? `${sig(S.acc.tops)} TOPS × ${fmtPct(S.acc.util)} achievable` : c.k==='host' ? `${S.host.units} × ${fmtBps(dramUnitBW(m.hd))} peak × ${fmtPct(m.hostE)} efficiency` : '';
-    const head = k==='max' ? `<h4>Max sustainable = target ÷ load on the most loaded part</h4>${eq(fmtBps(S.T), '÷', fmtPct(c.U), '=', `<b>${fmtBps(m.maxT)}</b>`)}<p>The load on ${esc(c.name)} is worked out like this:</p>`
-      : `<h4>Load = demand at the peak ÷ capacity</h4>`;
+    const head = k==='max' ? `<h2>Max sustainable = target ÷ load on the most loaded part</h2>${eq(fmtBps(S.T), '÷', fmtPct(c.U), '=', `<b>${fmtBps(m.maxT)}</b>`)}<p>The load on ${esc(c.name)} is worked out like this:</p>`
+      : `<h2>Load = demand at the peak ÷ capacity</h2>`;
     return head + eq(`<i>demand</i> = ${fmtBps(S.T)} ÷ ${fmtN(n)} ${host?'node':'accelerator'}${n>1?'s':''} × ${sig(pk)} peak-to-average${host && pk!==S.burst ? ' (smoothed over '+S.scale.perNode+' streams)' : ''} × ${sig(c.need/per)} ${unit} per byte = ${c.f(c.need)}`)
       + eq(`<i>capacity</i> = ${cap ? cap+' = ' : ''}${c.f(c.have)}`) + eq(`<i>load</i> = ${c.f(c.need)} ÷ ${c.f(c.have)} = <b>${fmtPct(c.U)}</b>`, `<i>(ceiling ${fmtPct(S.ceil)})</i>`)
       + `<p>Every part on the data path is worked out the same way; the most loaded sets the system. The weakest-link strip below shows the rate each part alone could carry.</p>`;
   }
   if(k==='lat'){
     const ls = latencyStats(m);
-    return `<h4>Latency = one block (${fmtB(S.block)}) through every stage: fixed delay + transfer + queueing</h4><table>${m.stages.map(st=>row(esc(st.name), `${fmtT(st.fixed)} + ${fmtT(st.svc)} + ${isFinite(st.q)?fmtT(st.q):'∞'} = ${fmtT(st.t)}`)).join('')}${row('<b>Mean</b>', `<b>${fmtT(m.latency)}</b>`)}</table>
+    return `<h2>Latency = one block (${fmtB(S.block)}) through every stage: fixed delay + transfer + queueing</h2><table>${m.stages.map(st=>row(esc(st.name), `${fmtT(st.fixed)} + ${fmtT(st.svc)} + ${isFinite(st.q)?fmtT(st.q):'∞'} = ${fmtT(st.t)}`)).join('')}${row('<b>Mean</b>', `<b>${fmtT(m.latency)}</b>`)}</table>
       <p>Transfer = block ÷ that stage’s usable rate. Queueing is Kingman’s G/G/1 wait at the stage’s load. The headline ${latLabel()} (${ls.unbounded?'unbounded':fmtT(latHead(m))}) comes from ${S.vary.deadline==='hard' ? 'stacking each stage’s own worst case' : `a Monte Carlo of lognormal stage delays with ${S.vary.jitter} jitter`}; the Latency tab shows the distribution.</p>`;
   }
   if(k==='power'){
     const A = m.A, H = m.H, OH = overhead(S), accW = m.pAcc*tp.nA, hostW = m.pNodeHost*tp.nN;
     const items = [['Compute: ops/s × '+S.acc.pj+' pJ/op', A.compute], ['Device DRAM: traffic × '+m.dev.pj+' pJ/bit + standby', A.devDram], ['On-chip: hops × pJ/bit + SRAM reads', A.noc],
       ['Leakage: '+fmtA(m.die)+' × '+S.acc.leak+' W/mm²', A.leak], ['Host link: traffic × pJ/bit + idle lanes', A.link], ['Scale-up fabric: traffic × pJ/bit + ports', A.up], ['Network: NIC, optics, switch port', A.out]].filter(x=>x[1]>0);
-    return `<h4>Power at the target = (per accelerator × ${fmtN(tp.nA)} + per host × ${fmtN(tp.nN)}) × (1 + fans and conversion)</h4>
+    return `<h2>Power at the target = (per accelerator × ${fmtN(tp.nA)} + per host × ${fmtN(tp.nN)}) × (1 + fans and conversion)</h2>
       <table>${items.map(([l,v])=>row(l, fmtW(v))).join('')}${row('<b>Per accelerator</b>', `<b>${fmtW(m.pAcc)}</b>`)}${row('Per host (fixed, memory, CPU, I/O)', fmtW(m.pNodeHost))}</table>
       ${eq(`(${fmtW(m.pAcc)} × ${fmtN(tp.nA)} + ${fmtW(m.pNodeHost)} × ${fmtN(tp.nN)}) × ${(1+OH).toFixed(3)} = <b>${fmtW(m.Ptot)}</b>`)}
       <p>Fans and conversion: ${(OH*100).toFixed(1)} % for ${coolOf(S).name} cooling, read from the ${S.scale.rackKW} kW rack limit. Full-load power (${fmtW(fullPower(S).total)}) runs every part at its peak instead.</p>`;
@@ -1891,7 +1903,7 @@ function whyHTML(k, m){
   if(k==='cost'){
     const c = costOf(S, m), llm = S.llm.on, work = (llm ? S.llm.users*S.llm.tps : m.T)*S.cost.duty*YEAR_S;
     const big = v => v>=1e4 ? fmtN(Math.round(v)) : sig(v);
-    return `<h4>Cost ${c.unitName} = cost a year ÷ work a year</h4>
+    return `<h2>Cost ${c.unitName} = cost a year ÷ work a year</h2>
       ${eq(`<i>a year</i> = ${fmtUSD(c.hw)} hardware ÷ ${S.cost.years} + ${fmtUSD(c.parts.facility)} facility ÷ ${COST.facYears} + ${fmtUSD(c.year.energy)} electricity = ${fmtUSD(c.perYear)}`)}
       ${eq(`<i>work</i> = ${llm ? fmtN(Math.round(S.llm.users*S.llm.tps))+' tokens/s' : fmtBps(m.T)} × ${fmtPct(S.cost.duty)} of ${fmtN(Math.round(YEAR_S))} s = ${llm ? big(work/1e6)+' M tokens' : big(work/1e15)+' PB'}`)}
       ${eq(`${fmtUSD(c.perYear)} ÷ ${llm ? big(work/1e6)+' M tokens' : big(work/1e15)+' PB'} = <b>${fmtUSD(c.unit)}</b>`)}
@@ -1965,7 +1977,7 @@ function paintCompare(m){
   const same = CMP_DESIGN.every(([,f])=>f(a.s,a.m)===f(b.s,b.m)) && CMP_NUM.every(([,f])=>f(a)===f(b));
   const head = same ? `<span>B is the same as A: change anything and it is compared here.</span>`
     : [['power', 3], ['cost', 8], ['die', 5], ['max rate', 1], ['latency', 2]].map(([n,i])=>`${n} <b>${delta(CMP_NUM[i][1](a), CMP_NUM[i][1](b), CMP_NUM[i][3])}</b>`).join(' · ');
-  const tbl = cmpOpen ? `<div class="cmp-t tbl-wrap"><table class="t"><thead><tr><th></th><th>A (pinned)</th><th>B (current)</th><th class="n">B against A</th></tr></thead><tbody>${
+  const tbl = cmpOpen ? `<div class="cmp-t tbl-wrap"><table class="t"><thead><tr><th><span class="sr">Action</span></th><th>A (pinned)</th><th>B (current)</th><th class="n">B against A</th></tr></thead><tbody>${
     CMP_DESIGN.map(([n,f])=>{ const va = f(a.s,a.m), vb = f(b.s,b.m); return `<tr><td>${n}</td><td>${esc(va)}</td><td class="${va!==vb?'diff':''}">${esc(vb)}</td><td class="n">${va===vb?'':'changed'}</td></tr>`; }).join('')}${
     CMP_NUM.map(([n,f,fm,lo])=>`<tr><td>${n}${n==='Latency'?', '+latLabel():''}</td><td class="n">${fm(f(a),a)}</td><td class="n">${fm(f(b),b)}</td><td class="n">${delta(f(a), f(b), lo)}</td></tr>`).join('')}</tbody></table>
     <p class="note">Bold = better than A. Each design is evaluated at its own requirement; the Rate sweep tab draws both as the rate grows.</p></div>` : '';
@@ -1982,10 +1994,10 @@ let moreOpen = false;
 let tab = 'sizing';
 function buildTabs(){
   if(TABS.find(t=>t.id===tab).more) moreOpen = true;
-  document.getElementById('tabbar').innerHTML = TABS.map(t=>`<button class="tab${t.id===tab?' on':''}${t.more?' more':''}" role="tab" data-t="${t.id}" ${t.more&&!moreOpen?'hidden':''}>${t.name}<span class="n" id="n_${t.id}" hidden></span></button>`).join('')
-    + `<button class="tab moretog" id="moreTog">${moreOpen?'Less':'More'} <span aria-hidden="true">${moreOpen?'‹':'›'}</span></button>`;
+  document.getElementById('tabbar').innerHTML = TABS.map(t=>`<button class="tab${t.id===tab?' on':''}${t.more?' more':''}" aria-current="${t.id===tab}" data-t="${t.id}" ${t.more&&!moreOpen?'hidden':''}>${t.name}<span class="n" id="n_${t.id}" hidden></span></button>`).join('')
+    + `<button class="tab moretog" id="moreTog" aria-expanded="${moreOpen}">${moreOpen?'Less':'More'} <span aria-hidden="true">${moreOpen?'‹':'›'}</span></button>`;
   document.getElementById('panes').innerHTML = TABS.map(t=>`<div class="pane${t.id===tab?' on':''}" id="p_${t.id}"></div>`).join('');
-  document.querySelectorAll('.tab[data-t]').forEach(b=>b.onclick=()=>{ tab=b.dataset.t; document.querySelectorAll('.tab[data-t]').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab[data-t]').forEach(b=>b.onclick=()=>{ tab=b.dataset.t; document.querySelectorAll('.tab[data-t]').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-current', x===b); });
     document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on', p.id==='p_'+tab)); update(); });
   document.getElementById('moreTog').onclick = ()=>{ moreOpen = !moreOpen; if(!moreOpen && TABS.find(t=>t.id===tab).more) tab = 'sizing'; buildTabs(); update(); };
 }
@@ -2008,19 +2020,19 @@ function paneSizing(m){
     On the host link, ${pcieOK.length ? `the narrowest PCIe that fits is <b>${pcieOK.map(l=>l.L.name+' x'+l.lanes).slice(0,2).join(' or ')}</b>.`
       : `<b>no single PCIe x16 is enough</b>: ${links.filter(l=>l.L.kind==='pcie').map(l=>l.L.name+' needs '+l.count+' × x16').slice(-2).join(', ')}. Move less data across it, or put the accelerator on the package (UCIe: ${links.find(l=>l.id==='ucie').count} modules).`}${accLine}</div>`;
   const shownRows = rows.filter(r=>(showAllDram || r.feas!=='bad' || r.id===S.dev.dram) && (showBins || r.d.top || r.id===S.dev.dram));
-  const dramT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>DRAM</th><th class="n">Units</th><th class="n">Bus width</th><th class="n">Peak</th><th class="n">Capacity</th><th class="n">Power</th><th class="n">PHY area</th><th class="n">Die edge</th><th class="n">Pins</th><th></th><th></th></tr></thead><tbody>${
+  const dramT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>DRAM</th><th class="n">Units</th><th class="n">Bus width</th><th class="n">Peak</th><th class="n">Capacity</th><th class="n">Power</th><th class="n">PHY area</th><th class="n">Die edge</th><th class="n">Pins</th><th><span class="sr">Action</span></th><th><span class="sr">Action</span></th></tr></thead><tbody>${
     shownRows.map(r=>`<tr class="${r.id===S.dev.dram?'cur':''}"><td>${r.d.name}</td><td class="n">${r.n} × ${r.d.unit}${r.capLimited?' ᶜ':''}</td><td class="n">${fmtN(r.width)}</td>
       <td class="n">${fmtBps(r.peak)}</td><td class="n">${fmtB(r.cap*1e9)}</td><td class="n">${fmtW(r.power)}</td><td class="n">${fmtA(r.phy)}</td><td class="n">${sig(r.shore)} mm</td><td class="n">${fmtN(Math.round(r.pins))}</td>
       <td>${tag(r.feas)}</td><td><button class="use" data-dram="${r.id}" data-n="${r.n}">use</button></td></tr>`).join('')}</tbody></table></div>
     <p class="note"><button class="link" id="dramAll">${showAllDram?'Hide impractical options':'Show impractical options'}</button> · <button class="link" id="dramBins">${showBins?'Fastest grade of each type only':'Show every speed grade ('+rows.length+')'}</button>. ᶜ sized by capacity. Practical / extreme limits: DDR 8 / 12 channels, LPDDR 256 / 1024-bit, GDDR 384 / 512-bit, HBM 6–8 / 12 stacks.</p>`;
-  const linkT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Config</th><th class="n">Usable H→D</th><th class="n">Overhead</th><th class="n">Power</th><th class="n">PHY area</th><th></th><th></th></tr></thead><tbody>${
+  const linkT = `<div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Config</th><th class="n">Usable H→D</th><th class="n">Overhead</th><th class="n">Power</th><th class="n">PHY area</th><th><span class="sr">Action</span></th><th><span class="sr">Action</span></th></tr></thead><tbody>${
     links.map(l=>`<tr class="${l.id===S.link.id?'cur':''}"><td>${l.L.name}</td><td class="n">${l.L.kind==='pcie' ? (l.count>1?l.count+' × ':'')+'x'+l.lanes : l.count+' × x64'}</td>
       <td class="n">${fmtBps(l.perDir)}</td><td class="n">${fmtPct(1-l.perDir/(l.L.kind==='pcie'?l.L.gt*1e9*l.lanes/8*l.count:l.L.gbps*1e9*l.count))}</td><td class="n">${fmtW(l.power)}</td><td class="n">${fmtA(l.phy)}</td><td>${tag(l.feas, l.feas==='ok'?'one link':l.feas==='warn'?'several':'impractical')}</td>
       <td><button class="use" data-link="${l.id}" data-lanes="${l.lanes}" data-count="${l.count}">use</button></td></tr>`).join('')}</tbody></table></div>`;
   let fabT = '';
   if(m.tp.nA>1){
     const needUp = m.Tba*S.scale.xUp/S.ceil, needOut = m.Tba*S.scale.xOut/S.ceil;
-    fabT = `<div class="card span"><h3>Accelerator-to-accelerator</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Scale-up fabric</th><th class="n">Per accelerator</th><th class="n">Load</th><th class="n">Max domain</th><th></th></tr></thead><tbody>${
+    fabT = `<div class="card span"><h3>Accelerator-to-accelerator</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Scale-up fabric</th><th class="n">Per accelerator</th><th class="n">Load</th><th class="n">Max domain</th><th><span class="sr">Action</span></th></tr></thead><tbody>${
       Object.entries(FABRICS).map(([id,f])=>{ const u = needUp/(f.bw*f.eff)*S.ceil; const fs = m.tp.dom>f.maxDom ? 'bad' : state(u);
         return `<tr class="${id===S.scale.fabric?'cur':''}"><td>${f.name}</td><td class="n">${fmtBps(f.bw*f.eff)}</td><td class="n">${fmtPct(u)}</td><td class="n">${f.maxDom}</td><td>${tag(fs, m.tp.dom>f.maxDom?'domain too big':fs==='ok'?'fits':fs==='warn'?'tight':'too slow')}</td></tr>`; }).join('')}</tbody></table></div>
       <div class="tbl-wrap" style="margin-top:14px"><table class="t"><thead><tr><th>Scale-out NIC</th><th class="n">NICs per accelerator</th><th class="n">Ports in system</th><th class="n">NIC power</th></tr></thead><tbody>${
@@ -2176,7 +2188,7 @@ function paneOnchip(m){
   return `<div class="cols"><div class="card"><h3>${t.name} · ${n.N} ${n.kind==='axi'?'masters':n.kind==='stream'?'stages':'tiles'}</h3>${svg}<p class="note">${esc(t.use)}. Line weight follows load.</p></div>
     <div class="card"><h3>Limits, per accelerator</h3>${n.kind==='bus'?lim(names[0],'bis'):n.kind==='stream'?lim(names[1],'edge')+lim(names[2],'inj'):lim(names[0],'bis')+lim(names[1],'edge')+lim(names[2],'inj')}${stat('SRAM banks', fmtPct(m.U.sram)+' · '+fmtBps(m.dem.sram)+' of '+fmtBps(m.cap.sram))}
       ${stat('Link bandwidth (each way)', fmtBps(n.link))}${stat('Mean hops', sig(n.hops))}${stat('Latency, there and back', fmtT(2*n.hops*nc.hopNs*1e-9))}${stat('Movement power', fmtW(m.A.noc))}${stat('Interconnect area', fmtA(m.area.noc))}
-      <details class="more"><summary>Compare every interconnect</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>Interconnect</th><th class="n">Config</th><th class="n">Load</th><th class="n">Area</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <details class="more"><summary>Compare every interconnect</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>Interconnect</th><th class="n">Config</th><th class="n">Load</th><th class="n">Area</th><th><span class="sr">Action</span></th><th><span class="sr">Action</span></th></tr></thead><tbody>${rows}</tbody></table></div>
       <p class="note">Each alternative at its typical width and clock; yours at your settings.</p></details></div></div>`;
 }
 
@@ -2391,7 +2403,7 @@ function paneCons(m){
   const C = showAllNotes ? all : all.filter(c=>c.lvl==='bad'||c.lvl==='warn');
   const lab = {bad:'fails', warn:'tight', ok:'ok', info:'note'};
   return (C.length ? '' : `<p class="note" style="margin-top:0">Nothing fails or runs tight.</p>`)
-    + `<div class="cons">${C.map(c=>`<div class="con ${c.lvl}"><h4>${c.title} <span class="tag ${c.lvl==='info'||c.lvl==='ok'?'':c.lvl}">${lab[c.lvl]}</span></h4>${c.body}</div>`).join('')}</div>`
+    + `<div class="cons">${C.map(c=>`<div class="con ${c.lvl}"><h3>${c.title} <span class="tag ${c.lvl==='info'||c.lvl==='ok'?'':c.lvl}">${lab[c.lvl]}</span></h3>${c.body}</div>`).join('')}</div>`
     + `<p class="note"><button class="link" id="notesAll">${showAllNotes?'Show only problems':'Show all '+all.length+' notes'}</button></p>`;
 }
 function paneModel(){
@@ -2438,7 +2450,7 @@ function lineChart(o){
   }
   for(const p of o.points||[]){ const x=X(p.x), y=Y(p.y); g += `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="#ededed" stroke-width="1.6"/><path d="M${x-9},${y} h18 M${x},${y-9} v18" stroke="#ededed"/>`; }
   const leg = o.legend ? `<div class="keys">${o.series.filter(s=>!s.noKey).map(s=>`<span><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="${s.col}" stroke-width="1.6" stroke-dasharray="${s.dash||''}"/></svg>${s.name}</span>`).join('')}</div>` : '';
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>${leg}`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label || 'Chart of '+o.series.filter(x=>!x.noKey && x.name).map(x=>x.name).join(', '))}">${g}</svg>${leg}`;
 }
 function scatterChart(pts){
   const W = 760, H = 320, ml = 64, mr = 20, mt = 16, mb = 36;
@@ -2482,6 +2494,11 @@ function update(){
   if(cl && !cl.dataset.done){ const r = runChecks().filter(isValidation); cl.dataset.done = 1;
     cl.innerHTML = `How this is checked: the model reproduces ${r.filter(x=>x.pass).length} of ${r.length} published reference figures within tolerance (NVIDIA, AMD, Intel and Google memory bandwidths, STREAM, PCIe 5.0 copies, DGX H100 and NVL72 power), and a regression suite runs in CI. <a href="#" data-tab="checks">See the checks</a>.`; }
 }
+// tables that scroll sideways must be reachable by keyboard, including ones drawn later (the rate sweep fills in after a delay)
+let tblN = 0;   // each gets a distinct name: its card's heading, numbered
+new MutationObserver(()=>document.querySelectorAll('.tbl-wrap:not([tabindex])').forEach(e=>{ const h = e.closest('.card') && e.closest('.card').querySelector('h3');
+    e.tabIndex = 0; e.setAttribute('role', 'region'); e.setAttribute('aria-label', `${h ? h.textContent.trim() : 'Table'} (table ${++tblN}, scrolls sideways)`); }))
+  .observe(document.body, {childList:true, subtree:true});
 function buildAll(){
   ctlUpdaters.length = 0;
   buildLlm(); buildReq(); buildWl(); buildScale(); buildVary(); buildCost(); buildInspector(); buildDiagram(); update();
@@ -2610,16 +2627,18 @@ function specHTML(){
     <h3>Open issues</h3>${issues.length ? `<ul>${issues.map(c=>`<li>${c.lvl==='bad'?'<b>Fails:</b> ':'Tight: '}${c.title}</li>`).join('')}</ul>` : '<p>None: every check in the Notes tab passes.</p>'}
     <div class="sh-foot">First-order model: throughput, M/D/1 and G/G/1 queueing, Monte Carlo latency and power from pJ/bit and pJ/op. It reproduces ${chk.filter(x=>x.pass).length} of ${chk.length} published reference figures within tolerance. Decimal units. Power excludes cooling plant outside the rack; costs are first-order ${S.cost.basis==='buy'?'purchase prices':'build costs'} from published 2025–26 estimates.</div>`;
 }
-function openSpec(){ document.getElementById('sheet').innerHTML = specHTML(); document.getElementById('spec').hidden = false; }
+let specFrom = null;
+function openSpec(){ specFrom = document.activeElement; document.getElementById('sheet').innerHTML = specHTML(); document.getElementById('spec').hidden = false; document.getElementById('page').inert = true; document.getElementById('specPrint').focus({preventScroll:true}); }
+function closeSpec(){ const sp = document.getElementById('spec'); if(sp.hidden) return; sp.hidden = true; document.getElementById('page').inert = false; if(specFrom && document.contains(specFrom)) specFrom.focus({preventScroll:true}); }
 document.addEventListener('click', e=>{
   if(e.target.id==='specBtn') openSpec();
   else if(e.target.id==='specPrint') window.print();
-  else if(e.target.id==='specClose' || e.target.id==='spec') document.getElementById('spec').hidden = true;
+  else if(e.target.id==='specClose' || e.target.id==='spec') closeSpec();
 });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') document.getElementById('spec').hidden = true; });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSpec(); });
 let specForPrint = false;   // printing from the browser menu prints the sheet as well
 addEventListener('beforeprint', ()=>{ if(document.getElementById('spec').hidden){ specForPrint = true; openSpec(); } });
-addEventListener('afterprint', ()=>{ if(specForPrint){ specForPrint = false; document.getElementById('spec').hidden = true; } });
+addEventListener('afterprint', ()=>{ if(specForPrint){ specForPrint = false; closeSpec(); } });
 
 /* =====================================================================
    DESIGN ASSISTANT
