@@ -16,7 +16,7 @@ const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
   await new Promise(r => setTimeout(r, 500));
   await page.evaluate(AXE);
   const states = [['page', '']];
-  for (const t of ['opt', 'sizing', 'sweep', 'onchip', 'rack', 'ppa', 'cost', 'cons', 'latency', 'checks', 'headroom', 'roofline', 'model'])
+  for (const t of ['opt', 'sizing', 'sweep', 'chip', 'onchip', 'rack', 'ppa', 'cost', 'cons', 'latency', 'checks', 'headroom', 'roofline', 'model'])
     states.push(['tab ' + t, `tab = '${t}'; buildTabs(); update();`]);
   states.push(['inputs drawer, LLM workload', `applyPreset('llmserve'); openDrawer('left');`], ['component drawer', `openDrawer(null); selected = 'dram'; openDrawer('right');`],
     ['assistant drawer', `openDrawer('assist');`], ['spec sheet', `openDrawer(null); openSpec();`], ['explanation', `closeSpec(); whyKey = 'lat'; paintSummary(M);`]);

@@ -156,8 +156,8 @@ checks that every overhead breakdown multiplies out to the model's capacities, t
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
 spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM serving and training workloads match hand calculations, that the cost parts add up and the
-cost goal finds the cheapest design, and that all 31 examples match their golden results within 2 %. An axe-core
-audit then checks the page, all 13 tabs, the drawers, the spec sheet and an explanation panel for accessibility
+cost goal finds the cheapest design, and that all 32 examples match their golden results within 2 %. An axe-core
+audit then checks the page, all 14 tabs, the drawers, the spec sheet and an explanation panel for accessibility
 violations, with none allowed. Text meets WCAG AA contrast. Tables that scroll sideways, the headline figures and
 the diagram's blocks are reachable by keyboard. Focus moves into a drawer when it opens and back when it closes,
 and closed drawers are out of the tab order. Every view fits a 390 px phone screen without sideways scrolling.
@@ -232,6 +232,44 @@ it opens underneath, with this design's numbers in it:
 The test suite checks that each explanation ends on exactly the figure shown, in every example.
 
 ![How power is worked out](why.png)
+
+## Inside the chip: compute array, dataflow, floorplan and chiplets
+
+The *Chip* tab goes below the accelerator's headline numbers.
+
+- **The compute array** (*Chip micro-architecture* in Inputs): cores of rows × columns of processing elements, a
+  clock, the element precision (4, 8 or 16-bit) and the dataflow (weight- or output-stationary).
+  - With *Derive the accelerator from its compute array* on, peak compute, compute area and energy per operation
+    follow from the array. Per-element area and energy scale as 0.6 × (bits/8)² + 0.4 × (bits/8), anchored at 8 bits
+    to the model's H100 calibration.
+  - The achievable share of peak comes from mapping a matrix multiply onto it.
+- **The matrix multiply:** taken from the LLM workload when one is on (an FFN projection for the batch or micro-batch),
+  or set by hand.
+  - **Spatial utilisation:** how the tile edges divide the matrix.
+  - **Temporal utilisation:** the streamed length against fill and drain.
+  - **Parallel utilisation:** how full the last round of tiles leaves the cores. Output-stationary splits the depth
+    across cores (split-K) when there are too few output blocks to occupy them.
+  - **The SRAM tiling with the least DRAM traffic:** this gives the achieved arithmetic intensity against the ridge
+    point, and whether it is compute- or DRAM-bound.
+  - **A chart of utilisation against M** for both dataflows shows why small decode batches can't fill a systolic array.
+- **Floorplan:** the die, or each chiplet, drawn to scale by area: compute cores, SRAM, the on-chip network and the
+  rest, with PHYs on the edges in proportion to the edge they need, and filler when the die is pad-limited.
+- **Package:** the dies and HBM stacks on the interposer, beside the reticle (26 × 33 mm) for scale.
+- **Chiplets:** with an explicit chiplet count, on-chip traffic that crosses between dies goes over UCIe links on an
+  advanced package (about 1,317 GB/s per mm of edge, 1,350 GB/s per mm², 0.3 pJ/bit and 2 ns, from the UCIe
+  consortium's published figures).
+  - The links add area, power and latency.
+  - Each die is square and pad-limited on its own, so splitting also adds edge for PHYs.
+  - Smaller dies yield better in the cost model.
+  - A sweep from 1 to 8 dies sets build cost, power and silicon against one die. In the new example (a GB200-class
+    accelerator from 1,356 cores of 32 × 32, as four chiplets), four dies of 647 mm² yield 72 % against 27 % for one
+    2,585 mm² die and cost 34 % less, for 14 W of die-to-die power.
+  - Left on *Auto*, the model behaves as before.
+
+The tests check the array formulas, an exactly divisible weight-stationary case against M ÷ (M + rows + columns),
+and that chiplets add die-to-die power for the crossing traffic and split the silicon. Still to come on this tab:
+voltage, frequency and heat (a V–f curve, leakage against temperature, power density), and memory-controller
+detail.
 
 ## LLM serving: from the model to the workload
 
@@ -425,7 +463,7 @@ would have to carry 4 TB/s to feed that link.
   full-duplex links, access-pattern efficiency, capacity, PCIe TLP efficiency, outstanding read tags
   (Little's law), DRAM concurrency, CPU cost per block, host memory on the data path, queueing,
   on-chip buffering, data-movement power, beachfront, HBM packaging and ECC.
-- **31 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
+- **32 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
   deliberately broken designs that illustrate a classic bottleneck:
   - *AI & LLMs*: rack-scale inference on 72 accelerators in one NVLink domain, a 1,024-accelerator
     training cluster over 32 racks, tensor-parallel prefill on 8 PCIe cards ✗, a mixture-of-experts

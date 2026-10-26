@@ -422,6 +422,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
     <details class="sec" open><summary>Requirements</summary><div id="req"></div></details>
     <details class="sec"><summary>Workload</summary><div id="wl"></div></details>
     <details class="sec"><summary>Scale: accelerators &amp; racks</summary><div id="sc"></div></details>
+    <details class="sec" id="chipSec"><summary>Chip micro-architecture</summary><div id="chipIn"></div></details>
     <details class="sec"><summary>Variability &amp; tolerances</summary><div id="va"></div></details>
     <details class="sec"><summary>Cost assumptions</summary><div id="co"></div></details>
   </div>
@@ -553,7 +554,7 @@ const LLM_MODELS = {
 // the inputs the LLM serving or training workload sets while it is on
 const LLM_OWNS = ['T', 'lat', 'block', 'resident', 'ops', 'xR', 'xW', 'inR', 'outR', 'scale.xUp'];
 const TRAIN_OWNS = [...LLM_OWNS, 'scale.xOut'];
-const ownedBy = s => s.llm && s.llm.on ? (llmSplit(s) ? TRAIN_OWNS : LLM_OWNS) : s.train && s.train.on ? TRAIN_OWNS : [];
+const ownedBy = s => [...(s.llm && s.llm.on ? (llmSplit(s) ? TRAIN_OWNS : LLM_OWNS) : s.train && s.train.on ? TRAIN_OWNS : []), ...(s.chip && s.chip.on ? CHIP_OWNS : [])];
 const llmSplit = s => s.llm.on && s.llm.prefill && s.llm.disagg;   // prefill and decode on separate pools
 /* Cost: first-order build cost of each part, then running cost. Sources for the defaults:
    wafer — Epoch AI assumes $17k for a TSMC 4NP wafer (press estimates $18–20k for 4 nm after the 2025 rises);
@@ -566,6 +567,17 @@ const COST = {wafer:17000, d0:0.05, maxDie:830, dram:{HBM:15, GDDR:10, LPDDR:10,
   organic:{base:50, mm2:0.1, yield:0.98}, aux:{base:100, perW:0.35}, hostBase:10000, fabricPerGBs:2.5, nicPerGb:7,
   facility:{air:11, 'rear-door / hybrid':12, 'direct liquid':13}, facYears:15, pue:{air:1.4, 'rear-door / hybrid':1.3, 'direct liquid':1.15}};
 const YEAR_S = 365.25*24*3600;
+/* Chip micro-architecture. A processing element (PE) does one multiply-accumulate a cycle at its precision. Area and
+   energy per PE scale as 0.6 × (bits/8)² + 0.4 × (bits/8) (the multiplier grows with the square of the width, the adder,
+   registers and wiring linearly), anchored at 8 bits to the model's H100 calibration: 2.43 TOPS/mm² at 1.8 GHz gives
+   1,481 µm² per PE including its share of array control, and 0.29 pJ per operation gives 0.58 pJ per MAC. Operations
+   are counted in 8-bit equivalents, so a 16-bit PE delivers two per MAC and a 4-bit PE half of one. */
+const PE8 = {um2:2*1.8e9*1e-12/2.43*1e6, pj:2*0.29}, CTRL_EFF = 0.9;   // CTRL_EFF: issue, sync and control losses beyond mapping
+const peScale = b => 0.6*(b/8)**2 + 0.4*(b/8);
+const CHIP_OWNS = ['acc.tops', 'acc.topsMm2', 'acc.pj', 'acc.util'];
+/* Die-to-die links between chiplets: UCIe on an advanced (2.5D) package at 32 GT/s, from the consortium's published
+   figures: about 1,317 GB/s per mm of die edge, 1,350 GB/s per mm² of PHY, 0.3 pJ/bit, under 2 ns. */
+const D2D = {name:'UCIe advanced package, 32 GT/s', shoreBps:1317e9, areaBps:1350e9, pj:0.3, latNs:2, eff:0.9};
 /* on-chip interconnect, networks-on-chip and AMBA. kind: grid (router per tile), axi (crossbar of masters and
    memory-side slave ports, separate read and write channels), stream (point-to-point pipelines), bus (shared,
    one transfer at a time). eff = usable share of each link after headers, snoops, arbitration and turnaround;
@@ -635,6 +647,7 @@ const BASE = {
   llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500, prefill:false, prompt:2000, reply:500, disagg:false, ttft:2, pre:{perNode:8, nodes:1, racks:1}},
   train:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, prec:2, tps:7e5, seq:8192, gbatch:4194304, micro:1, tp:8, pp:4, vpp:1, recompute:false, zero:true, total:15e12},
   cost:{basis:'build', margin:0.75, years:4, kwh:0.08, duty:1},
+  chip:{on:false, cores:64, rows:32, cols:32, ghz:1.8, bits:8, flow:'ws', gsrc:'auto', M:4096, N:4096, K:4096, dies:0},
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const merge = (a,b) => { for(const k in b){ if(b[k] && typeof b[k]==='object' && !Array.isArray(b[k])) { a[k]=merge(a[k]||{}, b[k]); } else a[k]=b[k]; } return a; };
@@ -813,6 +826,11 @@ const PRESETS = [
     pattern:'stream', dev:{dram:'hbm3_64', units:2}, link:{id:'pcie5', lanes:16, count:1},
     host:{dram:'ddr5_5600', units:8, cores:16, cpuUs:4}, acc:{tops:20, util:0.6, pj:0.5, topsMm2:3, sram:256}}},
 ];
+// a GB200-class accelerator built from its compute array, as four chiplets: the rack example's
+// hardware with peak compute, area and energy derived from 1,356 cores of 32 × 32 8-bit PEs at 1.8 GHz
+PRESETS.splice(1, 0, {g:'AI & LLMs', id:'chiparray', name:'GB200-class accelerator from its compute array, as four chiplets',
+  d:'The rack-scale inference example with the accelerator designed rather than given: 1,356 cores of 32 × 32 8-bit processing elements at 1.8 GHz make its 5 PFLOPS. At the H100-class density the array is calibrated to, that is about 2,600 mm² of silicon, so it is split into four chiplets joined by UCIe, each within the reticle (B200 reaches the same compute in two dies on a denser process). Open the Chip tab for the floorplan, the package and the chiplet sweep, and try output-stationary dataflow or a smaller array.',
+  p:merge(clone(PRESETS[0].p), {chip:{on:true, cores:1356, rows:32, cols:32, ghz:1.8, bits:8, flow:'ws', gsrc:'custom', M:4096, N:4096, K:4096, dies:4}})});
 let S = clone(BASE);
 let selected = 'dram';
 
@@ -1045,8 +1063,51 @@ function model(s){
 // the whole system: one pool, or decode and prefill pools together
 const sysOf = m => m.sys || {worst:m.worst, U:m.worst.U, pool:'', Ptot:m.Ptot, maxT:m.maxT};
 const sysFull = s => fullPower(s).total + (llmSplit(s) ? fullPower(prefillState(s)).total : 0);
+/* the representative matrix multiply C[M×N] = A[M×K] · B[K×N] for the chip analysis: from the LLM workload when one is on
+   (an FFN up-projection, 3.5 × hidden wide, split across tensor parallel), otherwise the one you give */
+function gemmOf(s){
+  const auto = s.chip.gsrc!=='custom';
+  if(auto && s.llm && s.llm.on){ const i = llmInfo(s), d = s.llm.dModel;
+    return {M:Math.max(1, Math.round(s.llm.batch)), K:d, N:Math.max(1, Math.round(3.5*d/Math.max(1, i.g))), bytes:s.llm.wBytes, what:'decode: the FFN up-projection for one copy’s batch'}; }
+  if(auto && s.train && s.train.on){ const d = s.train.dModel, tp = Math.min(s.train.tp, topo(s).nA);
+    return {M:s.train.seq*s.train.micro, K:d, N:Math.max(1, Math.round(3.5*d/tp)), bytes:s.train.prec, what:'training: the FFN up-projection for one micro-batch'}; }
+  return {M:s.chip.M, K:s.chip.K, N:s.chip.N, bytes:s.chip.bits/8, what:'set under Chip micro-architecture'};
+}
+/* map a GEMM onto the cores: weight-stationary holds a K×N weight tile in the array and streams M rows through it;
+   output-stationary holds an M×N output tile and streams K. Each tile pays fill and drain (rows + cols cycles). Then
+   tile it through the shared SRAM (half of it, double-buffered) for the least DRAM traffic. */
+function gemmMap(s, g, devBW){
+  const c = s.chip, R = c.rows, C = c.cols, ws = c.flow==='ws';
+  const [a, b, depth] = ws ? [g.K, g.N, g.M] : [g.M, g.N, g.K];
+  const ta = Math.ceil(a/R), tb = Math.ceil(b/C), base = ta*tb;
+  // output-stationary with fewer output tiles than cores splits the depth K across cores (split-K), then adds the partial sums
+  const ks = ws ? 1 : Math.max(1, Math.min(Math.floor(c.cores/base), Math.ceil(g.K/(R + C)))), stream = Math.ceil(depth/ks), tiles = base*ks, rounds = Math.ceil(tiles/c.cores);
+  const spatial = (a/(ta*R))*(b/(tb*C)), temporal = stream/(stream + R + C), parallel = tiles/(rounds*c.cores);
+  const cycles = rounds*(stream + R + C), macs = g.M*g.N*g.K, util = macs/(c.cores*R*C*cycles);
+  const cap = s.acc.sram*1e6/2/g.bytes, cand = n => { const o = []; for(let x = 1; x < n*2; x *= 2) o.push(Math.min(n, x)); return [...new Set(o)]; };
+  let best = null;
+  for(const Tm of cand(g.M)) for(const Tn of cand(g.N)) for(const Tk of cand(g.K)){
+    if(Tm*Tk + Tk*Tn + Tm*Tn > cap) continue;
+    const t = g.bytes*(g.M*g.K*Math.ceil(g.N/Tn) + g.K*g.N*Math.ceil(g.M/Tm) + g.M*g.N*(2*Math.ceil(g.K/Tk) - 1));
+    if(!best || t < best.t) best = {Tm, Tn, Tk, t};
+  }
+  const minT = g.bytes*(g.M*g.K + g.K*g.N + g.M*g.N), traffic = best ? best.t : Infinity;
+  const tCompute = cycles/(c.ghz*1e9), tMem = traffic/devBW, time = Math.max(tCompute, tMem);
+  return {R, C, ws, a, b, stream, ks, ta, tb, tiles, rounds, spatial, temporal, parallel, util, cycles, macs, tile:best, traffic, minT,
+    intensity:2*macs/traffic, ridge:2*c.cores*R*C*c.ghz*1e9/devBW, tCompute, tMem, time, bound: tMem>tCompute ? 'DRAM' : 'compute', achieved:2*macs/time};
+}
+// derive peak compute, its area and energy from the array; utilisation from mapping the representative GEMM
+function chipApply(s){
+  const c = s.chip, f = c.bits/8, pes = c.cores*c.rows*c.cols;
+  s.acc.tops = pes*2*c.ghz*1e9*f/1e12;
+  s.acc.topsMm2 = s.acc.tops/(pes*PE8.um2*peScale(c.bits)/1e6);
+  s.acc.pj = PE8.pj*peScale(c.bits)/(2*f);
+  const dev = DRAMS[s.dev.dram], bw = s.dev.units*dramUnitBW(dev)*0.9;
+  s.acc.util = gemmMap(s, gemmOf(s), bw).util*CTRL_EFF;
+}
 function modelOne(s){
   if(s.llm && s.llm.on) llmApply(s); else if(s.train && s.train.on) trainApply(s);
+  if(s.chip && s.chip.on) chipApply(s);
   const T = s.T, Tb = T*s.burst;
   const tp = topo(s);
   const Ta = T/tp.nA, Tba = Tb/tp.nA;                                       // per accelerator
@@ -1150,19 +1211,23 @@ function modelOne(s){
              {k:'sram', name:'SRAM bandwidth', U:U.sram, need:dem.sram, have:cap.sram, f:fmtBps});
   comps.sort((a,b)=>b.U-a.U);
   worst = comps[0]; maxT = T/worst.U; maxTceil = maxT*s.ceil;
-  { const fixed = 2*nocHops*nc.hopNs*1e-9 + 64/nocLink, u = U.noc/s.burst;
+  // chiplets (an explicit die count): on-chip traffic between dies crosses UCIe links, sized for the peak
+  const nD = s.chip && s.chip.dies>0 ? s.chip.dies : 0, xFrac = nD>1 ? 1 - 1/nD : 0;
+  const d2dBps = xFrac*((inT + outT) + localT*(nc.pattern==='uniform' ? 1 : 0.3))*s.burst/D2D.eff;
+  { const fixed = 2*nocHops*nc.hopNs*1e-9 + 64/nocLink + xFrac*D2D.latNs*1e-9, u = U.noc/s.burst;
     stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip interconnect', fixed, svc:0, q:u>=1?Infinity:fixed*u/(1-u)*(s.vary.ca**2 + stageJit('noc', s)**2)/2});
     stages.forEach(st=>st.t = st.fixed+st.svc+st.q); latency = stages.reduce((a,st)=>a+st.t,0); }
 
   // area of one accelerator die
   const area = {compute:s.acc.tops/s.acc.topsMm2, sram:s.acc.sram*0.45, dramPhy:s.dev.units*dev.phy, linkPhy:lk.totalLanes*lk.L.phy,
     fabPhy: multi && tp.dom>1 ? fab.phy : 0,
-    noc: nq.area};
-  area.misc = 0.15*(area.compute+area.sram+area.dramPhy+area.linkPhy+area.fabPhy+area.noc);
-  const coreArea = area.compute+area.sram+area.dramPhy+area.linkPhy+area.fabPhy+area.noc+area.misc;
-  const shoreNeed = s.dev.units*dev.shore + lk.totalLanes*lk.L.shore + (multi && tp.dom>1 ? fab.shore : 0);
-  const padArea = Math.pow(shoreNeed/(4*0.8), 2);
-  const die = Math.max(coreArea, padArea), shoreHave = 4*Math.sqrt(die)*0.8;
+    noc: nq.area, d2d: d2dBps/D2D.areaBps};
+  area.misc = 0.15*(area.compute+area.sram+area.dramPhy+area.linkPhy+area.fabPhy+area.noc+area.d2d);
+  const coreArea = area.compute+area.sram+area.dramPhy+area.linkPhy+area.fabPhy+area.noc+area.d2d+area.misc;
+  // each die-to-die link uses edge on both dies it joins; with chiplets every die is square and pad-limited on its own
+  const d2dShore = 2*d2dBps/D2D.shoreBps, shoreNeed = s.dev.units*dev.shore + lk.totalLanes*lk.L.shore + (multi && tp.dom>1 ? fab.shore : 0) + d2dShore;
+  const nDies = nD || 1, padArea = nDies*Math.pow(shoreNeed/nDies/(4*0.8), 2);
+  const die = Math.max(coreArea, padArea), dieEach = die/nDies, shoreHave = nDies*4*Math.sqrt(dieEach)*0.8;
 
   // power (average)
   const A = {devDram: Ta*(dR+dW)*8*dev.pj*1e-12 + dev.bg*s.dev.units,
@@ -1170,7 +1235,8 @@ function modelOne(s){
     compute: Ta*s.ops*s.acc.pj*1e-12, leak: die*s.acc.leak,
     noc: ((inT+outT)*hopsEdge + localT*hopsLocal)*8*nc.pj*1e-12 + Ta*(dR+dW+nc.xNoc+s.inR+s.outR)*8*SRAM_PJ*1e-12,
     up: multi && tp.dom>1 ? Ta*xUp*8*fab.pj*1e-12 + fab.w : 0,
-    out: hasNics(s, tp) ? Ta*xOut*8*15e-12 + nic.w*s.scale.nics : 0};
+    out: hasNics(s, tp) ? Ta*xOut*8*15e-12 + nic.w*s.scale.nics : 0,
+    d2d: d2dBps*D2D.eff/s.burst*8*D2D.pj*1e-12};   // average traffic over the die-to-die links
   const pAcc = Object.values(A).reduce((a,b)=>a+b,0);
   const H = {base: s.host.base||0, hostDram: Tn*(hR+hW)*8*hd.pj*1e-12 + hd.bg*s.host.units,
     hostCpu: (Tn/s.block*s.host.cpuUs*1e-6)*s.host.wCore,
@@ -1178,11 +1244,11 @@ function modelOne(s){
   const pNodeHost = Object.values(H).reduce((a,b)=>a+b,0);
   const OH = overhead(s), Ptot = (pAcc*tp.nA + pNodeHost*tp.nN)*(1+OH);
   const Prack = Ptot/s.scale.racks;
-  const Pmove = ((A.devDram+A.link+A.up+A.out+A.noc)*tp.nA + (H.hostDram+H.src)*tp.nN)*(1+OH);
+  const Pmove = ((A.devDram+A.link+A.up+A.out+A.noc+A.d2d)*tp.nA + (H.hostDram+H.src)*tp.nN)*(1+OH);
 
   return {T, Tb, Ta, Tba, Tn, Tbn, tp, dev, hd, lk, fab, nic, multi, xUp, xOut, dR, dW, hR, hW, hIn, ledger, devE, hostE, devBW, hostBW, ops,
     dem, cap, U, comps, worst, maxT, maxTceil, stages, latency, inflightPcie, tags, inflightDram, dramReqs, devCap, sramNeed,
-    bHost, A, pAcc, H, pNodeHost, Ptot, Prack, Pmove, area, coreArea, padArea, die, shoreNeed, shoreHave, srcBW, srcName, viaHost,
+    bHost, A, pAcc, H, pNodeHost, Ptot, Prack, Pmove, area, coreArea, padArea, die, dieEach, nDies, nD, d2dBps, d2dShore, shoreNeed, shoreHave, srcBW, srcName, viaHost,
     noc:{N, k:kk, S:nq.S, kind:nq.kind, link:nocLink, inT, outT, localT, hopsEdge, hopsLocal, hops:nocHops, dem:nocDem, cap:nocCap, U:nocU, worst:nocWorst}};
 }
 
@@ -1249,7 +1315,7 @@ function fullPower(s){
 /* cost of one accelerator to build: dies from wafer price, area and yield; device DRAM; package; yield loss; board */
 function accCost(s, m, fp){
   m = m || model(s); fp = fp || fullPower(s);
-  const n = Math.ceil(m.die/COST.maxDie), a = m.die/n;                       // above the reticle the accelerator is several dies
+  const n = m.nD || Math.ceil(m.die/COST.maxDie), a = m.die/n;               // the chiplet count, or as many dies as the reticle forces
   const dpw = Math.PI*150*150/a - Math.PI*300/Math.sqrt(2*a), y = Math.exp(-a/100*COST.d0);
   const die = n*COST.wafer/(dpw*y), fam = m.dev.fam, hbm = fam==='HBM';
   const dram = m.devCap*COST.dram[fam];
@@ -1452,7 +1518,7 @@ function optimise(base, opt){
       else if(LINKS[s.link.id].kind==='pcie' && s.link.lanes<16) s.link.lanes *= 2;
       else if(s.link.count<(LINKS[s.link.id].kind==='pcie' && opt.practical ? 1 : 4)) s.link.count++; else break;
       m = model(s); }
-    const r = ev(s); if(opt.reticle && r.A>830) r.ok = false; res.push(r);
+    const r = ev(s); if(opt.reticle && r.m.dieEach>830) r.ok = false; res.push(r);
   }
   const ok = res.filter(r=>r.ok);
   // Pareto front on (power, area), and cost a year when that is the goal
@@ -1695,6 +1761,27 @@ function paintTrain(){
     peer traffic per accelerator <b>${fmtBps(i.up)}</b> on the fabric, <b>${fmtBps(i.out)}</b> on the network.
     At most <b>${fmtN(Math.round(S.train.tps*M.maxT/M.T))}</b> tokens/s on this hardware. ${sig(S.train.total/1e12)} T tokens at the target take <b>${sig(i.days)}</b> days and cost about <b>${fmtUSD(c.perYear*i.days/365.25/S.cost.duty)}</b>.
     ${i.dp<1 || !Number.isInteger(+sig(i.dp)) ? '<i>Data parallel is not a whole number: make the accelerator count a multiple of tensor × pipeline.</i>' : ''}`;
+}
+function buildChip(){
+  const el = document.getElementById('chipIn'); el.innerHTML = '';
+  ctl(el, {k:'chip.on', label:'Derive the accelerator from its compute array', type:'toggle', rebuild:true,
+    after:v=>{ if(v){ const c = S.chip; c.cores = Math.max(1, Math.round(S.acc.tops*1e12/(c.rows*c.cols*2*c.ghz*1e9*c.bits/8))); } },   // keep today's peak
+    hint:'Peak compute, its area and energy, and the achievable share of peak come from the array and how a matrix multiply maps onto it.'});
+  if(S.chip.on){
+    ctl(el, {k:'chip.cores', label:'Cores', type:'log', min:1, max:4096, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:fmtN});
+    ctl(el, {k:'chip.rows', label:'Array rows per core', type:'select', num:true, options:{8:'8', 16:'16', 32:'32', 64:'64', 128:'128', 256:'256'}});
+    ctl(el, {k:'chip.cols', label:'Array columns per core', type:'select', num:true, options:{8:'8', 16:'16', 32:'32', 64:'64', 128:'128', 256:'256'}});
+    ctl(el, {k:'chip.ghz', label:'Clock', type:'range', min:0.3, max:3, step:0.05, fmt:v=>v.toFixed(2)+' GHz'});
+    ctl(el, {k:'chip.bits', label:'Processing-element precision', type:'select', num:true, options:{4:'4-bit', 8:'8-bit', 16:'16-bit'}});
+    ctl(el, {k:'chip.flow', label:'Dataflow', type:'select', options:{ws:'Weight-stationary (weights held, rows stream)', os:'Output-stationary (outputs held, depth streams)'}});
+  }
+  ctl(el, {k:'chip.gsrc', label:'Matrix multiply to analyse', type:'select', options:{auto:'From the LLM workload when on', custom:'Set M, N and K'}, rebuild:true});
+  if(S.chip.gsrc==='custom' || !(S.llm.on || S.train.on)){
+    for(const [k, l] of [['M','M (rows of A and C)'], ['N','N (columns of B and C)'], ['K','K (depth)']])
+      ctl(el, {k:'chip.'+k, label:l, type:'log', min:1, max:131072, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:fmtN});
+  }
+  ctl(el, {k:'chip.dies', label:'Chiplets per accelerator', type:'select', num:true, options:{0:'Auto (as before: split for cost only)', 1:'1 (monolithic)', 2:'2', 3:'3', 4:'4', 6:'6', 8:'8'},
+    hint:'With a count set, traffic between dies crosses UCIe links that cost area, power and latency; smaller dies yield better and have more edge.'});
 }
 function buildCost(){
   const el = document.getElementById('co'); el.innerHTML = '';
@@ -2039,7 +2126,7 @@ function whyHTML(k, m, plain){
   if(k==='power'){
     const A = m.A, H = m.H, OH = overhead(S), accW = m.pAcc*tp.nA, hostW = m.pNodeHost*tp.nN;
     const items = [['Compute: ops/s × '+S.acc.pj+' pJ/op', A.compute], ['Device DRAM: traffic × '+m.dev.pj+' pJ/bit + standby', A.devDram], ['On-chip: hops × pJ/bit + SRAM reads', A.noc],
-      ['Leakage: '+fmtA(m.die)+' × '+S.acc.leak+' W/mm²', A.leak], ['Host link: traffic × pJ/bit + idle lanes', A.link], ['Scale-up fabric: traffic × pJ/bit + ports', A.up], ['Network: NIC, optics, switch port', A.out]].filter(x=>x[1]>0);
+      ['Leakage: '+fmtA(m.die)+' × '+S.acc.leak+' W/mm²', A.leak], ['Host link: traffic × pJ/bit + idle lanes', A.link], ['Scale-up fabric: traffic × pJ/bit + ports', A.up], ['Network: NIC, optics, switch port', A.out], ['Die-to-die: traffic × '+D2D.pj+' pJ/bit', A.d2d]].filter(x=>x[1]>0);
     return `<h2>Power at the target = (per accelerator × ${fmtN(tp.nA)} + per host × ${fmtN(tp.nN)}) × (1 + fans and conversion)</h2>
       <table>${items.map(([l,v])=>row(l, fmtW(v))).join('')}${row('<b>Per accelerator</b>', `<b>${fmtW(m.pAcc)}</b>`)}${row('Per host (fixed, memory, CPU, I/O)', fmtW(m.pNodeHost))}</table>
       ${eq(`(${fmtW(m.pAcc)} × ${fmtN(tp.nA)} + ${fmtW(m.pNodeHost)} × ${fmtN(tp.nN)}) × ${(1+OH).toFixed(3)} = ${Y.pool ? fmtW(m.Ptot)+' for the decode pool' : `<b>${fmtW(m.Ptot)}</b>`}`)}
@@ -2134,7 +2221,7 @@ function pinCurrent(msg){ pinA = clone(S); digA = null; toast(msg || 'Pinned as 
 /* =====================================================================
    TABS
    ===================================================================== */
-const TABS = [{id:'opt', name:'Optimise'}, {id:'sizing', name:'Minimum specs'}, {id:'sweep', name:'Rate sweep'}, {id:'onchip', name:'On-chip'}, {id:'rack', name:'Racks'}, {id:'ppa', name:'Power & area'}, {id:'cost', name:'Cost'}, {id:'cons', name:'Notes'},
+const TABS = [{id:'opt', name:'Optimise'}, {id:'sizing', name:'Minimum specs'}, {id:'sweep', name:'Rate sweep'}, {id:'chip', name:'Chip'}, {id:'onchip', name:'On-chip'}, {id:'rack', name:'Racks'}, {id:'ppa', name:'Power & area'}, {id:'cost', name:'Cost'}, {id:'cons', name:'Notes'},
   {id:'latency', name:'Latency', more:true}, {id:'checks', name:'Checks', more:true}, {id:'headroom', name:'Headroom', more:true}, {id:'roofline', name:'Roofline', more:true}, {id:'model', name:'Model', more:true}];
 let moreOpen = false;
 let tab = 'sizing';
@@ -2273,6 +2360,111 @@ function paneSweep(m){
     <div class="card span"><h3>Where the design steps up</h3><div class="tbl-wrap"><table class="t"><thead><tr><th class="n">Rate</th><th>Cheapest design</th><th class="n">Accelerators</th><th class="n">System power</th><th class="n">Die</th></tr></thead><tbody>${
       steps.map(st=>`<tr class="${st.from<=S.T*1.0001 && st.to>=S.T*0.9999?'cur':''}"><td class="n">${st.from===st.to ? fmtBps(st.from) : fmtBps(st.from)+' – '+fmtBps(st.to)}</td>${st.k ? `<td>${esc(st.r.d)}</td><td class="n">${st.n0===st.r.nA ? fmtN(st.r.nA) : fmtN(st.n0)+' – '+fmtN(st.r.nA)}</td><td class="n">${fmtW(st.r.P)}</td><td class="n">${fmtA(st.r.A)}</td>` : '<td colspan="4">no design within the limits</td>'}</tr>`).join('')}</tbody></table></div>
     <p class="note">Rates are the sampled points (${xs.length} across four decades); power and die are at the top of each range.</p></div></div>`;
+}
+
+/* the chip: the compute array and how a matrix multiply maps onto it, the floorplan, the package, and chiplets */
+function paneChip(m){
+  const c = S.chip, g = gemmOf(S), map = gemmMap(S, g, m.devBW), pes = c.cores*c.rows*c.cols;
+  const derived = c.on, eff = map.util*CTRL_EFF;
+  // utilisation against the streamed dimension (batch for weight-stationary), for both dataflows
+  const xs = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192];
+  const at = (flow, v) => { const s2 = clone(S); s2.chip.flow = flow; const g2 = {...g, M:v}; return gemmMap(s2, g2, m.devBW).util; };
+  const uChart = lineChart({xs, xfmt:v=>fmtN(v), yfmt:v=>fmtPct(v), ymin:0.001, ymax:1.5, h:220, legend:true, vlines:[{x:g.M, col:'#a3a3a3', name:'this M'}],
+    label:'Array utilisation against M for both dataflows',
+    series:[{ys:xs.map(v=>at('ws', v)), col:'#ededed', name:'weight-stationary'}, {ys:xs.map(v=>at('os', v)), col:'#8a8a8a', name:'output-stationary'}]});
+  const T = map.tile;
+  const arr = (fa, fb, label) => { const W = 120, cell = W/8; let r = '';
+    for(let i=0;i<8;i++) for(let j=0;j<8;j++){ const on = i < Math.ceil(fa*8) && j < Math.ceil(fb*8); r += `<rect x="${j*cell+1}" y="${i*cell+1}" width="${cell-2}" height="${cell-2}" fill="${on?'#cfcfcf':'#1f1f1f'}"/>`; }
+    return `<figure style="margin:0; text-align:center"><svg viewBox="0 0 ${W} ${W}" width="120" height="120" role="img" aria-label="${esc(label)}">${r}</svg><figcaption class="note" style="margin:4px 0 0">${label}</figcaption></figure>`; };
+  const ea = (map.a - (map.ta-1)*map.R)/map.R, eb = (map.b - (map.tb-1)*map.C)/map.C;
+  return `<div class="answer">${fmtN(c.cores)} core${c.cores>1?'s':''} of ${c.rows} × ${c.cols} processing elements at ${c.ghz.toFixed(2)} GHz, ${c.bits}-bit: <b>${sig(pes*2*c.ghz*1e9*c.bits/8/1e12)} TOPS</b> peak${derived?'':' (not driving the model: switch on “Derive the accelerator from its compute array” under Chip micro-architecture in Inputs)'}.
+      The matrix multiply analysed (${esc(g.what)}), ${fmtN(g.M)} × ${fmtN(g.K)} by ${fmtN(g.K)} × ${fmtN(g.N)}, keeps <b>${fmtPct(map.util)}</b> of the array busy with ${map.ws?'weight':'output'}-stationary dataflow and is <b>${map.bound}-bound</b>.
+      ${derived ? `The model uses ${fmtPct(eff)} of peak (that × ${fmtPct(CTRL_EFF)} for issue and control).` : ''} <button class="link" data-open="left">Chip inputs</button></div>
+    <div class="cols">
+    <div class="card"><h3>Matrix multiply on the array</h3>
+      <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:8px">${arr(1, 1, 'a full tile')}${arr(ea, eb, 'the edge tile, '+fmtPct(ea*eb)+' used')}</div>
+      ${stat(map.ws?'Weight tiles (K × N)':'Output tiles (M × N)', `${fmtN(map.ta)} × ${fmtN(map.tb)} = ${fmtN(map.tiles)} over ${fmtN(c.cores)} cores, ${fmtN(map.rounds)} round${map.rounds>1?'s':''}`)}
+      ${stat('Spatial: tile edges', fmtPct(map.spatial))}${stat(`Temporal: ${fmtN(map.stream)} streamed against ${map.R + map.C} fill and drain`, fmtPct(map.temporal))}
+      ${stat('Cores busy in the last round', fmtPct(map.parallel))}${stat('<b>Array utilisation</b>', `<b>${fmtPct(map.util)}</b>`)}
+      <p class="note">${map.ws ? 'Weight-stationary loads a K × N weight tile into the array and streams the M rows of A through it, so a small M (a decode batch) leaves the array filling and draining.' : `Output-stationary holds an M × N block of results and streams the depth K through it${map.ks>1 ? `, split ${map.ks} ways across cores because there are too few output blocks to occupy them` : ''}; a small M leaves most rows of each block empty.`}</p></div>
+    <div class="card"><h3>Through SRAM to DRAM</h3>
+      ${stat('SRAM tile (half the SRAM, double-buffered)', T ? `${fmtN(T.Tm)} × ${fmtN(T.Tn)}, depth ${fmtN(T.Tk)}` : 'does not fit')}
+      ${stat('DRAM traffic', `${fmtB(map.traffic)} (each operand once: ${fmtB(map.minT)})`)}
+      ${stat('Achieved intensity · ridge point', `${sig(map.intensity)} · ${sig(map.ridge)} op/B`)}
+      ${stat('Compute time · DRAM time', `${fmtT(map.tCompute)} · ${fmtT(map.tMem)}`)}
+      ${stat('<b>Achieved</b>', `<b>${fmtOps(map.achieved)}</b>, ${map.bound}-bound`)}
+      <p class="note">The tiling is the one with the least DRAM traffic that fits; below the ridge point the matrix multiply waits on DRAM however busy the array could be.</p></div>
+    <div class="card span"><h3>Utilisation against M</h3>${uChart}
+      <p class="note">With N = ${fmtN(g.N)} and K = ${fmtN(g.K)} held. At small M both waste the array: weight-stationary on fill and drain (it needs M well above rows + columns, ${map.R + map.C}), output-stationary on the empty rows of each output block. That is why decode at small batches is memory-bound on any systolic design.</p></div>
+    <div class="card span"><h3>Floorplan · ${m.nDies>1 ? `${m.nDies} chiplets of ${fmtA(m.dieEach)}` : fmtA(m.die)}</h3>${floorplanSvg(m)}
+      <p class="note">Schematic, to scale by area. PHYs sit on the edges in proportion to the edge they need${m.padArea>m.coreArea?'; the hatched area is filler, there only because the PHYs need more edge than the logic provides':''}.</p></div>
+    <div class="card span"><h3>Package</h3>${packageSvg(m)}</div>
+    <div class="card span"><h3>Chiplets: 1 to 8 dies</h3>${chipletSweep(m)}</div>
+    </div>`;
+}
+// one die (or chiplet), drawn to scale by area: PHY strips on the edges, then compute cores, SRAM and the rest inside
+function floorplanSvg(m){
+  const n = m.nDies, A = m.area, L = Math.sqrt(m.dieEach), W = 760, sc = Math.min(270/L, (W-40)/(n*L + (n-1)*2)), H = L*sc + 40;
+  const strip = Math.max(0.8, L*0.06), dev = m.dev;
+  let g = '';
+  for(let d=0; d<n; d++){
+    const x0 = 20 + d*(L+2)*sc, y0 = 10, px = v=>v*sc;
+    g += `<rect x="${x0}" y="${y0}" width="${px(L)}" height="${px(L)}" fill="#111" stroke="#6b6b6b"/>`;
+    // interior: compute | SRAM over a band of NoC, other and filler
+    const inner = L - 2*strip, ix = x0 + px(strip), iy = y0 + px(strip), iw = px(inner), ih = px(inner);
+    const cA = A.compute/n, sA = A.sram/n, rest = A.noc/n + A.misc/n + A.d2d/n*0, fill = Math.max(0, m.dieEach - m.coreArea/n), tot = cA + sA + rest + fill;
+    const topH = ih*(cA + sA)/tot, cw = iw*cA/Math.max(1e-9, cA + sA);
+    const cores = S.chip.on ? Math.max(1, Math.round(S.chip.cores/n)) : Math.max(1, Math.round(S.noc.tiles/n)), cg = Math.ceil(Math.sqrt(cores));
+    for(let i=0;i<cores;i++){ const r = Math.floor(i/cg), q = i%cg, w = cw/cg, h = topH/Math.ceil(cores/cg);
+      g += `<rect x="${ix + q*w + 0.5}" y="${iy + r*h + 0.5}" width="${Math.max(0.5, w-1)}" height="${Math.max(0.5, h-1)}" fill="#3a3a3a"/>`; }
+    g += `<rect x="${ix+cw}" y="${iy}" width="${iw-cw}" height="${topH}" fill="#262626" stroke="#4a4a4a"/>`;
+    const bh = ih - topH, rw = iw*rest/Math.max(1e-9, rest + fill);
+    g += `<rect x="${ix}" y="${iy+topH}" width="${rw}" height="${bh}" fill="#1a1a1a" stroke="#4a4a4a"/>`;
+    if(fill > 0) g += `<rect x="${ix+rw}" y="${iy+topH}" width="${iw-rw}" height="${bh}" fill="url(#fp_hatch)" stroke="#4a4a4a"/>`;
+    if(d===0){ const lab = (x, y, t) => `<text x="${x}" y="${y}" class="edgelbl" style="fill:#a3a3a3">${t}</text>`;
+      if(cw > 60 && topH > 24) g += lab(ix+4, iy+12, 'compute');
+      if(iw-cw > 40 && topH > 24) g += lab(ix+cw+4, iy+12, 'SRAM');
+      if(rw > 60 && bh > 14) g += lab(ix+4, iy+topH+12, 'NoC, other'); }
+    // edge strips: DRAM top and bottom, host link left, fabric right, die-to-die on the inner edges
+    const len = v => Math.min(L, v), ePx = px(strip);
+    const dramL = len(m.dev && S.dev.units*dev.shore/n/2), linkL = len(m.lk.totalLanes*m.lk.L.shore/n), fabL = len(m.area.fabPhy ? m.fab.shore/n : 0), dL = len(m.d2dShore/n/(n>1 ? (d===0||d===n-1 ? 1 : 2) : 1));
+    g += `<rect x="${x0 + px((L-dramL)/2)}" y="${y0}" width="${px(dramL)}" height="${ePx}" fill="#8a8a8a"/><rect x="${x0 + px((L-dramL)/2)}" y="${y0+px(L)-ePx}" width="${px(dramL)}" height="${ePx}" fill="#8a8a8a"/>`;
+    if(d===0) g += `<rect x="${x0}" y="${y0 + px((L-linkL)/2)}" width="${ePx}" height="${px(linkL)}" fill="#a3a3a3"/>`;
+    if(d===n-1 && fabL) g += `<rect x="${x0+px(L)-ePx}" y="${y0 + px((L-fabL)/2)}" width="${ePx}" height="${px(fabL)}" fill="#6b6b6b"/>`;
+    if(n>1){ if(d<n-1) g += `<rect x="${x0+px(L)-ePx}" y="${y0 + px((L-dL)/2)}" width="${ePx}" height="${px(dL)}" fill="#ededed"/>`;
+      if(d>0) g += `<rect x="${x0}" y="${y0 + px((L-dL)/2)}" width="${ePx}" height="${px(dL)}" fill="#ededed"/>`; }
+  }
+  const key = [['#3a3a3a','compute cores'],['#262626','SRAM'],['#1a1a1a','NoC and other'],['#8a8a8a','DRAM PHY'],['#a3a3a3','host link PHY'],['#6b6b6b','fabric PHY'],['#ededed','die-to-die PHY']]
+    .map(([f,t],i)=>`<rect x="${20+i*104}" y="${H-12}" width="9" height="9" fill="${f}" stroke="#4a4a4a"/><text x="${33+i*104}" y="${H-4}" class="edgelbl">${t}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H+4}" role="img" aria-label="Floorplan of the accelerator die${m.nDies>1?'s':''}, to scale by area"><defs><pattern id="fp_hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#4a4a4a" stroke-width="1.5"/></pattern></defs>${g}${key}</svg>`;
+}
+// the package: dies on an interposer with HBM stacks above and below, and the reticle (26 × 33 mm) for scale
+function packageSvg(m){
+  const n = m.nDies, L = Math.sqrt(m.dieEach), hbm = m.dev.fam==='HBM' ? S.dev.units : 0, sW = 11, sH = 10, gap = 1;
+  const rowsD = n>4 ? 2 : 1, perRow = Math.ceil(n/rowsD), dw = perRow*L + (perRow-1)*gap, dh = rowsD*L + (rowsD-1)*gap;
+  const perSide = Math.ceil(hbm/2), sw = Math.max(dw, perSide*(sW+gap)-gap), iw = Math.max(sw, 26) + 4, ih = dh + (hbm ? 2*(sH+gap) : 0) + 4;
+  const W = 760, H = 260, sc = Math.min((W-200)/iw, (H-20)/ih), ox = 10, oy = 10, px = v=>v*sc;
+  let g = `<rect x="${ox}" y="${oy}" width="${px(iw)}" height="${px(ih)}" fill="#0f0f0f" stroke="#4a4a4a"/>`;
+  const dy0 = oy + px(2 + (hbm ? sH+gap : 0)), dx0 = ox + px((iw - dw)/2);
+  for(let d=0; d<n; d++){ const r = Math.floor(d/perRow), q = d%perRow;
+    g += `<rect x="${dx0 + px(q*(L+gap))}" y="${dy0 + px(r*(L+gap))}" width="${px(L)}" height="${px(L)}" fill="#3a3a3a" stroke="#8a8a8a"/>`; }
+  for(let i=0; i<hbm; i++){ const top = i < perSide, k = top ? i : i - perSide, cnt = top ? perSide : hbm - perSide, x = ox + px((iw - (cnt*(sW+gap)-gap))/2 + k*(sW+gap));
+    g += `<rect x="${x}" y="${top ? oy + px(2) - px(0) : dy0 + px(dh + gap)}" width="${px(sW)}" height="${px(sH)}" fill="#262626" stroke="#8a8a8a"/>`; }
+  const rx = ox + px(iw) + 20;
+  g += `<rect x="${rx}" y="${oy}" width="${px(26)}" height="${px(33)}" fill="none" stroke="#a3a3a3" stroke-dasharray="4 3"/><text x="${rx}" y="${oy + px(33) + 14}" class="edgelbl">reticle 26 × 33 mm</text>`;
+  const txt = `${n} die${n>1?'s':''} of ${fmtA(m.dieEach)}${hbm ? `, ${hbm} HBM stacks` : ''} on a ${sig(iw)} × ${sig(ih)} mm ${hbm || n>1 ? 'interposer' : 'package substrate'}`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc('Package: '+txt)}">${g}</svg><p class="note">${txt}${m.nD ? '' : '. With the chiplet count on auto the die is drawn whole; set a count under Chip micro-architecture to split it'}. Stacks drawn at about 11 × 10 mm.</p>`;
+}
+// sweep the chiplet count: build cost, power and silicon per accelerator against one die
+function chipletSweep(m){
+  const ns = [1,2,3,4,6,8], rows = ns.map(n=>{ const s2 = clone(S); s2.chip.dies = n; const m2 = model(s2), a = accCost(s2, m2);
+    return {n, cost:a.total, die:a.die, P:m2.pAcc, area:m2.die, each:m2.dieEach, d2d:m2.A.d2d, y:a.y}; });
+  const b = rows[0], pc = v=>(v>=1?'+':'−')+Math.abs((v-1)*100).toFixed(0)+' %';
+  const chart = lineChart({xs:ns, xticks:ns, xfmt:v=>String(v), yfmt:v=>fmtPct(v), h:220, legend:true, label:'Chiplet count against cost, power and silicon, relative to one die',
+    series:[{ys:rows.map(r=>r.cost/b.cost), col:'#ededed', name:'build cost'}, {ys:rows.map(r=>r.P/b.P), col:'#8a8a8a', name:'power'}, {ys:rows.map(r=>r.area/b.area), col:'#a3a3a3', name:'silicon area', w:1}]});
+  return chart + `<div class="tbl-wrap"><table class="t"><thead><tr><th class="n">Dies</th><th class="n">Each</th><th class="n">Yield</th><th class="n">Dies cost</th><th class="n">Build cost</th><th class="n">Die-to-die power</th><th class="n">Accelerator power</th></tr></thead><tbody>${
+    rows.map(r=>`<tr class="${r.n===m.nDies && m.nD ? 'cur' : ''}"><td class="n">${r.n}</td><td class="n">${fmtA(r.each)}${r.each>830?' ✗':''}</td><td class="n">${fmtPct(r.y)}</td><td class="n">${fmtUSD(r.die)}</td><td class="n">${fmtUSD(r.cost)} <span class="note">${r.n>1?pc(r.cost/b.cost):''}</span></td><td class="n">${fmtW(r.d2d)}</td><td class="n">${fmtW(r.P)}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note">Smaller dies yield better and give the package more edge for PHYs; each split adds UCIe links (${D2D.pj} pJ/bit, ${D2D.latNs} ns) for the traffic that crosses, and their PHY area. ✗ = a die still above the reticle.</p>`;
 }
 
 function paneOnchip(m){
@@ -2454,8 +2646,8 @@ function stackOf(items, f){ const t = items.reduce((a,x)=>a+x[1],0); return `<di
     <div class="keys">${items.map((x,i)=>`<span><i class="hs h${i}"></i>${x[0]} · ${f(x[1])}</span>`).join('')}</div>`; }
 function panePPA(m){
   const A = m.A;
-  const pItems = [['Device DRAM',A.devDram],['Host link',A.link],['Compute',A.compute],['On-chip movement',A.noc],['Leakage',A.leak],['Scale-up',A.up],['Scale-out',A.out]].filter(x=>x[1]>0);
-  const aItems = [['Compute',m.area.compute],['SRAM',m.area.sram],['NoC routers',m.area.noc],['DRAM PHY',m.area.dramPhy],['Link PHY',m.area.linkPhy],['Fabric PHY',m.area.fabPhy],['Other (15 %)',m.area.misc]].filter(x=>x[1]>0);
+  const pItems = [['Device DRAM',A.devDram],['Host link',A.link],['Compute',A.compute],['On-chip movement',A.noc],['Leakage',A.leak],['Scale-up',A.up],['Scale-out',A.out],['Die-to-die',A.d2d]].filter(x=>x[1]>0);
+  const aItems = [['Compute',m.area.compute],['SRAM',m.area.sram],['NoC routers',m.area.noc],['DRAM PHY',m.area.dramPhy],['Link PHY',m.area.linkPhy],['Fabric PHY',m.area.fabPhy],['Die-to-die PHY',m.area.d2d],['Other (15 %)',m.area.misc]].filter(x=>x[1]>0);
   if(m.padArea>m.coreArea) aItems.push(['Pad-limited filler', m.padArea-m.coreArea]);
   const rows = sizeDram(S, m);
   const scatter = scatterChart(rows.filter(r=>r.d.top || r.id===S.dev.dram).map(r=>({x:r.phy, y:r.power, label:r.d.name.replace(' Gb/s',''), feas:r.feas, cur:r.id===S.dev.dram, id:r.id, n:r.n})));
@@ -2465,7 +2657,7 @@ function panePPA(m){
     <div class="card"><h3>Power per accelerator · <span>${fmtW(m.pAcc)}</span></h3>${stackOf(pItems, fmtW)}<p class="note">System total ${fmtW(m.Ptot)} including hosts and ${(overhead(S)*100).toFixed(1)} % for fans and conversion losses (${coolOf(S).name} cooling, from the rack limit).</p></div>
     <div class="card"><h3>Die area · <span>${fmtA(m.die)}</span></h3>${stackOf(aItems, fmtA)}
       ${stat('Core-limited area', fmtA(m.coreArea))}${stat('Pad-limited area', fmtA(m.padArea))}${stat('Die edge needed / available', sig(m.shoreNeed)+' / '+sig(m.shoreHave)+' mm')}
-      <p class="note">${m.padArea>m.coreArea ? 'Pad-limited: the edge its PHYs need sizes the die, not its logic. ' : ''}${m.die>830 ? 'Above the ~830 mm² reticle limit: this needs several dies on one package.' : 'Within one reticle (~830 mm²).'}</p></div>
+      <p class="note">${m.padArea>m.coreArea ? 'Pad-limited: the edge its PHYs need sizes the die, not its logic. ' : ''}${m.nD ? `${m.nD} chiplet${m.nD>1?'s':''} of ${fmtA(m.dieEach)} each${m.dieEach>830 ? ', each still above the ~830 mm² reticle' : ', each within one reticle'}.` : m.die>830 ? 'Above the ~830 mm² reticle limit: this needs several dies on one package (set a chiplet count on the Chip tab to model the links between them).' : 'Within one reticle (~830 mm²).'}</p></div>
     <div class="card span"><h3>DRAM options sized for this requirement · power against PHY area</h3>${scatter}
       <p class="note">Down and left is better. Filled = practical, outlined = stretch, crossed = impractical. Click a point to use it.</p></div></div>`;
 }
@@ -2537,7 +2729,7 @@ function considerations(m){
   { const ts = tolStats(m); if(ts) add(ts.pCeil<0.9?'warn':'ok', 'Catalogue tolerance', `<p>With capacities uncertain by ±${(S.vary.tol*100).toFixed(0)} %, the design stays under the utilisation ceiling in <b>${fmtPct(ts.pCeil)}</b> of draws and under 100 % in <b>${fmtPct(ts.pFull)}</b>. Most often weakest: ${ts.per.filter(c=>c.weak>0.005).sort((a,b)=>b.weak-a.weak).slice(0,3).map(c=>c.name+' '+fmtPct(c.weak)).join(', ')}.</p>`); }
   add(m.sramNeed>S.acc.sram*1e6?'warn':'ok', 'On-chip buffering', `<p>Hiding link and DRAM latency needs about <b>${fmtB(m.sramNeed)}</b> double-buffered; the accelerator has <b>${sig(S.acc.sram)} MB</b>.</p>`);
   add(m.Pmove/m.Ptot>0.5?'warn':'info', 'Power: moving data vs computing', `<p>Data movement is <b>${fmtPct(m.Pmove/m.Ptot)}</b> of <b>${fmtW(m.Ptot)}</b>. A ${d.name} bit costs ${d.pj} pJ, a PCIe bit ${L.pj} pJ, an operation ${S.acc.pj} pJ.</p>`);
-  add(m.die>830?'bad':m.padArea>m.coreArea?'warn':'ok', 'Area and die edge', `<p>Die estimate <b>${fmtA(m.die)}</b>; PHYs need <b>${sig(m.shoreNeed)} mm</b> of edge. ${m.padArea>m.coreArea?'Pad-limited. ':''}${m.die>830?'Beyond one reticle: chiplets.':''}</p>`);
+  add(m.dieEach>830?'bad':m.padArea>m.coreArea?'warn':'ok', 'Area and die edge', `<p>Die estimate <b>${fmtA(m.die)}</b>; PHYs need <b>${sig(m.shoreNeed)} mm</b> of edge. ${m.padArea>m.coreArea?'Pad-limited. ':''}${m.die>830?'Beyond one reticle: chiplets.':''}</p>`);
   if(d.fam==='HBM') add('info', 'HBM packaging and thermals', `<p>HBM needs an interposer or bridge, known-good-die test and careful thermals; refresh doubles above 85 °C.</p>`);
   add('info', 'Reliability (ECC)', `<p>${S.ecc ? (d.fam==='DDR'?'DDR ECC adds 8 bits per 64 side-band.' : d.fam==='HBM'?'HBM carries ECC side-band.' : d.fam==='LPDDR6'?'LPDDR6 carries metadata in every burst.':'Inline ECC costs about 12.5 % capacity and ~15 % bandwidth here.') : 'ECC is off; long-running systems normally need it.'}</p>`);
   add('info', 'Not modelled', `<p>IOMMU/ATS misses, coherence, PCIe switches and retimers, collective algorithms in detail, stragglers and failures, power states, software copies, and cost.</p>`);
@@ -2583,7 +2775,8 @@ function lineChart(o){
   if(yt.length<3){ yt = []; for(let e=Math.floor(Math.log10(ymin)); e<=e1; e++) for(const k of [1,2,5]){ const v = k*Math.pow(10,e); if(v>=ymin && v<=ymax) yt.push(v); } }   // narrow range: 1-2-5 ticks
   for(const v of yt){ const y = Y(v); g += `<line class="gl" x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}"/><text x="${ml-6}" y="${y+3}" text-anchor="end">${o.yfmt(v)}</text>`; }
   const x0 = Math.ceil(Math.log10(xmin)), x1 = Math.floor(Math.log10(xmax)), xs = Math.max(1, Math.ceil((x1-x0+1)/7));
-  for(let e=x0; e<=x1; e+=xs){ const x = X(Math.pow(10,e)); g += `<line class="gl" y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}"/><text x="${x}" y="${H-mb+16}" text-anchor="middle">${o.xfmt(Math.pow(10,e))}</text>`; }
+  const xt = o.xticks || []; if(!o.xticks) for(let e=x0; e<=x1; e+=xs) xt.push(Math.pow(10,e));   // decades, unless the caller lists ticks
+  for(const v of xt){ const x = X(v); g += `<line class="gl" y1="${mt}" y2="${H-mb}" x1="${x}" x2="${x}"/><text x="${x}" y="${H-mb+16}" text-anchor="middle">${o.xfmt(v)}</text>`; }
   g += `<line class="ax" x1="${ml}" x2="${ml}" y1="${mt}" y2="${H-mb}"/><line class="ax" x1="${ml}" x2="${W-mr}" y1="${H-mb}" y2="${H-mb}"/>`;
   for(const h of o.hlines||[]){ if(!isFinite(h.y)||h.y<=0) continue; const y = Y(h.y);
     g += `<line x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}" stroke="${h.col}" stroke-dasharray="5 4"/><text x="${h.left?ml+6:W-mr-4}" y="${h.left?y+13:y-5}" text-anchor="${h.left?'start':'end'}" style="fill:${h.col}">${h.name}</text>`; }
@@ -2625,7 +2818,7 @@ function scatterChart(pts){
    UPDATE LOOP, PRESETS, SHARE
    ===================================================================== */
 let M = null;
-const PANES = {opt:paneOpt, checks:paneChecks, sizing:paneSizing, sweep:paneSweep, onchip:paneOnchip, rack:paneRack, ppa:panePPA, cost:paneCost, latency:paneLatency, headroom:paneHeadroom, roofline:paneRoofline, cons:paneCons, model:paneModel};
+const PANES = {opt:paneOpt, checks:paneChecks, sizing:paneSizing, sweep:paneSweep, chip:paneChip, onchip:paneOnchip, rack:paneRack, ppa:panePPA, cost:paneCost, latency:paneLatency, headroom:paneHeadroom, roofline:paneRoofline, cons:paneCons, model:paneModel};
 function update(){
   S.mod = isModified();
   const m = model(S); M = m;
@@ -2647,7 +2840,7 @@ new MutationObserver(()=>document.querySelectorAll('.tbl-wrap:not([tabindex])').
   .observe(document.body, {childList:true, subtree:true});
 function buildAll(){
   ctlUpdaters.length = 0;
-  buildLlm(); buildTrain(); buildReq(); buildWl(); buildScale(); buildVary(); buildCost(); buildInspector(); buildDiagram(); update();
+  buildLlm(); buildTrain(); buildReq(); buildWl(); buildScale(); buildVary(); buildChip(); buildCost(); buildInspector(); buildDiagram(); update();
 }
 document.addEventListener('change', e=>{ const k = e.target.dataset && e.target.dataset.opt; if(!k) return;
   optState[k] = e.target.type==='checkbox' ? e.target.checked : e.target.value; optResult = null; update(); });
@@ -2919,7 +3112,7 @@ function agentSummary(){
     tolerance: tolStats(m) ? {plus_minus:fmtPct(S.vary.tol), p_under_ceiling:fmtPct(tolStats(m).pCeil), p_under_100:fmtPct(tolStats(m).pFull)} : 'off',
     accelerators: m.tp.nA, accelerators_needed_with_this_design: an.n, scaleup_domain_size: m.tp.dom,
     power_system: fmtW(m.Ptot), power_full_load: fmtW(fullPower(S).total), power_per_accelerator: fmtW(m.pAcc), power_per_rack_full_load: fmtW(fullPower(S).rack), rack_limit: S.scale.rackKW+' kW',
-    die_area: fmtA(m.die), fits_one_reticle: m.die<=830, energy_per_byte: sig(m.Ptot/m.T*1e12)+' pJ',
+    die_area: fmtA(m.die), dies: m.nDies, fits_one_reticle: m.dieEach<=830, energy_per_byte: sig(m.Ptot/m.T*1e12)+' pJ',
     cost: (c=>({basis:S.cost.basis==='buy'?'purchase price':'build cost', capital:fmtUSD(c.capex), per_year:fmtUSD(c.perYear), unit_cost:fmtUSD(c.unit)+' '+c.unitName,
       accelerator_build_cost:fmtUSD(c.acc.total), electricity_per_year:fmtUSD(c.year.energy)}))(costOf(S, m)),
     llm_workload: S.llm.on ? (i=>({model:LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom', copies_of_model:sig(i.copies), accelerators_per_copy:sig(i.g),

@@ -128,6 +128,16 @@ const update = process.argv.includes('--update');
     const cd = costOf({...clone(S), llm: {...S.llm, role: 'decode'}}, m).capex, cp = costOf(ps, m.pre).capex, c = costOf(S, m).capex;
     return {decOps, preOps, power: Y.Ptot / (m.Ptot + m.pre.Ptot), capex: c / (cd + cp), kv: S.scale.xOut * S.T / (i.pre * i.kvTok), pool: Y.pool, nPre: m.pre.tp.nA};
   });
+  // chip: the array gives peak, density and energy by formula; a weight-stationary GEMM that divides exactly uses M ÷ (M + R + C);
+  // explicit chiplets add UCIe power for the traffic that crosses and split the silicon; switching the array on keeps the peak
+  const chip = await page.evaluate(() => {
+    applyPreset('nvl72'); const before = S.acc.tops; document.querySelector('#chipIn input[type=checkbox]').click(); model(S); const kept = S.acc.tops / before;
+    const c = S.chip, peak = c.cores * c.rows * c.cols * 2 * c.ghz * 1e9 / 1e12;
+    const ex = clone(S); ex.chip = {...ex.chip, cores: 4, rows: 32, cols: 32, flow: 'ws'}; const g = gemmMap(ex, {M: 4096, N: 64, K: 64, bytes: 1}, 1e12);
+    S.chip.dies = 4; const m = model(S);
+    return {kept, peak: S.acc.tops / peak, dens: S.acc.topsMm2 * 1.8 / c.ghz / 2.43, pj: S.acc.pj / 0.29, ws: g.util / (4096 / (4096 + 64)),
+      d2d: m.A.d2d / (m.d2dBps * D2D.eff / S.burst * 8 * D2D.pj * 1e-12), each: m.dieEach * 4 / m.die, dies: accCost(S, m).n, d2dOn: m.A.d2d > 0};
+  });
   // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
   await page.setViewport({width: 711, height: 1039}); await page.emulateMediaType('print');
   const spec = await page.evaluate(ids => {
@@ -173,6 +183,8 @@ const update = process.argv.includes('--update');
   else console.log('ok   training: arithmetic and memory match the formulas by hand, follow the sweep, and exclude the serving workload');
   if (!(near(pools.decOps, 1) && near(pools.preOps, 1) && near(pools.power, 1) && near(pools.capex, 1) && near(pools.kv, 1) && pools.nPre === 32)) fail(`pools: ${JSON.stringify(pools)}`);
   else console.log(`ok   prefill and decode pools: arithmetic splits exactly, power and capital add up, KV caches cross the network (most loaded: ${pools.pool})`);
+  if (!(Math.abs(chip.kept - 1) < 0.01 && near(chip.peak, 1) && near(chip.dens, 1) && near(chip.pj, 1) && near(chip.ws, 1) && near(chip.d2d, 1) && near(chip.each, 1) && chip.dies === 4 && chip.d2dOn)) fail(`chip: ${JSON.stringify(chip)}`);
+  else console.log('ok   chip: array peak, density and energy by formula; exact weight-stationary utilisation; chiplets add die-to-die power and split the silicon');
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
   else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
   if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);
