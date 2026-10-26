@@ -118,6 +118,7 @@ The *Checks* tab (under More) compares the model with published figures:
 | DGX H100: 10.2 kW maximum | System composition: accelerators, hosts, switches, NICs, fans, power supplies | −18 % (a planning maximum) |
 | GB200 NVL72: about 120 kW per rack | Rack composition, liquid cooled | −5.0 % |
 | GB200 NVL72 compute tray: 6.3 kW maximum | Node composition: 4 GPUs, 2 Grace, NICs, DPUs, drives, 48→12 V | −3.0 % |
+| MLPerf v5.0 Llama 2 70B, 8 × H200: 34,988 tokens/s | LLM serving: decode and prefill, best batch and parallelism | +11.5 % |
 
 Four more are calibration points rather than validations. Energy per operation is set from the H100 (700 W)
 and B200 (1,000 W) TDPs. The cost model's packaging price and effective defect density were chosen with two
@@ -131,13 +132,14 @@ carries across vendors to about ±25 %; to model a specific part closely, set it
 
 The LLM workload is checked against MLPerf Inference v5.0 (Llama 2 70B, Offline, 8 GPUs). The search runs every
 batch and tensor-parallel size whose KV caches fit in memory, with compute at the default 60 % of peak and
-operations counted in 8-bit equivalents (FP4 weight matmuls at twice the rate, attention no faster than 8-bit).
-MLPerf does not publish the dataset's mean prompt length, so H200 (34,988 tokens/s, FP8) is used to set it:
-280 tokens, alongside MLPerf's reference reply of 294. That makes H200 a calibration point (+0.2 %). B200 at FP4
-(98,858 tokens/s) is then a real test, with ±25 % fixed beforehand, and the model misses by +60 %. Prefill makes
-both compute-bound, and the model gives FP4 the same share of its peak as FP8. The published B200 ÷ H200 ratio
-is 2.8×, against 4.5× for peak FP4 ÷ FP8, so FP4 reaches a smaller share of its peak in practice. The miss is shown
-as a labelled row rather than tuned away.
+operations counted in 8-bit equivalents (FP4 weight matmuls at twice the rate, attention no faster than 8-bit). The
+mean prompt, 222.33 tokens, was measured from MLCommons' 24,576-sample dataset file by the sibling AI Accelerators
+Explained site, and MLPerf's reference reply is 294.45 tokens. Both rows had ±25 % fixed before the run.
+- **H200 at FP8:** the model gives 39,029 tokens/s against 34,988 published, +11.5 %.
+- **B200 at FP4:** the model gives 176,631 against 98,858, +79 %, a known miss shown as a labelled row rather than
+  tuned away. Prefill makes both compute-bound, and the model gives FP4 the same share of its peak as FP8. The
+  published B200 ÷ H200 ratio is 2.8×, against 4.5× for peak FP4 ÷ FP8, so FP4 reaches a smaller share of its peak
+  in practice.
 
 Fans and power conversion are no longer a flat 15 %. They follow the rack's cooling, read from its power limit.
 Air-cooled racks add 8 % for fans and lose 5 % in Titanium server supplies. Direct-liquid racks add 2 % for fans

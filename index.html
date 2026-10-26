@@ -1302,11 +1302,11 @@ const MI300X = {dev:{dram:'hbm3_52', units:8}, acc:{tops:2615, util:1, pj:H100.a
 const MI355X = {dev:{dram:'hbm3e_80', units:8}, acc:{tops:5033, util:1, pj:B200.acc.pj, topsMm2:B200.acc.topsMm2, sram:256, leak:0.02}, link:{id:'pcie5', lanes:16}};
 const GAUDI3 = {dev:{dram:'hbm2e_36', units:8}, acc:{tops:1835, util:1, pj:H100.acc.pj, topsMm2:H100.acc.topsMm2, sram:96, leak:0.02}, link:{id:'pcie5', lanes:16}};
 // MLPerf Inference v5.0, Llama 2 70B, Offline, 8 GPUs: H200 (6 × HBM3E 6.4 Gb/s, 141 GB) at FP8; B200 at FP4 weights, FP8 KV.
-// Compute at the default 60 % of the 8-bit dense peak. The dataset's mean prompt length is not published: it is set to
-// 280 tokens to match H200 (a calibration), with MLPerf's reference reply of 294 tokens; B200 then tests the model.
+// Compute at the default 60 % of the 8-bit dense peak. Mean prompt 222.33 tokens, measured from MLCommons' 24,576-sample
+// dataset file by the AI Accelerators Explained site (scripts/mlperf_input_length.py); MLPerf's reference reply is 294 tokens.
 const MLPERF_H200 = {dev:{dram:'hbm3e_64', units:6}, acc:{tops:1979, util:0.6, pj:0.29, topsMm2:2.43, sram:50}, link:{id:'pcie5', lanes:16}, scale:{fabric:'nvl4'}};
 const MLPERF_B200 = {dev:{dram:'hbm3e_80', units:8}, acc:{tops:4500, util:0.6, pj:0.17, topsMm2:3.5, sram:50}, link:{id:'pcie6', lanes:16}, scale:{fabric:'nvl5'}};
-const MLPERF_LLM = {on:true, model:'custom', params:69, active:69, layers:80, dModel:8192, kv:2048, kvBytes:1, prefill:true, prompt:280, reply:294, tps:10};
+const MLPERF_LLM = {on:true, model:'custom', params:69, active:69, layers:80, dModel:8192, kv:2048, kvBytes:1, prefill:true, prompt:222.33, reply:294.45, tps:10};
 // best offline tokens/s on 8 accelerators over tensor-parallel size and batch, with every user's KV cache in device memory
 function llmMaxTokens(hw, llm){ let top = {tok:0};
   for(const g of [1,2,4,8]) for(let B = 8; B<=4096; B = Math.round(B*1.25)){
@@ -1373,9 +1373,9 @@ const REFS = [
   {id:'gaudi3p', name:'Intel Gaudi 3 at full load', tests:'indicative: H100’s energy per operation on another vendor’s part', pub:900, f:fmtW, tol:0.25, info:true,
    src:['The Register: Gaudi 3 OAM, 900 W, 1,835 TFLOPS FP8 dense','https://www.theregister.com/2024/04/09/intel_gaudi_ai_accelerator/'],
    run:()=>fullPower(cfgOf(GAUDI3)).acc, how:'1,835 TFLOPS FP8 dense, 3.7 TB/s'},
-  {id:'mlperfh200', name:'MLPerf Llama 2 70B, 8 × H200, Offline', tests:'calibration point: the mean prompt length MLPerf does not publish', pub:34988, f:v=>fmtN(Math.round(v))+' tok/s', tol:0.10, fitted:true,
+  {id:'mlperfh200', name:'MLPerf Llama 2 70B, 8 × H200, Offline', tests:'LLM serving: decode and prefill on 8 GPUs, best batch and parallelism', pub:34988, f:v=>fmtN(Math.round(v))+' tok/s', tol:0.25,
    src:['NVIDIA: MLPerf Inference v5.0, 34,988 tokens/s (entry 5.0-0060)','https://developer.nvidia.com/blog/nvidia-blackwell-delivers-massive-performance-leaps-in-mlperf-inference-v5-0'],
-   run:()=>llmMaxTokens(MLPERF_H200, {wBytes:1}).tok, how:'FP8; best batch and tensor-parallel size; prefill makes it compute-bound; prompt length set to 280 tokens to match'},
+   run:()=>llmMaxTokens(MLPERF_H200, {wBytes:1}).tok, how:'FP8; mean prompt 222.33 tokens measured from the MLPerf dataset; prefill makes it compute-bound; ±25 % fixed before the run'},
   {id:'mlperfb200', name:'MLPerf Llama 2 70B, 8 × B200, Offline (FP4)', tests:'known miss: the same model with FP4 weights over-predicts', pub:98858, f:v=>fmtN(Math.round(v))+' tok/s', tol:0.25, info:true,
    src:['NVIDIA: MLPerf Inference v5.0, 98,858 tokens/s (entry 5.0-0056)','https://developer.nvidia.com/blog/nvidia-blackwell-delivers-massive-performance-leaps-in-mlperf-inference-v5-0'],
    run:()=>llmMaxTokens(MLPERF_B200, {wBytes:0.5}).tok, how:'the ±25 % tolerance was fixed before the run. The model gives FP4 matmuls twice the 8-bit rate at the same 60 % of peak; published B200 ÷ H200 is 2.8×, against 4.5× in peak FP4 ÷ FP8, so FP4 reaches a smaller share of its peak'},
