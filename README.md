@@ -129,6 +129,16 @@ Three rows are indicative rather than pass/fail. They apply the energy per opera
 +24 % (750 W published), MI355X −22 % (1,400 W) and Intel Gaudi 3 −26 % (900 W). So one energy-per-operation figure
 carries across vendors to about ±25 %; to model a specific part closely, set its pJ/op from its own TDP.
 
+The LLM workload is checked against MLPerf Inference v5.0 (Llama 2 70B, Offline, 8 GPUs). The search runs every
+batch and tensor-parallel size whose KV caches fit in memory, with compute at the default 60 % of peak and
+operations counted in 8-bit equivalents (FP4 weight matmuls at twice the rate, attention no faster than 8-bit).
+MLPerf does not publish the dataset's mean prompt length, so H200 (34,988 tokens/s, FP8) is used to set it:
+280 tokens, alongside MLPerf's reference reply of 294. That makes H200 a calibration point (+0.2 %). B200 at FP4
+(98,858 tokens/s) is then a real test, with ±25 % fixed beforehand, and the model misses by +60 %. Prefill makes
+both compute-bound, and the model gives FP4 the same share of its peak as FP8. The published B200 ÷ H200 ratio
+is 2.8×, against 4.5× for peak FP4 ÷ FP8, so FP4 reaches a smaller share of its peak in practice. The miss is shown
+as a labelled row rather than tuned away.
+
 Fans and power conversion are no longer a flat 15 %. They follow the rack's cooling, read from its power limit.
 Air-cooled racks add 8 % for fans and lose 5 % in Titanium server supplies. Direct-liquid racks add 2 % for fans
 and lose power twice, in ORv3 power shelves (96.5 %) and in each tray's 48→12 V converter (97.5 %). The

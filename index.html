@@ -466,7 +466,7 @@ const DRAM_LINES = [
   {line:'HBM2',        fam:'HBM',    width:1024, unit:'stack',          cap:8,  lat:120, pj:3.9,  bg:1.0,  phy:12,  shore:7,   sig:1700,pract:4,  ext:6,  bins:[2000,2400],                 id:r=>'hbm2_'+r/100,  nm:r=>`HBM2 ${r/1000} Gb/s`},
   {line:'HBM2E',       fam:'HBM',    width:1024, unit:'stack',          cap:16, lat:120, pj:3.6,  bg:1.0,  phy:12,  shore:7,   sig:1700,pract:4,  ext:6,  bins:[3200,3600],                 id:r=>'hbm2e_'+r/100, nm:r=>`HBM2E ${r/1000} Gb/s`},
   {line:'HBM3',        fam:'HBM',    width:1024, unit:'stack',          cap:24, lat:110, pj:3.2,  bg:1.2,  phy:12,  shore:7,   sig:1700,pract:6,  ext:8,  bins:[[5200,{cap:16}],5600,6400],  id:r=>'hbm3_'+r/100,  nm:r=>`HBM3 ${r/1000} Gb/s`},
-  {line:'HBM3E',       fam:'HBM',    width:1024, unit:'stack',          cap:36, lat:110, pj:3.0,  bg:1.5,  phy:13,  shore:7,   sig:1700,pract:8,  ext:12, bins:[[8000,{cap:24}],9200,9600,9800], id:r=>'hbm3e_'+r/100, nm:r=>`HBM3E ${r/1000} Gb/s`},
+  {line:'HBM3E',       fam:'HBM',    width:1024, unit:'stack',          cap:36, lat:110, pj:3.0,  bg:1.5,  phy:13,  shore:7,   sig:1700,pract:8,  ext:12, bins:[[6400,{cap:24}],[8000,{cap:24}],9200,9600,9800], id:r=>'hbm3e_'+r/100, nm:r=>`HBM3E ${r/1000} Gb/s`},
   {line:'HBM4',        fam:'HBM',    width:2048, unit:'stack',          cap:48, lat:110, pj:2.6,  bg:2.0,  phy:18,  shore:9,   sig:2900,pract:8,  ext:12, bins:[6400,8000,[10000,{vendor:true}]], id:r=>r===6400?'hbm4_64':'hbm4_'+r/1000, nm:r=>`HBM4 ${r/1000} Gb/s`},
 ];
 const DRAMS = {};
@@ -955,9 +955,12 @@ function llmInfo(s){
   const W = L.params*1e9*L.wBytes, kvTok = L.layers*L.kv*L.kvBytes, kvUser = kvTok*ctx;
   const copies = L.users/L.batch, step = W + L.batch*kvUser;                   // bytes one copy reads per step
   const tokens = L.users*L.tps, g = tp.nA/copies;                              // g = accelerators per copy (tensor parallel)
-  const opsTok = 2*L.active*1e9 + 4*L.layers*ctx*L.dModel;                      // weights, then attention over the context
+  // arithmetic in 8-bit-equivalent operations (acc.tops is the 8-bit dense rate): weight matmuls run at the weight
+  // precision (FP4 twice as fast, BF16 half), attention over the cache at the KV precision but no faster than 8-bit
+  const wR = L.wBytes, aR = Math.max(1, L.kvBytes);
+  const opsTok = 2*L.active*1e9*wR + 4*L.layers*ctx*L.dModel*aR;               // weights, then attention over the context
   const pre = L.prefill ? tokens*L.prompt/L.reply : 0;                         // prompt tokens per second
-  const preOpsTok = 2*L.active*1e9 + 2*L.layers*L.prompt*L.dModel;              // causal: attention over half the prompt on average
+  const preOpsTok = 2*L.active*1e9*wR + 2*L.layers*L.prompt*L.dModel*aR;        // causal: attention over half the prompt on average
   const preReads = pre*(L.prompt/2)*kvTok/LLM_CHUNK;                           // each chunk re-reads the prompt's KV so far
   const T = copies*L.tps*step + preReads, ops = tokens*opsTok + pre*preOpsTok, writes = (tokens + pre)*kvTok;
   const xUp = g>1 ? 4*(g-1)*L.layers*L.dModel*L.actBytes*(tokens + pre)/T : 0; // two all-reduces of the activations per layer, per token
@@ -1219,6 +1222,19 @@ const DGX = {host:{dram:'ddr5_4800', units:16, base:1250}, scale:{perNode:8, nod
 const MI300X = {dev:{dram:'hbm3_52', units:8}, acc:{tops:2615, util:1, pj:H100.acc.pj, topsMm2:H100.acc.topsMm2, sram:256, leak:0.02}, link:{id:'pcie5', lanes:16}};
 const MI355X = {dev:{dram:'hbm3e_80', units:8}, acc:{tops:5033, util:1, pj:B200.acc.pj, topsMm2:B200.acc.topsMm2, sram:256, leak:0.02}, link:{id:'pcie5', lanes:16}};
 const GAUDI3 = {dev:{dram:'hbm2e_36', units:8}, acc:{tops:1835, util:1, pj:H100.acc.pj, topsMm2:H100.acc.topsMm2, sram:96, leak:0.02}, link:{id:'pcie5', lanes:16}};
+// MLPerf Inference v5.0, Llama 2 70B, Offline, 8 GPUs: H200 (6 × HBM3E 6.4 Gb/s, 141 GB) at FP8; B200 at FP4 weights, FP8 KV.
+// Compute at the default 60 % of the 8-bit dense peak. The dataset's mean prompt length is not published: it is set to
+// 280 tokens to match H200 (a calibration), with MLPerf's reference reply of 294 tokens; B200 then tests the model.
+const MLPERF_H200 = {dev:{dram:'hbm3e_64', units:6}, acc:{tops:1979, util:0.6, pj:0.29, topsMm2:2.43, sram:50}, link:{id:'pcie5', lanes:16}, scale:{fabric:'nvl4'}};
+const MLPERF_B200 = {dev:{dram:'hbm3e_80', units:8}, acc:{tops:4500, util:0.6, pj:0.17, topsMm2:3.5, sram:50}, link:{id:'pcie6', lanes:16}, scale:{fabric:'nvl5'}};
+const MLPERF_LLM = {on:true, model:'custom', params:69, active:69, layers:80, dModel:8192, kv:2048, kvBytes:1, prefill:true, prompt:280, reply:294, tps:10};
+// best offline tokens/s on 8 accelerators over tensor-parallel size and batch, with every user's KV cache in device memory
+function llmMaxTokens(hw, llm){ let top = {tok:0};
+  for(const g of [1,2,4,8]) for(let B = 8; B<=4096; B = Math.round(B*1.25)){
+    const s = cfgOf(hw, {scale:{perNode:8, nodes:1, racks:1, domain:'node', xOut:0}, llm:{...MLPERF_LLM, ...llm, batch:B, users:B*8/g}});
+    const m = model(s); if(s.resident > m.devCap) continue;
+    const tok = s.llm.users*s.llm.tps/m.worst.U; if(tok>top.tok) top = {tok, g, B}; }
+  return top; }
 const NVL72 = {acc:{tops:5000}, host:{dram:'lp5x_8533', units:16, base:1000}, scale:{perNode:4, nodes:18, racks:1, domain:'rack', xUp:0.1, xOut:0.02, nic:'e800', nics:1, rackKW:132}};
 const cfgOf = (...parts) => parts.reduce((a,p)=>merge(a, clone(p)), clone(BASE));
 const REFS = [
@@ -1278,6 +1294,12 @@ const REFS = [
   {id:'gaudi3p', name:'Intel Gaudi 3 at full load', tests:'indicative: H100’s energy per operation on another vendor’s part', pub:900, f:fmtW, tol:0.25, info:true,
    src:['The Register: Gaudi 3 OAM, 900 W, 1,835 TFLOPS FP8 dense','https://www.theregister.com/2024/04/09/intel_gaudi_ai_accelerator/'],
    run:()=>fullPower(cfgOf(GAUDI3)).acc, how:'1,835 TFLOPS FP8 dense, 3.7 TB/s'},
+  {id:'mlperfh200', name:'MLPerf Llama 2 70B, 8 × H200, Offline', tests:'calibration point: the mean prompt length MLPerf does not publish', pub:34988, f:v=>fmtN(Math.round(v))+' tok/s', tol:0.10, fitted:true,
+   src:['NVIDIA: MLPerf Inference v5.0, 34,988 tokens/s (entry 5.0-0060)','https://developer.nvidia.com/blog/nvidia-blackwell-delivers-massive-performance-leaps-in-mlperf-inference-v5-0'],
+   run:()=>llmMaxTokens(MLPERF_H200, {wBytes:1}).tok, how:'FP8; best batch and tensor-parallel size; prefill makes it compute-bound; prompt length set to 280 tokens to match'},
+  {id:'mlperfb200', name:'MLPerf Llama 2 70B, 8 × B200, Offline (FP4)', tests:'known miss: the same model with FP4 weights over-predicts', pub:98858, f:v=>fmtN(Math.round(v))+' tok/s', tol:0.25, info:true,
+   src:['NVIDIA: MLPerf Inference v5.0, 98,858 tokens/s (entry 5.0-0056)','https://developer.nvidia.com/blog/nvidia-blackwell-delivers-massive-performance-leaps-in-mlperf-inference-v5-0'],
+   run:()=>llmMaxTokens(MLPERF_B200, {wBytes:0.5}).tok, how:'the ±25 % tolerance was fixed before the run. The model gives FP4 matmuls twice the 8-bit rate at the same 60 % of peak; published B200 ÷ H200 is 2.8×, against 4.5× in peak FP4 ÷ FP8, so FP4 reaches a smaller share of its peak'},
   {id:'h100cost', name:'H100 SXM build cost', tests:'calibration point: interposer $/mm² and effective defect density', pub:3320, f:fmtUSD, tol:0.25, fitted:true,
    src:['Silicon Analysts: H100 about $3,320 to make (2026 model)','https://siliconanalysts.com/analysis/nvidia-b200-blackwell-cost-breakdown'],
    run:()=>accCost(cfgOf(H100)).total, how:'814 mm² die, 80 GB HBM3, CoWoS-S, board; their estimate puts more in test and assembly'},
@@ -1291,7 +1313,7 @@ function runChecks(){
 const isValidation = r => !r.fitted && !r.info;   // calibration points and indicative rows are shown but not counted
 function paneChecks(){
   const res = runChecks(), val = res.filter(isValidation), np = val.filter(r=>r.pass).length, nf = res.filter(r=>r.fitted).length, ni = res.filter(r=>r.info).length;
-  return `<div class="answer">The model is checked against <b>${val.length}</b> published figures; <b>${np} of ${val.length}</b> fall within their tolerance. ${nf} more are calibration points, where a parameter (energy per operation, or a price) was set with a published figure in view, so they show the fit rather than validate it. ${ni} are indicative: one vendor’s energy per operation applied to another’s part, which shows how far that figure carries (about ±25 %) rather than passing or failing. The same checks run in CI on every change.</div>
+  return `<div class="answer">The model is checked against <b>${val.length}</b> published figures; <b>${np} of ${val.length}</b> fall within their tolerance. ${nf} more are calibration points, where a parameter (energy per operation, or a price) was set with a published figure in view, so they show the fit rather than validate it. ${ni} are indicative: shown with their error but not counted, either because they test how far one figure carries (another vendor’s energy per operation, about ±25 %) or because they are known misses explained in the row (MLPerf on B200 with FP4). The same checks run in CI on every change.</div>
     <div class="card"><div class="tbl-wrap"><table class="t wrap"><thead><tr><th>Reference</th><th>What it tests</th><th class="n">Published</th><th class="n">Model</th><th class="n">Error</th><th class="n">Tolerance</th><th><span class="sr">Action</span></th></tr></thead><tbody>${
       res.map(r=>`<tr><td>${r.name}<br><span class="note" style="margin:0">${esc(r.how)} · <a href="${r.src[1]}" target="_blank" rel="noopener">${esc(r.src[0])}</a></span></td><td style="white-space:normal">${r.tests}</td><td class="n">${r.f(r.pub)}</td><td class="n">${r.f(r.v)}</td><td class="n">${(r.err>=0?'+':'')+(r.err*100).toFixed(1)} %</td><td class="n">${r.info?'—':'±'+(r.tol*100).toFixed(0)+' %'}</td><td>${r.fitted?tag('ok','calibration'):r.info?tag('ok','indicative'):tag(r.pass?'ok':'bad', r.pass?'within':'outside')}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
@@ -1553,6 +1575,7 @@ function paintLlm(){
   const i = llmInfo(S), L = S.llm;
   el.innerHTML = `<b>${+sig(i.copies)}</b> cop${i.copies===1?'y':'ies'} of the model, each on <b>${+sig(i.g)}</b> accelerator${i.g===1?'':'s'} · weights <b>${fmtB(i.W)}</b> · KV cache <b>${fmtB(i.kvUser)}</b> per user, <b>${fmtB(i.kvAll)}</b> in all ·
     each step reads <b>${fmtB(i.step)}</b> per copy (${fmtPct(i.W/i.step)} weights) · <b>${fmtN(Math.round(i.tokens))}</b> tokens/s in all → <b>${fmtBps(i.T)}</b> of DRAM reads, <b>${sig(S.ops)}</b> op/B, step budget <b>${fmtT(S.lat)}</b>.
+    At most <b>${fmtN(Math.round(i.tokens*M.maxT/M.T))}</b> tokens/s on this hardware, with the most loaded part at 100 %.
     ${S.llm.prefill ? `Prefill adds <b>${fmtN(Math.round(i.pre))}</b> prompt tokens/s (${fmtPct(i.pre*i.preOpsTok/i.ops)} of the arithmetic); a prompt alone on one copy takes at least <b>${fmtT(i.ttft)}</b> before its first token.` : 'Prefill (reading the prompts) is not included.'}
     ${i.copies>topo(S).nA ? ' <i>More copies than accelerators: add accelerators or raise the batch.</i>' : ''}`;
 }
