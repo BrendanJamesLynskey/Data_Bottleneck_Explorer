@@ -553,7 +553,8 @@ const LLM_MODELS = {
 // the inputs the LLM serving or training workload sets while it is on
 const LLM_OWNS = ['T', 'lat', 'block', 'resident', 'ops', 'xR', 'xW', 'inR', 'outR', 'scale.xUp'];
 const TRAIN_OWNS = [...LLM_OWNS, 'scale.xOut'];
-const ownedBy = s => s.llm && s.llm.on ? LLM_OWNS : s.train && s.train.on ? TRAIN_OWNS : [];
+const ownedBy = s => s.llm && s.llm.on ? (llmSplit(s) ? TRAIN_OWNS : LLM_OWNS) : s.train && s.train.on ? TRAIN_OWNS : [];
+const llmSplit = s => s.llm.on && s.llm.prefill && s.llm.disagg;   // prefill and decode on separate pools
 /* Cost: first-order build cost of each part, then running cost. Sources for the defaults:
    wafer — Epoch AI assumes $17k for a TSMC 4NP wafer (press estimates $18–20k for 4 nm after the 2025 rises);
    d0 — effective defect density after spare cores, chosen so an 800 mm² die yields about 67 % (Epoch 40–70 %, Silicon Analysts 70–75 %);
@@ -631,7 +632,7 @@ const BASE = {
   scale:{perNode:1, nodes:1, racks:1, domain:'node', xUp:0, xOut:0, fabric:'nvl5', nic:'e800', nics:1, rackKW:40},
   noc:{topo:'mesh', tiles:64, width:512, ghz:2, hopNs:1.5, pattern:'local', xNoc:1, banks:64, bankB:64, pj:0.15, ports:8},
   vary:{deadline:'soft', pct:0.99, ca:1, jitter:'typical', corr:'partial', tol:0},
-  llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500, prefill:false, prompt:2000, reply:500},
+  llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500, prefill:false, prompt:2000, reply:500, disagg:false, ttft:2, pre:{perNode:8, nodes:1, racks:1}},
   train:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, prec:2, tps:7e5, seq:8192, gbatch:4194304, micro:1, tp:8, pp:4, vpp:1, recompute:false, zero:true, total:15e12},
   cost:{basis:'build', margin:0.75, years:4, kwh:0.08, duty:1},
 };
@@ -665,6 +666,12 @@ const PRESETS = [
     host:{dram:'ddr5_4800', units:16, cores:112, cpuUs:10, base:1250}, acc:{tops:1979, util:0.5, pj:0.29, topsMm2:2.43, sram:50}, vary:{ca:0.2}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:8, nodes:2, racks:1, domain:'node', xOut:0, fabric:'nvl4', nic:'e400', nics:1, rackKW:40},
     llm:{on:true, prefill:false, prompt:3600, reply:1000}}},
+  {g:'AI & LLMs', id:'llmsplit', name:'Prefill and decode on separate pools (Llama 3.1 70B, 3,600-token prompts)',
+   d:'The LLM serving example with prefill switched on and split across two pools: 16 accelerators decode, 32 read the prompts and send each KV cache over the network. Put all 48 in one pool instead (untick the split and set 6 nodes) and the prompts’ arithmetic stretches every decode step past the 50 ms budget; split, decode steps stay inside it and the first token comes in about 140 ms.', p:{
+    burst:1.1, pattern:'stream', dev:{dram:'hbm3e_80', units:6}, link:{id:'pcie5', lanes:16, count:1},
+    host:{dram:'ddr5_4800', units:16, cores:112, cpuUs:10, base:1250}, acc:{tops:1979, util:0.5, pj:0.29, topsMm2:2.43, sram:50}, vary:{ca:0.2}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
+    scale:{perNode:8, nodes:2, racks:1, domain:'node', fabric:'nvl4', nic:'e400', nics:1, rackKW:40},
+    llm:{on:true, prefill:true, prompt:3600, reply:1000, disagg:true, ttft:2, pre:{perNode:8, nodes:4, racks:1}}}},
   {g:'AI & LLMs', id:'trainllm', name:'LLM training from the model’s shape (Llama 3.1 70B, BF16, 1,024 accelerators)',
    d:'The workload comes from the LLM training inputs: tensor parallel 8 inside each node, pipeline parallel 4, data parallel 32, 8k-token sequences and a 4M-token global batch. Compute dominates; the pipeline bubble adds a fifth; the gradient all-reduce crosses the network once a step. Change the parallelism and watch memory per accelerator, the bubble and the network move, and see the time and cost of a 15T-token run.', p:{
     burst:1, pattern:'stream', dev:{dram:'hbm3e_80', units:6}, link:{id:'pcie5', lanes:16, count:1},
@@ -970,17 +977,29 @@ function llmInfo(s){
   const wR = L.wBytes, aR = Math.max(1, L.kvBytes);
   const opsTok = 2*L.active*1e9*wR + 4*L.layers*ctx*L.dModel*aR;               // weights, then attention over the context
   const pre = L.prefill ? tokens*L.prompt/L.reply : 0;                         // prompt tokens per second
+  const split = L.prefill && L.disagg, role = L.role || (split ? 'decode' : 'both');
   const preOpsTok = 2*L.active*1e9*wR + 2*L.layers*L.prompt*L.dModel*aR;        // causal: attention over half the prompt on average
   const preReads = pre*(L.prompt/2)*kvTok/LLM_CHUNK;                           // each chunk re-reads the prompt's KV so far
-  const T = copies*L.tps*step + preReads, ops = tokens*opsTok + pre*preOpsTok, writes = (tokens + pre)*kvTok;
-  const xUp = g>1 ? 4*(g-1)*L.layers*L.dModel*L.actBytes*(tokens + pre)/T : 0; // two all-reduces of the activations per layer, per token
-  const ttft = L.prefill ? L.prompt*preOpsTok/(g*s.acc.tops*1e12*s.acc.util) : 0;   // a prompt alone on its copy's compute
-  return {ctx, W, kvTok, kvUser, copies, step, T, g, opsTok, ops, writes, xUp, tokens, pre, preOpsTok, preReads, ttft, kvAll:L.users*kvUser};
+  // the share of the work each pool does: decode only, prefill only (alone, each chunk reads the weights once), or both
+  const dec = role!=='prefill', pf = role!=='decode', gp = role==='prefill' ? s.scale.perNode : g;   // prefill copies span a node
+  const T = (dec ? copies*L.tps*step : 0) + (pf ? preReads + (role==='prefill' ? pre/LLM_CHUNK*W : 0) : 0);
+  const ops = (dec ? tokens*opsTok : 0) + (pf ? pre*preOpsTok : 0), writes = ((dec ? tokens : 0) + (pf ? pre : 0))*kvTok;
+  const xUp = gp>1 ? 4*(gp-1)*L.layers*L.dModel*L.actBytes*((dec ? tokens : 0) + (pf ? pre : 0))/T : 0;   // two all-reduces per layer, per token
+  const kvMove = split ? pre*kvTok : 0;                                         // prompts' KV caches cross from prefill to decode
+  const ttft = L.prefill ? L.prompt*preOpsTok/(gp*s.acc.tops*1e12*s.acc.util) : 0;  // a prompt alone on its copy's compute
+  return {ctx, W, kvTok, kvUser, copies, step, T, g:gp, opsTok, ops, writes, xUp, tokens, pre, preOpsTok, preReads, ttft, kvMove, role, kvAll:L.users*kvUser};
 }
 function llmApply(s){
   const i = llmInfo(s), tp = topo(s), L = s.llm;
-  s.T = i.T; s.lat = 1/L.tps; s.block = i.T/tp.nA/L.tps; s.resident = (i.copies*i.W + i.kvAll)/tp.nA/1e9;
-  s.ops = i.ops/i.T; s.xR = 1; s.xW = i.writes/i.T; s.inR = s.outR = (i.tokens + i.pre)*4/i.T; s.scale.xUp = i.xUp;
+  s.ops = i.ops/i.T; s.xR = 1; s.xW = i.writes/i.T; s.inR = s.outR = (i.tokens + i.pre)*4/i.T; s.scale.xUp = i.xUp; s.T = i.T;
+  if(i.role==='prefill'){   // budget: time to first token; a block is one prompt on one node's copy; weights per node plus prompts in flight
+    s.lat = L.ttft; s.block = i.T/i.pre*L.prompt/s.scale.perNode; s.resident = (i.W/s.scale.perNode + i.pre*L.ttft*i.kvTok/tp.nA)/1e9;
+  } else { s.lat = 1/L.tps; s.block = i.T/tp.nA/L.tps; s.resident = (i.copies*i.W + i.kvAll)/tp.nA/1e9; }
+  if(i.role!=='both') s.scale.xOut = i.kvMove/i.T;   // sent by prefill, received by decode
+}
+// the prefill pool: the same accelerators, its own node and rack counts, prompts only
+function prefillState(s){
+  const c = clone(s); Object.assign(c.scale, s.llm.pre); c.llm.role = 'prefill'; c.preset = undefined; return c;
 }
 /* LLM training → the model's workload, per accelerator, for tensor (tp) × pipeline (pp) × data (dp) parallelism, with
    dp = accelerators ÷ (tp × pp). Arithmetic is 6 × active parameters per token plus attention (Kaplan et al.), in
@@ -1016,6 +1035,17 @@ function trainApply(s){
   s.ops = i.ops/i.T; s.xR = 1; s.xW = i.wr/per; s.inR = s.outR = 1e-6; s.scale.xUp = i.up/per; s.scale.xOut = i.out/per;
 }
 function model(s){
+  if(s.llm && s.llm.on && llmSplit(s) && !s.llm.role){
+    const m = modelOne(s), p = modelOne(prefillState(s)), pw = p.worst.U>m.worst.U;   // both pools scale with the users
+    m.pre = p; m.sys = {worst:pw ? p.worst : m.worst, U:Math.max(m.worst.U, p.worst.U), pool:pw ? 'prefill pool' : 'decode pool', Ptot:m.Ptot + p.Ptot, maxT:m.T/Math.max(m.worst.U, p.worst.U)};
+    return m;
+  }
+  return modelOne(s);
+}
+// the whole system: one pool, or decode and prefill pools together
+const sysOf = m => m.sys || {worst:m.worst, U:m.worst.U, pool:'', Ptot:m.Ptot, maxT:m.maxT};
+const sysFull = s => fullPower(s).total + (llmSplit(s) ? fullPower(prefillState(s)).total : 0);
+function modelOne(s){
   if(s.llm && s.llm.on) llmApply(s); else if(s.train && s.train.on) trainApply(s);
   const T = s.T, Tb = T*s.burst;
   const tp = topo(s);
@@ -1239,9 +1269,14 @@ function costOf(s, m){
     nic: hasNics(s, tp) ? s.scale.nics*m.nic.gbps*COST.nicPerGb*tp.nA : 0,
     host: tp.nN*(COST.hostBase + s.host.units*dramCapPerUnit(hd, false)*COST.dram[hd.fam]),
     facility: fp.total*COST.facility[cool.name]};
-  const hw = parts.acc + parts.dram + parts.fabric + parts.nic + parts.host, capex = hw + parts.facility;
+  let hw = parts.acc + parts.dram + parts.fabric + parts.nic + parts.host, capex = hw + parts.facility;
   const pue = COST.pue[cool.name], energy = m.Ptot*pue*c.duty*YEAR_S/3.6e6*c.kwh;   // kWh × $/kWh
-  const year = {hw:hw/c.years, facility:parts.facility/COST.facYears, energy}, perYear = year.hw + year.facility + year.energy;
+  const year = {hw:hw/c.years, facility:parts.facility/COST.facYears, energy}; let perYear = year.hw + year.facility + year.energy;
+  if(llmSplit(s) && !s.llm.role){   // add the prefill pool's parts and running cost
+    const q = costOf(prefillState(s), m.pre || model(prefillState(s)));
+    for(const k in parts) parts[k] += q.parts[k];
+    hw += q.hw; capex += q.capex; year.hw += q.year.hw; year.facility += q.year.facility; year.energy += q.year.energy; perYear = year.hw + year.facility + year.energy;
+  }
   const llm = s.llm && s.llm.on, tr = !llm && s.train && s.train.on, tok = llm || tr;
   const work = (llm ? s.llm.users*s.llm.tps : tr ? s.train.tps : m.T)*c.duty*YEAR_S;
   const unit = perYear/work*(tok ? 1e6 : 1e15);
@@ -1605,6 +1640,13 @@ function buildLlm(){
   if(S.llm.prefill){
     ctl(el, {k:'llm.prompt', label:'Prompt per request', type:'log', min:16, max:1e6, snap:v=>Math.round(snapLog(v)), fmt:v=>fmtN(v)+' tokens'});
     ctl(el, {k:'llm.reply', label:'Reply per request', type:'log', min:1, max:1e5, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:v=>fmtN(v)+' tokens', hint:'The context then averages the prompt plus half the reply.'});
+    ctl(el, {k:'llm.disagg', label:'Split prefill and decode across two pools', type:'toggle', rebuild:true, hint:'The hardware above becomes the decode pool; a prefill pool of the same accelerators reads the prompts and sends each KV cache over the network.'});
+    if(S.llm.disagg){
+      ctl(el, {k:'llm.ttft', label:'Time to first token, budget', type:'log', min:0.01, max:30, snap:snapLog, fmt:fmtT});
+      ctl(el, {k:'llm.pre.perNode', label:'Prefill pool: accelerators per node', type:'range', min:1, max:8, step:1, fmt:v=>v});
+      ctl(el, {k:'llm.pre.nodes', label:'Prefill pool: nodes per rack', type:'range', min:1, max:36, step:1, fmt:v=>v});
+      ctl(el, {k:'llm.pre.racks', label:'Prefill pool: racks', type:'log', min:1, max:1024, snap:v=>Math.max(1,Math.round(snapLog(v))), fmt:v=>v});
+    }
   } else ctl(el, {k:'llm.ctx', label:'Average context per user', type:'log', min:128, max:1e6, snap:v=>Math.round(snapLog(v)), fmt:v=>fmtN(v)+' tokens'});
   const det = document.createElement('details'); det.className = 'more'; det.innerHTML = '<summary>Model shape</summary>'; el.appendChild(det);
   const custom = () => { S.llm.model = 'custom'; };
@@ -1619,8 +1661,9 @@ function paintLlm(){
   const i = llmInfo(S), L = S.llm;
   el.innerHTML = `<b>${+sig(i.copies)}</b> cop${i.copies===1?'y':'ies'} of the model, each on <b>${+sig(i.g)}</b> accelerator${i.g===1?'':'s'} · weights <b>${fmtB(i.W)}</b> · KV cache <b>${fmtB(i.kvUser)}</b> per user, <b>${fmtB(i.kvAll)}</b> in all ·
     each step reads <b>${fmtB(i.step)}</b> per copy (${fmtPct(i.W/i.step)} weights) · <b>${fmtN(Math.round(i.tokens))}</b> tokens/s in all → <b>${fmtBps(i.T)}</b> of DRAM reads, <b>${sig(S.ops)}</b> op/B, step budget <b>${fmtT(S.lat)}</b>.
-    At most <b>${fmtN(Math.round(i.tokens*M.maxT/M.T))}</b> tokens/s on this hardware, with the most loaded part at 100 %.
-    ${S.llm.prefill ? `Prefill adds <b>${fmtN(Math.round(i.pre))}</b> prompt tokens/s (${fmtPct(i.pre*i.preOpsTok/i.ops)} of the arithmetic); a prompt alone on one copy takes at least <b>${fmtT(i.ttft)}</b> before its first token.` : 'Prefill (reading the prompts) is not included.'}
+    At most <b>${fmtN(Math.round(i.tokens*sysOf(M).maxT/M.T))}</b> tokens/s on this hardware, with the most loaded part at 100 %.
+    ${M.pre ? (p=>{ const ps = prefillState(S), lh = withS(ps, ()=>latHead(p)); return `<br>Prefill pool: <b>${fmtN(p.tp.nA)}</b> accelerators, most loaded <b>${esc(p.worst.name)} ${fmtPct(p.worst.U)}</b>, time to first token <b>${fmtT(lh)}</b> of ${fmtT(L.ttft)}${lh>L.ttft?' <i>(over budget)</i>':''}, <b>${fmtW(p.Ptot)}</b>; KV caches cross the network at <b>${fmtBps(i.kvMove)}</b>. The decode pool no longer does the prompts’ arithmetic.`; })(M.pre) : ''}
+    ${S.llm.prefill ? `Prefill adds <b>${fmtN(Math.round(i.pre))}</b> prompt tokens/s (${fmtPct(i.pre*i.preOpsTok/(i.tokens*i.opsTok + i.pre*i.preOpsTok))} of the arithmetic); a prompt alone on one copy takes at least <b>${fmtT(i.ttft)}</b> before its first token.` : 'Prefill (reading the prompts) is not included.'}
     ${i.copies>topo(S).nA ? ' <i>More copies than accelerators: add accelerators or raise the batch.</i>' : ''}`;
 }
 function buildTrain(){
@@ -1970,8 +2013,13 @@ let scenOpen = false;
 /* "how is this worked out": click a headline figure for its calculation, with this design's numbers in it */
 let whyKey = null;
 const whyAttr = k => `data-why="${k}" role="button" tabindex="0" aria-expanded="${whyKey===k}" aria-controls="why" title="How this is worked out"`;
-function whyHTML(k, m){
-  const tp = m.tp, eq = (...p) => `<div class="eq">${p.join(' ')}</div>`, row = (l, v) => `<tr><td>${l}</td><td class="n">${v}</td></tr>`;
+function whyHTML(k, m, plain){
+  const tp = m.tp, eq = (...p) => `<div class="eq">${p.join(' ')}</div>`, row = (l, v) => `<tr><td>${l}</td><td class="n">${v}</td></tr>`, Y = sysOf(m);
+  if((k==='worst' || k==='max') && Y.pool && !plain){   // two pools: the most loaded part may be in either
+    const inPre = Y.pool==='prefill pool', body = withS(inPre ? prefillState(S) : S, ()=>whyHTML('worst', inPre ? m.pre : m, true));
+    return (k==='max' ? `<h2>Max sustainable = target ÷ load on the most loaded part, across both pools</h2>${eq(fmtBps(S.T), '÷', fmtPct(Y.U), '=', `<b>${fmtBps(Y.maxT)}</b>`)}` : '')
+      + `<p>The most loaded part is in the ${Y.pool}${inPre ? ', where every rate is the prefill pool’s own' : ''}:</p>` + body;
+  }
   if(k==='worst' || k==='max'){
     const c = m.worst, host = ['cpu','host','src'].includes(c.k), n = host ? tp.nN : tp.nA, pk = host ? m.bHost : S.burst, per = S.T/n*pk;   // a host's peak is smoothed over its streams
     const unit = c.k==='compute' ? 'op' : c.k==='cpu' ? 'core·s' : 'B';
@@ -1994,7 +2042,8 @@ function whyHTML(k, m){
       ['Leakage: '+fmtA(m.die)+' × '+S.acc.leak+' W/mm²', A.leak], ['Host link: traffic × pJ/bit + idle lanes', A.link], ['Scale-up fabric: traffic × pJ/bit + ports', A.up], ['Network: NIC, optics, switch port', A.out]].filter(x=>x[1]>0);
     return `<h2>Power at the target = (per accelerator × ${fmtN(tp.nA)} + per host × ${fmtN(tp.nN)}) × (1 + fans and conversion)</h2>
       <table>${items.map(([l,v])=>row(l, fmtW(v))).join('')}${row('<b>Per accelerator</b>', `<b>${fmtW(m.pAcc)}</b>`)}${row('Per host (fixed, memory, CPU, I/O)', fmtW(m.pNodeHost))}</table>
-      ${eq(`(${fmtW(m.pAcc)} × ${fmtN(tp.nA)} + ${fmtW(m.pNodeHost)} × ${fmtN(tp.nN)}) × ${(1+OH).toFixed(3)} = <b>${fmtW(m.Ptot)}</b>`)}
+      ${eq(`(${fmtW(m.pAcc)} × ${fmtN(tp.nA)} + ${fmtW(m.pNodeHost)} × ${fmtN(tp.nN)}) × ${(1+OH).toFixed(3)} = ${Y.pool ? fmtW(m.Ptot)+' for the decode pool' : `<b>${fmtW(m.Ptot)}</b>`}`)}
+      ${Y.pool ? eq(`${fmtW(m.Ptot)} + ${fmtW(m.pre.Ptot)} for the prefill pool (${fmtN(m.pre.tp.nA)} accelerators, worked out the same way) = <b>${fmtW(Y.Ptot)}</b>`) : ''}
       <p>Fans and conversion: ${(OH*100).toFixed(1)} % for ${coolOf(S).name} cooling, read from the ${S.scale.rackKW} kW rack limit. Full-load power (${fmtW(fullPower(S).total)}) runs every part at its peak instead.</p>`;
   }
   if(k==='cost'){
@@ -2022,20 +2071,20 @@ document.addEventListener('keydown', e=>{ const k = e.target.closest && e.target
   if(k && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); k.click(); } });
 
 function paintSummary(m){
-  const w = m.worst, st = state(w.U), tp = m.tp;
+  const Y = sysOf(m), w = Y.worst, st = state(w.U), tp = m.tp;
   const ls = latencyStats(m), lh = latHead(m), latSt = lh>S.lat ? 'bad' : 'ok';
   const scope = ['cpu','host','src'].includes(w.k) ? (tp.nN>1?' per node':'') : (tp.nA>1?' per accelerator':'');
   const cost = costOf(S, m);
   document.getElementById('verdict').innerHTML = `
     <div class="kpi hero ${st}" ${whyAttr('worst')}><div class="l">${st==='ok'?'Most loaded':st==='warn'?'Limiting (above ceiling)':'Bottleneck'}</div>
-      <div class="v">${w.name} · ${fmtPct(w.U)}</div><div class="s">needs ${w.f(w.need)}, has ${w.f(w.have)}${scope}</div></div>
-    <div class="kpi ${m.maxT>=m.T?'ok':'bad'}" ${whyAttr('max')}><div class="l">Max sustainable</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target</div></div>
+      <div class="v">${w.name} · ${fmtPct(w.U)}</div>${Y.pool ? `<div class="s">in the ${Y.pool}</div>` : ''}<div class="s">needs ${w.f(w.need)}, has ${w.f(w.have)}${scope}</div></div>
+    <div class="kpi ${Y.maxT>=m.T?'ok':'bad'}" ${whyAttr('max')}><div class="l">Max sustainable</div><div class="v">${fmtBps(Y.maxT)}</div><div class="s">${sig(Y.maxT/m.T)}× the target</div></div>
     <div class="kpi ${latSt}" ${whyAttr('lat')}><div class="l">Latency, ${latLabel()}</div><div class="v">${fmtT(lh)}</div><div class="s">${ls.unbounded?'queue unstable':S.vary.deadline==='hard'?'hard deadline · budget '+fmtT(S.lat):'worst-case stack '+fmtT(ls.stack)+' · budget '+fmtT(S.lat)}</div></div>
-    <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}" ${whyAttr('power')}><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${fmtW(fullPower(S).total)} at full load${tp.nA>1?' · '+fmtW(fullPower(S).rack)+'/rack':' · '+sig(m.Ptot/m.T*1e12)+' pJ/B'}</div></div>
+    <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}" ${whyAttr('power')}><div class="l">Power${Y.pool?', both pools':''}</div><div class="v">${fmtW(Y.Ptot)}</div><div class="s">${fmtW(sysFull(S))} at full load${tp.nA>1?' · '+fmtW(fullPower(S).rack)+'/rack':' · '+sig(m.Ptot/m.T*1e12)+' pJ/B'}</div></div>
     <div class="kpi" ${whyAttr('cost')}><div class="l">Cost ${S.llm.on || S.train.on ? 'per M tokens' : 'per PB'}</div><div class="v">${fmtUSD(cost.unit)}</div><div class="s">${fmtUSD(cost.capex)} · ${fmtUSD(cost.perYear)}/yr</div></div>`;
   const p = PRESETS.find(x=>x.id===S.preset);
   const L = S.llm, lm = L.on ? `${esc(LLM_MODELS[L.model] ? LLM_MODELS[L.model].name : 'Custom LLM')} · ${fmtN(L.users)} users × ${L.tps} tok/s · ` : '';
-  document.getElementById('reqLine').innerHTML = `<span>${lm}${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
+  document.getElementById('reqLine').innerHTML = `<span>${lm}${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${m.pre ? `${fmtN(tp.nA)} decode + ${fmtN(m.pre.tp.nA)} prefill accelerators (the diagram is the decode pool)` : tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
     <button class="link" data-open="left">Edit inputs</button><button class="link" id="specBtn" title="A one-page summary to print or save as PDF">Spec sheet</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
   document.getElementById('scen').innerHTML = p && scenOpen ? esc(p.d) : '';
   const sm = document.getElementById('scenMore'); if(sm) sm.onclick = ()=>{ scenOpen = !scenOpen; paintSummary(M); };
@@ -2054,12 +2103,12 @@ function paintChain(m){
 /* compare: pin a design as A, change anything, and the current design (B) is set against it */
 let pinA = null, cmpOpen = false, digA = null;
 const withS = (s, f) => { const keep = S; S = s; try{ return f(); } finally{ S = keep; } };   // latency and tolerance read the global S
-function digest(s){ const m = model(s); return withS(s, ()=>({s, m, lat:latHead(m), full:fullPower(s).total, cost:costOf(s, m)})); }
+function digest(s){ const m = model(s); return withS(s, ()=>({s, m, lat:latHead(m), full:sysFull(s), cost:costOf(s, m)})); }
 const CMP_DESIGN = [['Device DRAM', s=>designLine(s).split(' · ')[0]], ['Host link', s=>designLine(s).split(' · ')[1]], ['On-chip interconnect', s=>designLine(s).split(' · ')[2]],
   ['Peak compute', s=>sig(s.acc.tops)+' TOPS'], ['Accelerators', (s,m)=>fmtN(m.tp.nA)], ['Requirement', s=>`${fmtBps(s.T)} · ≤ ${fmtT(s.lat)} · ${sig(s.ops)} op/B`]];
 // [label, value, format, lower is better]
-const CMP_NUM = [['Most loaded', d=>d.m.worst.U, (v,d)=>`${d.m.worst.name} · ${fmtPct(v)}`, true], ['Max sustainable', d=>d.m.maxT, fmtBps, false],
-  ['Latency', d=>d.lat, fmtT, true], ['Power at the target', d=>d.m.Ptot, fmtW, true], ['Power at full load', d=>d.full, fmtW, true],
+const CMP_NUM = [['Most loaded', d=>sysOf(d.m).U, (v,d)=>`${sysOf(d.m).worst.name} · ${fmtPct(v)}`, true], ['Max sustainable', d=>sysOf(d.m).maxT, fmtBps, false],
+  ['Latency', d=>d.lat, fmtT, true], ['Power at the target', d=>sysOf(d.m).Ptot, fmtW, true], ['Power at full load', d=>d.full, fmtW, true],
   ['Die per accelerator', d=>d.m.die, fmtA, true], ['Energy per byte', d=>d.m.Ptot/d.m.T, v=>sig(v*1e12)+' pJ', true],
   ['Capital cost', d=>d.cost.capex, fmtUSD, true], ['Cost per unit of work', d=>d.cost.unit, (v,d)=>fmtUSD(v)+d.cost.unitShort, true]];
 function delta(a, b, lower){ if(!isFinite(a) || !isFinite(b)) return a===b ? '<span>same</span>' : `<span class="${(isFinite(a)===lower)?'worse':'better'}">${isFinite(b)?'finite':'∞'}</span>`;
@@ -2070,7 +2119,7 @@ function paintCompare(m){
   document.getElementById('pinBtn').classList.toggle('on', !!pinA);
   if(!pinA){ el.innerHTML = ''; return; }
   const key = JSON.stringify(pinA); if(!digA || digA.key!==key) digA = {key, d:digest(pinA)};
-  const a = digA.d, b = {s:S, m, lat:latHead(m), full:fullPower(S).total, cost:costOf(S, m)};
+  const a = digA.d, b = {s:S, m, lat:latHead(m), full:sysFull(S), cost:costOf(S, m)};
   const same = CMP_DESIGN.every(([,f])=>f(a.s,a.m)===f(b.s,b.m)) && CMP_NUM.every(([,f])=>f(a)===f(b));
   const head = same ? `<span>B is the same as A: change anything and it is compared here.</span>`
     : [['power', 3], ['cost', 8], ['die', 5], ['max rate', 1], ['latency', 2]].map(([n,i])=>`${n} <b>${delta(CMP_NUM[i][1](a), CMP_NUM[i][1](b), CMP_NUM[i][3])}</b>`).join(' · ');
@@ -2683,10 +2732,11 @@ function specHTML(){
   const m = model(S), tp = m.tp, fp = fullPower(S), lh = latHead(m), p = PRESETS.find(x=>x.id===S.preset), cool = coolOf(S), OH = overhead(S);
   const name = p ? p.name+(S.mod ? ' (modified)' : '') : 'Custom design';
   const url = location.href, cons = considerations(m), fails = cons.filter(c=>c.lvl==='bad'), tight = cons.filter(c=>c.lvl==='warn');
-  const st = state(m.worst.U), latOk = lh<=S.lat, ok = st!=='bad' && latOk;
+  const Y = sysOf(m), st = state(Y.U), latOk = lh<=S.lat, ok = st!=='bad' && latOk, wn = Y.worst.name+(Y.pool ? ' ('+Y.pool+')' : '');
   const kv = rows => `<table class="kv">${rows.filter(Boolean).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>`;
   const lk = LINKS[S.link.id], hostLink = lk.kind==='pcie' ? `${lk.name} x${S.link.lanes}` : `UCIe, ${S.link.lanes} lanes`;
-  const multi = tp.nA>1, up = multi && tp.dom>1, nics = hasNics(S, tp), nc = NOC_TOPO[S.noc.topo], cost = costOf(S, m), CP = cost.parts;
+  const multi = tp.nA>1, up = multi && tp.dom>1, nics = hasNics(S, tp), nc = NOC_TOPO[S.noc.topo], cost = costOf(S, m);
+  const CP = (m.pre ? costOf({...clone(S), llm:{...S.llm, role:'decode'}}, m) : cost).parts;   // the decode pool's own parts when split
   // [part, specification, quantity, total power without fans and conversion, capital cost]
   const parts = [
     ['Accelerator', `${sig(S.acc.tops)} TOPS peak at ${fmtPct(S.acc.util)} use, ${fmtN(S.acc.sram)} MB SRAM, ${fmtA(m.die)} die${m.die>830?' (several dies)':''}`, tp.nA, (m.A.compute+m.A.leak+m.A.noc)*tp.nA, CP.acc],
@@ -2701,20 +2751,21 @@ function specHTML(){
   const partRows = parts.map(([n,d,q,w,c])=>`<tr><td>${n}</td><td>${esc(d)}</td><td class="n">${q===null?'':fmtN(q)}</td><td class="n">${w===null?'in die':fmtW(w)}</td><td class="n">${c===null?'in die':fmtUSD(c)}</td></tr>`).join('')
     + `<tr><td>Fans and conversion</td><td>${cool.name} cooling, ${cool.supply}</td><td class="n"></td><td class="n">${fmtW(sub*OH)}</td><td class="n"></td></tr>`
     + `<tr><td>Facility</td><td>power and cooling for ${fmtW(fp.total)} at full load</td><td class="n"></td><td class="n"></td><td class="n">${fmtUSD(CP.facility)}</td></tr>`
-    + `<tr class="tot"><td colspan="3">System at the target rate</td><td class="n">${fmtW(m.Ptot)}</td><td class="n">${fmtUSD(cost.capex)}</td></tr>`;
+    + (m.pre ? `<tr><td>Prefill pool</td><td>the same accelerators and hosts, ${S.llm.pre.perNode} per node × ${S.llm.pre.nodes} nodes × ${S.llm.pre.racks} rack${S.llm.pre.racks>1?'s':''}; facility, fans and conversion included</td><td class="n">${fmtN(m.pre.tp.nA)}</td><td class="n">${fmtW(m.pre.Ptot)}</td><td class="n">${fmtUSD(costOf(prefillState(S), m.pre).capex)}</td></tr>` : '')
+    + `<tr class="tot"><td colspan="3">System at the target rate</td><td class="n">${fmtW(Y.Ptot)}</td><td class="n">${fmtUSD(cost.capex)}</td></tr>`;
   const loadRows = m.comps.map(c=>{ const s = state(c.U); return `<tr class="${s==='bad'?'over':''}"><td>${c.name}</td><td class="n">${c.f(c.need)}</td><td class="n">${c.f(c.have)}</td><td class="n">${fmtPct(c.U)}${s==='bad'?' over':s==='warn'?' tight':''}</td></tr>`; }).join('');
   const chk = runChecks().filter(isValidation);
   const issues = [...fails, ...tight].slice(0, 6);
   return `<div class="sh-top"><h2>${esc(name)}</h2><span class="sh-brand">Hardware System Design Explorer · spec sheet</span></div>
     <div class="sh-meta">${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})} · <a href="${esc(url)}">${esc(url)}</a></div>
-    <div class="sh-verdict ${ok?'':'bad'}">${ok ? `${st==='warn' ? `Meets the rate, but above the ${fmtPct(S.ceil)} utilisation ceiling` : 'Meets the requirement'}. Most loaded: ${m.worst.name} at ${fmtPct(m.worst.U)}; it runs up to ${sig(m.maxT/m.T)}× the target rate.${fails.length ? ` ${fails.length} check${fails.length>1?'s fail':' fails'}: see open issues.` : ''}`
-      : `Does not meet the requirement: ${[st==='bad' ? `${m.worst.name} is ${fmtPct(m.worst.U)} loaded` : '', latOk ? '' : `latency ${fmtT(lh)} against a ${fmtT(S.lat)} budget`].filter(Boolean).join('; ')}.`}</div>
+    <div class="sh-verdict ${ok?'':'bad'}">${ok ? `${st==='warn' ? `Meets the rate, but above the ${fmtPct(S.ceil)} utilisation ceiling` : 'Meets the requirement'}. Most loaded: ${wn} at ${fmtPct(Y.U)}; it runs up to ${sig(Y.maxT/m.T)}× the target rate.${fails.length ? ` ${fails.length} check${fails.length>1?'s fail':' fails'}: see open issues.` : ''}`
+      : `Does not meet the requirement: ${[st==='bad' ? `${wn} is ${fmtPct(Y.U)} loaded` : '', latOk ? '' : `latency ${fmtT(lh)} against a ${fmtT(S.lat)} budget`].filter(Boolean).join('; ')}.`}</div>
     <div class="sh-cols">
       <div><h3>Requirement</h3>${kv([S.train.on && ['LLM training', (i=>`${esc(LLM_MODELS[S.train.model] ? LLM_MODELS[S.train.model].name : 'custom model')}, ${fmtN(Math.round(S.train.tps))} tokens/s, ${S.train.prec===2?'BF16':'FP8'}, tensor ${i.TP} × pipeline ${i.PP} × data ${+sig(i.dp)}, ${sig(S.train.total/1e12)} T tokens in ${sig(i.days)} days`)(trainInfo(S))], S.llm.on && ['LLM decode', `${esc(LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom model')}, ${fmtN(S.llm.users)} users × ${S.llm.tps} tok/s, ${S.llm.prefill ? `${fmtN(S.llm.prompt)}-token prompts, ${fmtN(S.llm.reply)}-token replies` : fmtN(S.llm.ctx)+'-token context, decode only'}, ${S.llm.wBytes*8}-bit weights`], ['Rate', fmtBps(S.T)], ['Latency budget', `${fmtT(S.lat)} per block, ${S.vary.deadline==='hard' ? 'hard deadline' : 'p'+sig(S.vary.pct*100)+', soft'}`],
         ['Block', fmtB(S.block)], ['Compute', sig(S.ops)+' op/B'], ['Host link per byte', `in ${sig(S.inR)} · out ${sig(S.outR)}`], ['Extra DRAM per byte', `read ${sig(S.xR)} · write ${sig(S.xW)}`],
         ['Resident per accelerator', fmtB(S.resident*1e9)], ['Data arrives from', m.srcName || 'host memory'], ['Utilisation ceiling', fmtPct(S.ceil)]])}</div>
-      <div><h3>Result</h3>${kv([['Max sustainable', `${fmtBps(m.maxT)} (${sig(m.maxT/m.T)}×)`], ['Most loaded', `${m.worst.name}, ${fmtPct(m.worst.U)}`], ['Latency, '+latLabel(), `${fmtT(lh)} of ${fmtT(S.lat)}`],
-        ['Power at the target', fmtW(m.Ptot)], ['Power at full load', fmtW(fp.total)], ['Energy per byte', sig(m.Ptot/m.T*1e12)+' pJ'],
+      <div><h3>Result</h3>${kv([['Max sustainable', `${fmtBps(Y.maxT)} (${sig(Y.maxT/m.T)}×)`], ['Most loaded', `${wn}, ${fmtPct(Y.U)}`], ['Latency, '+latLabel(), `${fmtT(lh)} of ${fmtT(S.lat)}`],
+        ['Power at the target', fmtW(Y.Ptot)], ['Power at full load', fmtW(sysFull(S))], ['Energy per byte', sig(m.Ptot/m.T*1e12)+' pJ'],
         ['Accelerators', multi ? `${fmtN(tp.nA)}: ${S.scale.perNode} per node, ${fmtN(tp.nN)} node${tp.nN>1?'s':''}` : '1'],
         multi && ['Racks', `${fmtN(S.scale.racks)} × ${fmtW(fp.rack)} at full load, limit ${S.scale.rackKW} kW`], ['Die per accelerator', `${fmtA(m.die)}${m.padArea>m.coreArea?', pad-limited':''}`],
         ['Cost', `${fmtUSD(cost.unit)} ${cost.unitName}; ${fmtUSD(cost.perYear)} a year over ${S.cost.years} years`]])}</div>
@@ -2873,7 +2924,7 @@ function agentSummary(){
       accelerator_build_cost:fmtUSD(c.acc.total), electricity_per_year:fmtUSD(c.year.energy)}))(costOf(S, m)),
     llm_workload: S.llm.on ? (i=>({model:LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom', copies_of_model:sig(i.copies), accelerators_per_copy:sig(i.g),
       weights:fmtB(i.W), kv_cache_per_user:fmtB(i.kvUser), bytes_read_per_step_per_copy:fmtB(i.step), tokens_per_s_total:fmtN(Math.round(i.tokens)), step_budget:fmtT(S.lat),
-      prefill: S.llm.prefill ? {prompt_tokens_per_s:fmtN(Math.round(i.pre)), share_of_arithmetic:fmtPct(i.pre*i.preOpsTok/i.ops), min_time_to_first_token:fmtT(i.ttft)} : 'not included'}))(llmInfo(S)) : 'off',
+      prefill: S.llm.prefill ? {prompt_tokens_per_s:fmtN(Math.round(i.pre)), share_of_arithmetic:fmtPct(i.pre*i.preOpsTok/(i.tokens*i.opsTok + i.pre*i.preOpsTok)), min_time_to_first_token:fmtT(i.ttft)} : 'not included'}))(llmInfo(S)) : 'off',
     failing_checks: considerations(m).filter(c=>c.lvl==='bad').map(c=>c.title),
     feasible_dram_per_accelerator_by_power: sizeDram(S,m).filter(r=>r.feas!=='bad').sort((a,b)=>a.power-b.power).slice(0,5)
       .map(r=>({dram_type:r.id, units:r.n, bus_bits:r.width, power:fmtW(r.power), phy_area:fmtA(r.phy), verdict:TAGS[r.feas]})),

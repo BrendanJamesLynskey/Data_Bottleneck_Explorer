@@ -152,7 +152,7 @@ checks that every overhead breakdown multiplies out to the model's capacities, t
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
 spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM serving and training workloads match hand calculations, that the cost parts add up and the
-cost goal finds the cheapest design, and that all 30 examples match their golden results within 2 %. An axe-core
+cost goal finds the cheapest design, and that all 31 examples match their golden results within 2 %. An axe-core
 audit then checks the page, all 13 tabs, the drawers, the spec sheet and an explanation panel for accessibility
 violations, with none allowed. Text meets WCAG AA contrast. Tables that scroll sideways, the headline figures and
 the diagram's blocks are reachable by keyboard. Focus moves into a drawer when it opens and back when it closes,
@@ -255,6 +255,21 @@ attention), KV-cache writes, and re-reads of each prompt's KV cache chunk by chu
 prompt plus half the reply, and the summary gives the shortest possible time to first token: one prompt alone on its
 copy's compute. With 3,600-token prompts and 1,000-token replies, prompts are about three quarters of the
 arithmetic, and the example becomes compute-bound.
+
+*Split prefill and decode across two pools* (with prefill on) makes the hardware the decode pool and adds a prefill
+pool of the same accelerators, with its own node and rack counts and a time-to-first-token budget. That is how
+production serving increasingly runs (DistServe, Splitwise, NVIDIA Dynamo).
+- **Prefill pool:** reads only the prompts. Each chunk reads the weights once, copies span a node, and its latency
+  budget is the time to first token.
+- **Decode pool:** no longer does the prompts' arithmetic.
+- **Between them:** each prompt's KV cache crosses the network.
+- **Combined:** the headline load, maximum rate, power and cost cover both pools, so Compare can set split against
+  colocated.
+
+The example *Prefill and decode on separate pools* shows why it matters. On 48 accelerators in one pool the prompts'
+arithmetic stretches each decode step to 73 ms against a 50 ms budget. Split 16 for decode and 32 for prefill, decode
+steps stay inside the budget and the first token comes in about 140 ms. Tests check that the arithmetic divides
+exactly between the pools and that power and capital add up.
 
 The new example *LLM serving from the model's shape* starts here, and the assistant has a matching
 `set_llm_workload` tool.
@@ -406,11 +421,11 @@ would have to carry 4 TB/s to feed that link.
   full-duplex links, access-pattern efficiency, capacity, PCIe TLP efficiency, outstanding read tags
   (Little's law), DRAM concurrency, CPU cost per block, host memory on the data path, queueing,
   on-chip buffering, data-movement power, beachfront, HBM packaging and ECC.
-- **30 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
+- **31 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
   deliberately broken designs that illustrate a classic bottleneck:
   - *AI & LLMs*: rack-scale inference on 72 accelerators in one NVLink domain, a 1,024-accelerator
     training cluster over 32 racks, tensor-parallel prefill on 8 PCIe cards ✗, a mixture-of-experts
-    layer that overloads its mesh ✗, LLM serving and LLM training derived from Llama 3.1 70B's shape, LLM decode on an
+    layer that overloads its mesh ✗, LLM serving (one pool, or prefill and decode on separate pools) and LLM training derived from Llama 3.1 70B's shape, LLM decode on an
     8-accelerator server and at the edge, prefill on one accelerator, DLRM embedding lookups, and a data
     loader starving an accelerator ✗.
   - *Fundamentals*: the 1 TB/s question.

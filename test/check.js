@@ -121,6 +121,13 @@ const update = process.argv.includes('--update');
     document.querySelector('#llmIn input[type=checkbox]').click(); const excl = S.llm.on && !S.train.on;   // the real toggle
     return {ops: S.ops === undefined ? 0 : (applyPreset('trainllm'), model(S), S.ops * S.T / ops), states: i.states / states, dp: i.dp, sweep: T2 / T0, excl, limit: model(S).worst.k};
   });
+  // prefill and decode pools: the arithmetic splits between them exactly, power and capital add up, KV caches cross the network
+  const pools = await page.evaluate(() => {
+    applyPreset('llmsplit'); const m = model(S), i = llmInfo(S), Y = sysOf(m), ps = prefillState(S); model(ps); const ip = llmInfo(ps);
+    const decOps = S.ops * S.T / (i.tokens * i.opsTok), preOps = ps.ops * ps.T / (ip.pre * ip.preOpsTok);
+    const cd = costOf({...clone(S), llm: {...S.llm, role: 'decode'}}, m).capex, cp = costOf(ps, m.pre).capex, c = costOf(S, m).capex;
+    return {decOps, preOps, power: Y.Ptot / (m.Ptot + m.pre.Ptot), capex: c / (cd + cp), kv: S.scale.xOut * S.T / (i.pre * i.kvTok), pool: Y.pool, nPre: m.pre.tp.nA};
+  });
   // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
   await page.setViewport({width: 711, height: 1039}); await page.emulateMediaType('print');
   const spec = await page.evaluate(ids => {
@@ -164,6 +171,8 @@ const update = process.argv.includes('--update');
   else console.log('ok   explanations: load, max rate, power and cost each work out to the figure shown, in every example');
   if (!(near(train.ops, 1) && near(train.states, 1) && train.dp === 32 && near(train.sweep, 2) && train.excl && train.limit === 'compute')) fail(`training: ${JSON.stringify(train)}`);
   else console.log('ok   training: arithmetic and memory match the formulas by hand, follow the sweep, and exclude the serving workload');
+  if (!(near(pools.decOps, 1) && near(pools.preOps, 1) && near(pools.power, 1) && near(pools.capex, 1) && near(pools.kv, 1) && pools.nPre === 32)) fail(`pools: ${JSON.stringify(pools)}`);
+  else console.log(`ok   prefill and decode pools: arithmetic splits exactly, power and capital add up, KV caches cross the network (most loaded: ${pools.pool})`);
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
   else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
   if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);
