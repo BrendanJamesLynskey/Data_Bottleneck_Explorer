@@ -336,6 +336,79 @@ def scale(c: dict, f: float) -> dict:
     return {k: (v * f if isinstance(v, float) and k != "n" else v) for k, v in c.items()}
 
 
+# the rule (TOLERANCE.md): widening of the simulation's 95 % CI by kind of figure, and the thresholds for judging a row
+RULE = {"ceiling": 0.02, "util": 0.02, "mean": 0.05, "wait": 0.10, "pct": 0.10,
+        "util_min": 0.01, "wait_share_min": 0.01, "drift_min": 1.5}
+
+
+def band(c: dict, w: float) -> tuple[float, float]:
+    return c["lo"] * (1 - w), c["hi"] * (1 + w)
+
+
+def judge(x: float, c: dict, w: float) -> str:
+    lo, hi = band(c, w)
+    return "pass" if lo <= x <= hi else "miss"
+
+
+def checks(spec_pool: dict, res_pool: dict, pct: float) -> list[dict]:
+    """One pool's model-vs-simulation rows, each judged by RULE."""
+    a, lat = spec_pool["analytic"], spec_pool["analytic"]["latency"]
+    stages = {s["k"]: s for s in spec_pool["stages"]}
+    rows = []
+
+    def row(kind, check, model, simc, w, verdict=None, note="", part=None):
+        rows.append({"kind": kind, "check": check, "part": part, "model": model, "sim": simc, "w": w,
+                     "verdict": verdict or judge(model, simc, w), "note": note})
+
+    names = {p["k"]: p["name"] for p in spec_pool["parts"]}
+    worst = a["worst"]
+    on_path = next((p["on_path"] for p in spec_pool["parts"] if p["k"] == worst["k"]), False)
+    busiest = max((s for s in spec_pool["stages"] if s["level"] == "block"), key=lambda s: s["util"])
+    note = "" if on_path else (f"The model's busiest part, {worst['name']}, is not a queued stage in the simulation; "
+                               f"this compares the busiest queued stage, {busiest['name']}.")
+    row("ceiling", "Ceiling: the most loaded queued stage sets the rate", a["path_ceiling_Bps"], res_pool["ceiling_Bps"],
+        RULE["ceiling"], note=note, part=busiest["k"])
+
+    if a["unbounded"]:
+        over = [s for s in spec_pool["stages"] if s["level"] in ("block", "packet") and s["util"] >= 1]
+        only_noc = bool(over) and all(s["level"] == "packet" for s in over)
+        d = res_pool["drift"]
+        if only_noc:
+            row("unbounded", "Unbounded latency", None, d, None, verdict="n/a",
+                note="Only the on-chip network is overloaded; the simulation queues its packets at the model's own "
+                     "utilisation, so both are unbounded by construction.")
+        else:
+            grows = d["lo"] is None or d["lo"] > RULE["drift_min"]
+            row("unbounded", "Unbounded latency: the backlog keeps growing", None, d, None,
+                verdict="pass" if grows else "miss",
+                note="Overloaded: " + ", ".join(f"{s['name']} ({s['util']:.0%})" for s in over) + ".")
+        return rows
+
+    for k, c in res_pool["util"].items():
+        u = stages[k]["util"]
+        if u >= RULE["util_min"]:
+            row("util", f"Utilisation: {stages[k]['name']}", u, c, RULE["util"], part=k)
+    row("mean", "Mean latency", lat["mean_s"], res_pool["mean_s"], RULE["mean"])
+    for k, c in res_pool["wait_s"].items():
+        q = stages[k]["wait_s"]
+        if q is not None and q >= RULE["wait_share_min"] * lat["mean_s"]:
+            row("wait", f"Queueing wait (Kingman): {stages[k]['name']}", q, c, RULE["wait"], part=k,
+                note=f"{q / lat['mean_s']:.0%} of the mean latency; utilisation {stages[k]['util']:.0%}.")
+    pname = f"p{pct * 100:g}"
+    row("pct", f"Latency {pname}", lat["pX_s"], res_pool["pX_s"], RULE["pct"])
+    c = res_pool["pX_s"]
+    row("stack", f"Tolerance stack bounds the {pname}", lat["stack_s"], c, None,
+        verdict="pass" if lat["stack_s"] >= c["lo"] else "miss",
+        note=f"Stack is {lat['stack_s'] / c['mean']:.2f} × the simulated {pname}.")
+    return rows
+
+
+def judged(spec: dict, res: dict) -> list[dict]:
+    """Every pool's model-vs-simulation rows for a simulated spec."""
+    pct = spec["workload"]["percentile"]
+    return [{"name": sp["name"], "rows": checks(sp, rp, pct)} for sp, rp in zip(spec["pools"], res["pools"])]
+
+
 def default_blocks(pct: float) -> int:
     """Enough blocks per run for the tail: about 20 beyond the design's percentile, at least 20,000, at most 100,000."""
     return int(min(100000, max(20000, 20 / (1 - pct))))
@@ -412,6 +485,10 @@ def main(argv: list[str] | None = None) -> int:
             u = next(s["util"] for s in sp["stages"] if s["k"] == k)
             if c["mean"] is not None and math.isfinite(c["mean"]):
                 print(f"  util {k:9} {c['mean']:12.4f}  [{c['lo']:.4f}, {c['hi']:.4f}]   model {u:.4f}")
+    print("model vs simulation (rule: sim/TOLERANCE.md)")
+    for p in judged(spec, res):
+        for r in p["rows"]:
+            print(f"  {r['verdict']:4}  {p['name']}: {r['check']}" + (f"  ({r['note']})" if r["note"] and r["verdict"] != "pass" else ""))
     if a.json:
         with open(a.json, "w") as f:
             f.write(dumps(res, indent=1) + "\n")

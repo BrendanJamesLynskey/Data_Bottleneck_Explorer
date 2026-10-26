@@ -79,6 +79,27 @@ Some things are deliberately *not* checked. The training model has no published 
 3.1 runs don't publish enough of their settings, and adjusting knobs until the GPU-hours match would be fitting, not
 checking.
 
+The published figures check the catalogue. The analytic shortcuts are checked against a discrete-event simulation
+instead. Every design exports as a spec built from the model's own computed stages. A SimPy simulator (the same
+`sim.py` on the host, in CI, and in the browser under Pyodide) runs it as queues, with seeded runs and 95 %
+confidence intervals.
+
+The agreement rule was committed before the first run: the model's figure must be inside the CI, widened by 2 % for
+ceilings and utilisation, 5 % for the mean, and 10 % for queue waits and the percentile.
+
+**Over the 32 examples, 210 of 234 checks agree.** Every ceiling, utilisation and unbounded design agrees. The 24
+misses stay on the page as findings:
+- **Kingman overestimates waits downstream of a busier or slower stage.** The model gives every stage the arrival
+  variability. A loaded stage spaces its departures out, so the next queue barely forms (the tandem-queue effect).
+  - 13 of 23 judged waits miss, all on the high side.
+  - With Poisson arrivals, the mean latency is 12 to 31 % high in five examples.
+- **Where one queue dominates, its tail is longer than the model's lognormal wait.** The CFD stencil's p99 is 17 %
+  low. The tolerance stack, meant as a bound, falls below the simulated p99 there (0.87 ×) and in single-accelerator
+  prefill (0.94 ×).
+
+Both errors are named rather than tuned away. The first is conservative. The second is not, and it is the one to fix
+next: model the wait as a mass at zero plus an exponential tail.
+
 Behind that, a regression suite runs in GitHub Actions on every push:
 - **Regression:** all 32 examples against golden results within 2 %.
 - **Hand calculations:**
@@ -89,7 +110,9 @@ Behind that, a regression suite runs in GitHub Actions on every push:
 - **Features:** the optimiser finds a design for every example that can be fixed; short share links round-trip
   exactly; each spec sheet fits one A4 page.
 - **Assistant adapters:** each provider is run against mocked APIs.
-- **Accessibility:** an axe-core audit of 19 page states, with no violations allowed.
+- **Accessibility:** an axe-core audit of 22 page states, with no violations allowed.
+- **Simulation:** pytest against M/M/1 and M/D/1; every example re-simulated against the committed results; the
+  in-browser Pyodide run end to end.
 
 ## Five things the model shows
 
@@ -109,7 +132,7 @@ Behind that, a regression suite runs in GitHub Actions on every push:
 
 ## Engineering decisions
 
-- **One static file.** The app is a single `index.html` (about 340 KB) with no build step and no backend. It loads
+- **One static file.** The app is a single `index.html` (about 470 KB, including the embedded simulator and its results) with no build step and no backend. It loads
   instantly, and a reviewer can read the whole model in one place. Catalogue values sit
   at the top of the script with their sources.
 - **Keys stay with the visitor.** The assistant calls each provider directly from the browser, so the site never

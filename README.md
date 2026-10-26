@@ -160,10 +160,74 @@ design for every example that can be fixed, that the rate sweep finds a design a
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
 spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM serving and training workloads match hand calculations, that the cost parts add up and the
 cost goal finds the cheapest design, and that all 32 examples match their golden results within 2 %. An axe-core
-audit then checks the page, all 14 tabs, the drawers, the spec sheet and an explanation panel for accessibility
-violations, with none allowed. Text meets WCAG AA contrast. Tables that scroll sideways, the headline figures and
+audit then checks the page, all 14 tabs, the drawers, the spec sheet, an explanation panel and a simulation
+in progress and finished for accessibility violations, with none allowed. Text meets WCAG AA contrast. Tables that scroll sideways, the headline figures and
 the diagram's blocks are reachable by keyboard. Focus moves into a drawer when it opens and back when it closes,
 and closed drawers are out of the tab order. Every view fits a 390 px phone screen without sideways scrolling.
+
+## Model vs simulation
+
+The latency and throughput figures rest on analytic shortcuts:
+- Kingman's G/G/1 wait at each stage;
+- stage percentiles composed under the chosen correlation;
+- the tolerance stack;
+- the most loaded part setting the ceiling.
+
+A discrete-event simulation checks those shortcuts. It does not check the catalogue, which the published-figure rows
+above cover.
+
+- **Export.** *Export simulation* (beside *Spec sheet*) downloads a zip with `design.json` and `sim.py`. Then:
+  `pip install simpy==4.1.1 && python sim.py design.json --runs 200 --seed 1 --json out.json`.
+  - The spec (schema `hw-explorer-sim/1`, `simSpec()` in the page) comes from the model's computed stages, not the
+    inputs. Per stage it holds the fixed latency, service time, both CVs, the average utilisation and the model's
+    wait.
+  - It also carries the analytic ceiling, mean, percentile and stack, a hash of the model's source and the design's
+    short link.
+  - With split pools, both pools are exported.
+- **The simulator** (`sim/sim.py`, SimPy, pure Python) runs each pool as a line of FIFO servers in `m.stages`
+  order.
+  - Blocks arrive as a renewal process with the design's arrival CV.
+  - Service and fixed times are lognormal, correlated across stages as in the explorer.
+  - The on-chip network is queued per packet (the Lindley recursion) at the model's utilisation, because its
+    packets are a million times shorter than a block.
+  - Seeded runs with a warm-up give throughput, a saturated ceiling, per-stage utilisation and waits, and latency
+    mean, p50, p99 and p99.9 with 95 % confidence intervals.
+  - pytest checks it against M/M/1, M/D/1 and a packet-level M/M/1, and checks that a fixed seed repeats exactly.
+- **In the browser.** *Simulate* (or *Simulate this design* on the Checks tab) runs the same `sim.py` under Pyodide
+  0.27.7 in a Web Worker: 10 runs of 10,000 blocks per pool, with a progress bar.
+  - Python (about 10 MB) and SimPy are fetched on the first click, never on page load.
+  - The result is a model-vs-simulation table judged by the same rule.
+- **Every example, in CI.** `sim/compare.py` runs all 32 examples (10 runs × 20,000 blocks, seed 1) and writes
+  `sim/results.json`, which the Checks tab shows. CI re-runs it and fails if any verdict or figure changes.
+  - The rule, [`sim/TOLERANCE.md`](sim/TOLERANCE.md), was committed before the first run. A check agrees when the
+    model's figure is inside the simulation's 95 % CI widened by 2 % (ceiling, utilisation), 5 % (mean) or 10 %
+    (queue waits, the percentile). The stack must be at least the simulated percentile.
+
+Outcome: 210 of 234 checks agree.
+- **Agree everywhere:** every ceiling (33), every utilisation (94) and every design the model calls unbounded (6;
+  one more, overloaded only in its on-chip network, is unbounded in both by construction and not counted).
+- **24 misses**, kept as findings:
+  - **Kingman, fed the arrival variability at every stage, overestimates the waits behind a busier or slower
+    stage.** That stage spaces its departures out, so the next queue barely forms: the tandem-queue effect. 13 of 23
+    judged waits miss, all on the high side. With Poisson arrivals, the mean latency comes out 12 to 31 % high in
+    five examples (compression, correlator, FHE, genomics, NVMe scan), and the p99 is high in three.
+  - **Where one queue dominates the latency, its tail is longer than the model's lognormal (CV 1) wait.** The CFD
+    stencil's p99 is 17 % low. The tolerance stack, meant as a bound, falls below the simulated p99 in the stencil
+    (0.87 ×) and single-accelerator prefill (0.94 ×) examples.
+
+![Model vs simulation](sim.png)
+
+Files:
+- `sim/sim.py`: the simulator.
+- `sim/test_sim.py`: the closed-form tests.
+- `sim/compare.py`: every example against the rule.
+- `sim/TOLERANCE.md`: the rule.
+- `sim/examples/*.json`: each example's exported spec.
+- `sim/results.json`: the committed run.
+- `sim/requirements.txt`: pinned SimPy and pytest.
+- `tools/sim_sync.js`: re-exports the specs and embeds `sim.py` and the results in the page; `--check` in
+  `npm test`.
+- `test/sim.js`: the in-browser run end to end, at desktop and phone width (`npm run test:sim`).
 
 ## Design optimiser
 
@@ -542,3 +606,8 @@ and by roughly how much, not for sign-off. The *Model* tab in the app lists ever
 ## Running locally
 
 It is one self-contained `index.html` file with no build step: open it in any modern browser. `npm install && npm test` runs the checks, including mocked runs of the assistant against each provider's API.
+
+The simulator: `python3 -m venv .venv && .venv/bin/pip install -r sim/requirements.txt`, then
+`.venv/bin/python -m pytest sim` and `.venv/bin/python sim/compare.py` (about 15 minutes for every example on one
+core; `--jobs 4` in CI). After a model change, `node tools/sim_sync.js` re-exports the specs and re-embeds the page's
+copies.

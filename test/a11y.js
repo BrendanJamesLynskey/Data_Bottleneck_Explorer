@@ -19,7 +19,10 @@ const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
   for (const t of ['opt', 'sizing', 'sweep', 'chip', 'onchip', 'rack', 'ppa', 'cost', 'cons', 'latency', 'checks', 'headroom', 'roofline', 'model'])
     states.push(['tab ' + t, `tab = '${t}'; buildTabs(); update();`]);
   states.push(['inputs drawer, LLM workload', `applyPreset('llmserve'); openDrawer('left');`], ['component drawer', `openDrawer(null); selected = 'dram'; openDrawer('right');`],
-    ['assistant drawer', `openDrawer('assist');`], ['spec sheet', `openDrawer(null); openSpec();`], ['explanation', `closeSpec(); whyKey = 'lat'; paintSummary(M);`]);
+    ['assistant drawer', `openDrawer('assist');`], ['spec sheet', `openDrawer(null); openSpec();`], ['explanation', `closeSpec(); whyKey = 'lat'; paintSummary(M);`],
+    // model vs simulation: a run in progress, then a finished run (the committed radar rows) with one example's rows open
+    ['simulation running', `whyKey = null; applyPreset('radar'); tab = 'checks'; buildTabs(); update(); simRun = {state:'running', stage:'Simulating', done:3, total:10}; simPaint();`],
+    ['simulation result', `simRun = {state:'done', link:SIM_URL+'#d='+packS(S), secs:42, result:{pools:simCommitted().examples.find(e=>e.id==='radar').pools}}; simAll = 'llmsplit'; update();`]);
   let fails = 0;
   for (const [label, setup] of states) {
     await page.evaluate(setup); await new Promise(r => setTimeout(r, 300));
@@ -29,5 +32,5 @@ const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
   }
   await browser.close();
   if (fails) { console.log(`${fails} accessibility violations`); process.exit(1); }
-  console.log(`ok   accessibility: no axe-core violations in ${states.length} states (page, ${states.length - 6} tabs, drawers, spec sheet, explanation)`);
+  console.log(`ok   accessibility: no axe-core violations in ${states.length} states (page, ${states.length - 8} tabs, drawers, spec sheet, explanation, simulation running and done)`);
 })();

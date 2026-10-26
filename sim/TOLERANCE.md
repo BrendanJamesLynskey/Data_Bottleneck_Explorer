@@ -4,7 +4,7 @@ Fixed on 2026-10-26, before the first comparison run, as was done for the MLPerf
 rule and the settings below are not changed to make a row pass. A row that misses is published as a finding on the
 Checks tab, with what it shows about the model.
 
-`sim/compare.py` applies this rule. It runs `sim/sim.py` on every example's exported spec (`sim/examples/*.json`) and
+The rule is `RULE` and `checks()` in `sim/sim.py`, so the page's in-browser run judges the same way. `sim/compare.py` runs `sim/sim.py` on every example's exported spec (`sim/examples/*.json`) and
 writes `sim/results.json`, which the Checks tab shows.
 
 ## What is compared

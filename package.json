@@ -3,7 +3,8 @@
   "private": true,
   "description": "Regression and reference checks for Hardware System Design Explorer (the app itself is the single index.html).",
   "scripts": {
-    "test": "node test/check.js && node test/providers.js && node test/a11y.js"
+    "test": "node test/check.js && node test/providers.js && node test/a11y.js && node tools/sim_sync.js --check",
+    "test:sim": "node test/sim.js"
   },
   "devDependencies": {
     "puppeteer": "24.43.0",

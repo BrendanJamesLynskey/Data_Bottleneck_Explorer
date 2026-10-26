@@ -13,3 +13,28 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm test
+  # the simulator: its own tests, then every example against the committed model-vs-simulation results
+  simulation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r sim/requirements.txt
+      - run: python -m pytest sim -q
+      - run: python sim/compare.py --check --jobs 4
+  # the same simulator in the browser: Pyodide and SimPy, cached between runs
+  browser-simulation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/hw-explorer-sim
+          key: pyodide-0.27.7-simpy-4.1.1
+      - run: npm install --no-audit --no-fund
+      - run: npm run test:sim

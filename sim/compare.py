@@ -22,71 +22,8 @@ import sim  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(HERE, "results.json")
 
-# the rule (TOLERANCE.md): widening of the simulation's 95 % CI by kind of figure, and the thresholds for judging a row
-RULE = {"ceiling": 0.02, "util": 0.02, "mean": 0.05, "wait": 0.10, "pct": 0.10,
-        "util_min": 0.01, "wait_share_min": 0.01, "drift_min": 1.5}
+# the settings fixed in TOLERANCE.md; the rule itself is sim.RULE, so the page's in-browser run judges rows the same way
 SETTINGS = {"runs": 10, "seed": 1, "blocks": 20000, "warmup": 2000}
-
-
-def band(c: dict, w: float) -> tuple[float, float]:
-    return c["lo"] * (1 - w), c["hi"] * (1 + w)
-
-
-def judge(x: float, c: dict, w: float) -> str:
-    lo, hi = band(c, w)
-    return "pass" if lo <= x <= hi else "miss"
-
-
-def rows_for(spec_pool: dict, res_pool: dict, pct: float) -> list[dict]:
-    a, lat = spec_pool["analytic"], spec_pool["analytic"]["latency"]
-    stages = {s["k"]: s for s in spec_pool["stages"]}
-    rows = []
-
-    def row(kind, check, model, simc, w, verdict=None, note="", part=None):
-        rows.append({"kind": kind, "check": check, "part": part, "model": model, "sim": simc, "w": w,
-                     "verdict": verdict or judge(model, simc, w), "note": note})
-
-    names = {p["k"]: p["name"] for p in spec_pool["parts"]}
-    worst = a["worst"]
-    on_path = next((p["on_path"] for p in spec_pool["parts"] if p["k"] == worst["k"]), False)
-    busiest = max((s for s in spec_pool["stages"] if s["level"] == "block"), key=lambda s: s["util"])
-    note = "" if on_path else (f"The model's busiest part, {worst['name']}, is not a queued stage in the simulation; "
-                               f"this compares the busiest queued stage, {busiest['name']}.")
-    row("ceiling", "Ceiling: the most loaded queued stage sets the rate", a["path_ceiling_Bps"], res_pool["ceiling_Bps"],
-        RULE["ceiling"], note=note, part=busiest["k"])
-
-    if a["unbounded"]:
-        over = [s for s in spec_pool["stages"] if s["level"] in ("block", "packet") and s["util"] >= 1]
-        only_noc = bool(over) and all(s["level"] == "packet" for s in over)
-        d = res_pool["drift"]
-        if only_noc:
-            row("unbounded", "Unbounded latency", None, d, None, verdict="n/a",
-                note="Only the on-chip network is overloaded; the simulation queues its packets at the model's own "
-                     "utilisation, so both are unbounded by construction.")
-        else:
-            grows = d["lo"] is None or d["lo"] > RULE["drift_min"]
-            row("unbounded", "Unbounded latency: the backlog keeps growing", None, d, None,
-                verdict="pass" if grows else "miss",
-                note="Overloaded: " + ", ".join(f"{s['name']} ({s['util']:.0%})" for s in over) + ".")
-        return rows
-
-    for k, c in res_pool["util"].items():
-        u = stages[k]["util"]
-        if u >= RULE["util_min"]:
-            row("util", f"Utilisation: {stages[k]['name']}", u, c, RULE["util"], part=k)
-    row("mean", "Mean latency", lat["mean_s"], res_pool["mean_s"], RULE["mean"])
-    for k, c in res_pool["wait_s"].items():
-        q = stages[k]["wait_s"]
-        if q is not None and q >= RULE["wait_share_min"] * lat["mean_s"]:
-            row("wait", f"Queueing wait (Kingman): {stages[k]['name']}", q, c, RULE["wait"], part=k,
-                note=f"{q / lat['mean_s']:.0%} of the mean latency; utilisation {stages[k]['util']:.0%}.")
-    pname = f"p{pct * 100:g}"
-    row("pct", f"Latency {pname}", lat["pX_s"], res_pool["pX_s"], RULE["pct"])
-    c = res_pool["pX_s"]
-    row("stack", f"Tolerance stack bounds the {pname}", lat["stack_s"], c, None,
-        verdict="pass" if lat["stack_s"] >= c["lo"] else "miss",
-        note=f"Stack is {lat['stack_s'] / c['mean']:.2f} × the simulated {pname}.")
-    return rows
 
 
 def run_example(path: str) -> dict:
@@ -96,7 +33,7 @@ def run_example(path: str) -> dict:
     res = sim.simulate(spec, runs=SETTINGS["runs"], seed=SETTINGS["seed"], blocks=SETTINGS["blocks"], warm=SETTINGS["warmup"])
     pools = []
     for sp, rp in zip(spec["pools"], res["pools"]):
-        pools.append({"name": sp["name"], "rows": rows_for(sp, rp, pct),
+        pools.append({"name": sp["name"], "rows": sim.checks(sp, rp, pct),
                       "sim": {k: rp[k] for k in ("mean_s", "p50_s", "p99_s", "p999_s", "pX_s", "throughput_Bps", "drift")}})
     return sim.jsonable({"id": spec["design"]["example"], "name": spec["design"]["name"], "percentile": pct,
                          "model_hash": spec["explorer"]["model_hash"], "pools": pools})
@@ -139,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
                 if r["verdict"] != "pass":
                     print(f"{r['verdict']:4} {e['id']}/{p['name']}: {r['check']}  model {r['model']}  sim {r['sim']}  {r['note']}")
     out = {"schema": sim.SCHEMA + "/compare", "sim_version": sim.VERSION, "simpy": sim.simpy.__version__,
-           "rule": RULE, "settings": SETTINGS, "summary": summary(examples), "examples": examples}
+           "rule": sim.RULE, "settings": SETTINGS, "summary": summary(examples), "examples": examples}
     s = out["summary"]
     print(f"{s['rows']} rows: {s['pass']} pass, {s['miss']} miss, {s['na']} not counted ({len(examples)} examples)")
     if a.only:

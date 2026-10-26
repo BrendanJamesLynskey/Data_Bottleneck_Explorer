@@ -1,0 +1,5464 @@
+{
+ "schema": "hw-explorer-sim/1/compare",
+ "sim_version": "1.0.0",
+ "simpy": "4.1.1",
+ "rule": {
+  "ceiling": 0.02,
+  "util": 0.02,
+  "mean": 0.05,
+  "wait": 0.1,
+  "pct": 0.1,
+  "util_min": 0.01,
+  "wait_share_min": 0.01,
+  "drift_min": 1.5
+ },
+ "settings": {
+  "runs": 10,
+  "seed": 1,
+  "blocks": 20000,
+  "warmup": 2000
+ },
+ "summary": {
+  "rows": 235,
+  "pass": 210,
+  "miss": 24,
+  "na": 1,
+  "by_kind": {
+   "ceiling": {
+    "pass": 33,
+    "miss": 0,
+    "n/a": 0
+   },
+   "util": {
+    "pass": 94,
+    "miss": 0,
+    "n/a": 0
+   },
+   "mean": {
+    "pass": 21,
+    "miss": 5,
+    "n/a": 0
+   },
+   "pct": {
+    "pass": 22,
+    "miss": 4,
+    "n/a": 0
+   },
+   "stack": {
+    "pass": 24,
+    "miss": 2,
+    "n/a": 0
+   },
+   "wait": {
+    "pass": 10,
+    "miss": 13,
+    "n/a": 0
+   },
+   "unbounded": {
+    "pass": 6,
+    "miss": 0,
+    "n/a": 1
+   }
+  }
+ },
+ "examples": [
+  {
+   "id": "8k",
+   "name": "8K60 broadcast encoder card",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "h2d",
+       "model": 13079950103.950102,
+       "sim": {
+        "mean": 13079854047.344889,
+        "lo": 13079069022.861969,
+        "hi": 13080639071.827806,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.28535888671875004,
+       "sim": {
+        "mean": 0.28558673793618194,
+        "lo": 0.28526491626233186,
+        "hi": 0.28590855961003203,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.10310578727089045,
+       "sim": {
+        "mean": 0.10317431842728761,
+        "lo": 0.10305914708790373,
+        "hi": 0.10328948976667149,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.0124416,
+       "sim": {
+        "mean": 0.01245247510793246,
+        "lo": 0.0124385875321705,
+        "hi": 0.012466362683694419,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.013805200195312499,
+       "sim": {
+        "mean": 0.013811622009168462,
+        "lo": 0.013794348746925738,
+        "hi": 0.013828895271411186,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.006780527479769142,
+       "sim": {
+        "mean": 0.0067382165966348604,
+        "lo": 0.006737901991271059,
+        "hi": 0.006738531201998662,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.007039577900482972,
+       "sim": {
+        "mean": 0.006911211958713892,
+        "lo": 0.006910310446689251,
+        "hi": 0.0069121134707385325,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.007197589211395381,
+       "sim": {
+        "mean": 0.006911211958713892,
+        "lo": 0.006910310446689251,
+        "hi": 0.0069121134707385325,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.04 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.0067382165966348604,
+       "lo": 0.006737901991271059,
+       "hi": 0.006738531201998662,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.00673734399443191,
+       "lo": 0.00673684417535582,
+       "hi": 0.006737843813508,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.006911211958713892,
+       "lo": 0.006910310446689251,
+       "hi": 0.0069121134707385325,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.006972070850194712,
+       "lo": 0.006968393813381972,
+       "hi": 0.006975747887007452,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.006911211958713892,
+       "lo": 0.006910310446689251,
+       "hi": 0.0069121134707385325,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 3735439537.457488,
+       "lo": 3731228917.779925,
+       "hi": 3739650157.1350513,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0000174539422744,
+       "lo": 0.9998399161153417,
+       "hi": 1.000194991769207,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "adas",
+   "name": "Autonomous-driving perception SoC",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 14600716694.214876,
+       "sim": {
+        "mean": 14601460114.332478,
+        "lo": 14600142410.270498,
+        "hi": 14602777818.394457,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.19725059120838356,
+       "sim": {
+        "mean": 0.19738987631336452,
+        "lo": 0.19717324756757781,
+        "hi": 0.19760650505915123,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.028800000000000003,
+       "sim": {
+        "mean": 0.028824159863371855,
+        "lo": 0.028792791527175954,
+        "hi": 0.028855528199567756,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.0077971229584788545,
+       "sim": {
+        "mean": 0.007763597103604305,
+        "lo": 0.007763046312761159,
+        "hi": 0.007764147894447452,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.00819733035119125,
+       "sim": {
+        "mean": 0.008119328301691552,
+        "lo": 0.008116364623145623,
+        "hi": 0.008122291980237482,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.008393943513476774,
+       "sim": {
+        "mean": 0.008119328301691552,
+        "lo": 0.008116364623145623,
+        "hi": 0.008122291980237482,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.03 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.007763597103604305,
+       "lo": 0.007763046312761159,
+       "hi": 0.007764147894447452,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.007759643328708421,
+       "lo": 0.007759083121927233,
+       "hi": 0.007760203535489609,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.008119328301691552,
+       "lo": 0.008116364623145623,
+       "hi": 0.008122291980237482,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.008252354651570214,
+       "lo": 0.0082412144550127,
+       "hi": 0.00826349484812773,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.008119328301691552,
+       "lo": 0.008116364623145623,
+       "hi": 0.008122291980237482,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 2882217170.936842,
+       "lo": 2879036552.9038467,
+       "hi": 2885397788.969837,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.000067868665635,
+       "lo": 0.9998619914126485,
+       "hi": 1.0002737459186215,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "chiparray",
+   "name": "GB200-class accelerator from its compute array: six chiplets at low voltage",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 529911850519031.2,
+       "sim": {
+        "mean": 529927634260770.4,
+        "lo": 529899884379590.3,
+        "hi": 529955384141950.5,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.7472941011078184,
+       "sim": {
+        "mean": 0.7472714888693396,
+        "lo": 0.7472408333383359,
+        "hi": 0.7473021444003433,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.2646506005720849,
+       "sim": {
+        "mean": 0.26472448831958645,
+        "lo": 0.26460432330529976,
+        "hi": 0.26484465333387314,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.6790123456790124,
+       "sim": {
+        "mean": 0.6789726449254572,
+        "lo": 0.6789488229379914,
+        "hi": 0.6789964669129229,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.03079794133667649,
+       "sim": {
+        "mean": 0.030788257909568257,
+        "lo": 0.03078549544440439,
+        "hi": 0.030791020374732123,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.032275952313101784,
+       "sim": {
+        "mean": 0.032235564812560825,
+        "lo": 0.03222010134991757,
+        "hi": 0.03225102827520408,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.03261374085861635,
+       "sim": {
+        "mean": 0.032235564812560825,
+        "lo": 0.03222010134991757,
+        "hi": 0.03225102827520408,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.01 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.030788257909568257,
+       "lo": 0.03078549544440439,
+       "hi": 0.030791020374732123,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.030764804808211466,
+       "lo": 0.030762208965483262,
+       "hi": 0.03076740065093967,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.032235564812560825,
+       "lo": 0.03222010134991757,
+       "hi": 0.03225102827520408,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.03277678393497609,
+       "lo": 0.03275202398159406,
+       "hi": 0.032801543888358126,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.032235564812560825,
+       "lo": 0.03222010134991757,
+       "hi": 0.03225102827520408,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 395986371489533.4,
+       "lo": 395985899034603.0,
+       "hi": 395986843944463.75,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9999918436023367,
+       "lo": 0.9994300286994585,
+       "hi": 1.000553658505215,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "compress",
+   "name": "Storage compression offload (zstd)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 18875569959.183666,
+       "sim": {
+        "mean": 18888572943.395397,
+        "lo": 18864117237.48595,
+        "hi": 18913028649.304844,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.45871734619140625,
+       "sim": {
+        "mean": 0.4579321039686334,
+        "lo": 0.4552483704228158,
+        "hi": 0.46061583751445095,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.6357423922005361,
+       "sim": {
+        "mean": 0.6347824625413871,
+        "lo": 0.6310613135758963,
+        "hi": 0.638503611506878,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.36,
+       "sim": {
+        "mean": 0.35941841561856613,
+        "lo": 0.3572912490798707,
+        "hi": 0.36154558215726157,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.1610469818115234,
+       "sim": {
+        "mean": 0.16078252114917163,
+        "lo": 0.15984641521267587,
+        "hi": 0.1617186270856674,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.00021076604145585736,
+       "sim": {
+        "mean": 0.00018528964586657292,
+        "lo": 0.00018397420351298034,
+        "hi": 0.0001866050882201655,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link H\u2192D",
+       "part": "h2d",
+       "model": 1.629310021316282e-05,
+       "sim": {
+        "mean": 1.636595873650083e-05,
+        "lo": 1.6010880986496344e-05,
+        "hi": 1.6721036486505316e-05,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "8% of the mean latency; utilisation 46%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Device DRAM",
+       "part": "dram",
+       "model": 4.7017366999295246e-05,
+       "sim": {
+        "mean": 3.116302285293544e-05,
+        "lo": 3.017918806509266e-05,
+        "hi": 3.214685764077821e-05,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "22% of the mean latency; utilisation 64%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Compute",
+       "part": "compute",
+       "model": 8.521875e-06,
+       "sim": {
+        "mean": 2.5700061489122853e-10,
+        "lo": 1.3086255443491705e-10,
+        "hi": 3.8313867534754e-10,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "4% of the mean latency; utilisation 36%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.0004316798708992134,
+       "sim": {
+        "mean": 0.00041969584734370403,
+        "lo": 0.0004069442558685394,
+        "hi": 0.00043244743881886864,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.0005401470287286267,
+       "sim": {
+        "mean": 0.00041969584734370403,
+        "lo": 0.0004069442558685394,
+        "hi": 0.00043244743881886864,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.29 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.00018528964586657292,
+       "lo": 0.00018397420351298034,
+       "hi": 0.0001866050882201655,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.00016460017471202072,
+       "lo": 0.00016384068120442924,
+       "hi": 0.0001653596682196122,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.00041969584734370403,
+       "lo": 0.0004069442558685394,
+       "hi": 0.00043244743881886864,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.0005846249108076796,
+       "lo": 0.0005418369481060563,
+       "hi": 0.0006274128735093028,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.00041969584734370403,
+       "lo": 0.0004069442558685394,
+       "hi": 0.00043244743881886864,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 11980957051.640722,
+       "lo": 11908571181.599041,
+       "hi": 12053342921.682402,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9958002091641202,
+       "lo": 0.976289431757657,
+       "hi": 1.0153109865705834,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "correlator",
+   "name": "Radio-telescope correlator (X-engine)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "compute",
+       "model": 72000000000,
+       "sim": {
+        "mean": 71989002751.70741,
+        "lo": 71897727210.26773,
+        "hi": 72080278293.1471,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Network ingress",
+       "part": "src",
+       "model": 0.6715708128993907,
+       "sim": {
+        "mean": 0.6717459267192369,
+        "lo": 0.6668251394204313,
+        "hi": 0.6766667140180426,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.4657823013371944,
+       "sim": {
+        "mean": 0.46591625494618655,
+        "lo": 0.46253532195349356,
+        "hi": 0.46929718793887953,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.1967753125209675,
+       "sim": {
+        "mean": 0.1968608318822811,
+        "lo": 0.1954477321237101,
+        "hi": 0.19827393164085208,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.6944444444444444,
+       "sim": {
+        "mean": 0.6946591992949177,
+        "lo": 0.6896214273972959,
+        "hi": 0.6996969711925395,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.022835289230847027,
+       "sim": {
+        "mean": 0.022842806879181797,
+        "lo": 0.022682954109317647,
+        "hi": 0.023002659649045947,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.0048040218110122395,
+       "sim": {
+        "mean": 0.003672166378426206,
+        "lo": 0.003631545286065395,
+        "hi": 0.003712787470787017,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Network ingress",
+       "part": "src",
+       "model": 0.0008797845213733492,
+       "sim": {
+        "mean": 0.0008773811492759749,
+        "lo": 0.0008462769570629301,
+        "hi": 0.0009084853414890198,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "18% of the mean latency; utilisation 67%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link H\u2192D",
+       "part": "h2d",
+       "model": 0.00026001088748936664,
+       "sim": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "5% of the mean latency; utilisation 47%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Compute",
+       "part": "compute",
+       "model": 0.0010202020202020202,
+       "sim": {
+        "mean": 0.00018181078602491694,
+        "lo": 0.00017157465545787008,
+        "hi": 0.0001920469165919638,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "21% of the mean latency; utilisation 69%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.0108118895810135,
+       "sim": {
+        "mean": 0.008412302062020238,
+        "lo": 0.007984579578032721,
+        "hi": 0.008840024546007755,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.013730373431247122,
+       "sim": {
+        "mean": 0.008412302062020238,
+        "lo": 0.007984579578032721,
+        "hi": 0.008840024546007755,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.63 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.003672166378426206,
+       "lo": 0.003631545286065395,
+       "hi": 0.003712787470787017,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.003288062869793951,
+       "lo": 0.0032688032484677037,
+       "hi": 0.003307322491120198,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.008412302062020238,
+       "lo": 0.007984579578032721,
+       "hi": 0.008840024546007755,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.011405871778532094,
+       "lo": 0.010163917676573214,
+       "hi": 0.012647825880490975,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.008412302062020238,
+       "lo": 0.007984579578032721,
+       "hi": 0.008840024546007755,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 50011925798.69389,
+       "lo": 49649984092.41558,
+       "hi": 50373867504.9722,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.000804107856147,
+       "lo": 0.9800101550192968,
+       "hi": 1.021598060692997,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "dlrm",
+   "name": "Recommendation embeddings (DLRM lookups)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 268800000000,
+       "sim": {
+        "mean": 268307930232.0329,
+        "lo": 267415851666.86105,
+        "hi": 269200008797.20477,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.14334917068481445,
+       "sim": {
+        "mean": 0.14315783741584848,
+        "lo": 0.14231430197288028,
+        "hi": 0.14400137285881667,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.5580357142857143,
+       "sim": {
+        "mean": 0.5579558469541954,
+        "lo": 0.5544246029169941,
+        "hi": 0.5614870909913967,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.015,
+       "sim": {
+        "mean": 0.014977958176760477,
+        "lo": 0.014889968904981395,
+        "hi": 0.01506594744853956,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.1411795616149902,
+       "sim": {
+        "mean": 0.1409790675726042,
+        "lo": 0.1401913534446223,
+        "hi": 0.1417667817005861,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 1.399377523813702e-05,
+       "sim": {
+        "mean": 1.3870839824628193e-05,
+        "lo": 1.3805597133055241e-05,
+        "hi": 1.3936082516201146e-05,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Device DRAM",
+       "part": "dram",
+       "model": 2.560012325637326e-06,
+       "sim": {
+        "mean": 2.5073815031989615e-06,
+        "lo": 2.452732126175007e-06,
+        "hi": 2.562030880222916e-06,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "18% of the mean latency; utilisation 56%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 2.8414045270722934e-05,
+       "sim": {
+        "mean": 2.9204281366858147e-05,
+        "lo": 2.8861943613432048e-05,
+        "hi": 2.9546619120284247e-05,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 3.7848782722552226e-05,
+       "sim": {
+        "mean": 2.9204281366858147e-05,
+        "lo": 2.8861943613432048e-05,
+        "hi": 2.9546619120284247e-05,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.30 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 1.3870839824628193e-05,
+       "lo": 1.3805597133055241e-05,
+       "hi": 1.3936082516201146e-05,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 1.2915847233765584e-05,
+       "lo": 1.286345411399177e-05,
+       "hi": 1.2968240353539397e-05,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 2.9204281366858147e-05,
+       "lo": 2.8861943613432048e-05,
+       "hi": 2.9546619120284247e-05,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 3.6974929495073305e-05,
+       "lo": 3.57859177631635e-05,
+       "hi": 3.816394122698311e-05,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 2.9204281366858147e-05,
+       "lo": 2.8861943613432048e-05,
+       "hi": 2.9546619120284247e-05,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 149786315822.98676,
+       "lo": 148936865767.8609,
+       "hi": 150635765878.11264,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0021168172364785,
+       "lo": 0.9868625404134145,
+       "hi": 1.0173710940595424,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "fhe",
+   "name": "FHE bootstrapping accelerator (CKKS)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 35546964172.3356,
+       "sim": {
+        "mean": 35548029134.29136,
+        "lo": 35536145827.675964,
+        "hi": 35559912440.906746,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.3822644551595052,
+       "sim": {
+        "mean": 0.38143462793583416,
+        "lo": 0.37979453525871065,
+        "hi": 0.38307472061295766,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.5626359512176003,
+       "sim": {
+        "mean": 0.5614033947053788,
+        "lo": 0.5590307479730072,
+        "hi": 0.5637760414377504,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.08333333333333333,
+       "sim": {
+        "mean": 0.08313621258091772,
+        "lo": 0.08278298682891548,
+        "hi": 0.08348943833291995,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.37647883097330725,
+       "sim": {
+        "mean": 0.37568334303521533,
+        "lo": 0.3740799760469797,
+        "hi": 0.377286710023451,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.0031791335894726393,
+       "sim": {
+        "mean": 0.0028121169660174127,
+        "lo": 0.002799668433687611,
+        "hi": 0.0028245654983472144,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link H\u2192D",
+       "part": "h2d",
+       "model": 0.00018931061466459108,
+       "sim": {
+        "mean": 0.0001893584273777343,
+        "lo": 0.00018588433409598068,
+        "hi": 0.0001928325206594879,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "6% of the mean latency; utilisation 38%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Device DRAM",
+       "part": "dram",
+       "model": 0.0005796099559755959,
+       "sim": {
+        "mean": 0.0003935159067563641,
+        "lo": 0.0003840884738459609,
+        "hi": 0.0004029433396667673,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "18% of the mean latency; utilisation 56%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link D\u2192H",
+       "part": "d2h",
+       "model": 0.00017473441285416013,
+       "sim": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "5% of the mean latency; utilisation 38%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.005849180788129536,
+       "sim": {
+        "mean": 0.0059237859215476975,
+        "lo": 0.005795738698296527,
+        "hi": 0.006051833144798868,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.007052756971270517,
+       "sim": {
+        "mean": 0.0059237859215476975,
+        "lo": 0.005795738698296527,
+        "hi": 0.006051833144798868,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.19 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.0028121169660174127,
+       "lo": 0.002799668433687611,
+       "hi": 0.0028245654983472144,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.0024411013981715966,
+       "lo": 0.002429981867335134,
+       "hi": 0.002452220929008059,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.0059237859215476975,
+       "lo": 0.005795738698296527,
+       "hi": 0.006051833144798868,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.007925741344714332,
+       "lo": 0.007534687388990533,
+       "hi": 0.008316795300438131,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.0059237859215476975,
+       "lo": 0.005795738698296527,
+       "hi": 0.006051833144798868,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 19957386305.624413,
+       "lo": 19872563055.247658,
+       "hi": 20042209556.001167,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9990681656000909,
+       "lo": 0.9829694411219627,
+       "hi": 1.0151668900782191,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "gbms",
+   "name": "1 GB per ms stream (the 1 TB/s question)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "h2d",
+       "model": 52319800415.800415,
+       "sim": {
+        "mean": 52338331452.15466,
+        "lo": 52315176043.93686,
+        "hi": 52361486860.37247,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "unbounded",
+       "check": "Unbounded latency: the backlog keeps growing",
+       "part": null,
+       "model": null,
+       "sim": {
+        "mean": 7.001165897044082,
+        "lo": 6.9949934481811304,
+        "hi": 7.0073383459070335,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Overloaded: Link H\u2192D (1911%), Link D\u2192H (1882%)."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.8693040322247126,
+       "lo": 0.8688387899769638,
+       "hi": 0.8697692744724614,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.8692331152222611,
+       "lo": 0.8687417407878449,
+       "hi": 0.8697244896566773,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 1.5794754285891026,
+       "lo": 1.578793102459583,
+       "hi": 1.5801577547186223,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 1.5924794077867166,
+       "lo": 1.5918128719503273,
+       "hi": 1.593145943623106,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 1.5794754285891026,
+       "lo": 1.578793102459583,
+       "hi": 1.5801577547186223,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 47788895398.229416,
+       "lo": 47769731974.76446,
+       "hi": 47808058821.69438,
+       "n": 10
+      },
+      "drift": {
+       "mean": 7.001165897044082,
+       "lo": 6.9949934481811304,
+       "hi": 7.0073383459070335,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "genomics",
+   "name": "Genomic read alignment (FPGA card)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 4848326530.612246,
+       "sim": {
+        "mean": 4848243946.985859,
+        "lo": 4847848413.899939,
+        "hi": 4848639480.07178,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.1529057820638021,
+       "sim": {
+        "mean": 0.15262078589630526,
+        "lo": 0.1518876545953256,
+        "hi": 0.15335391719728492,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.4125134698275862,
+       "sim": {
+        "mean": 0.4117492330254405,
+        "lo": 0.4097714162031699,
+        "hi": 0.413727049847711,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.4,
+       "sim": {
+        "mean": 0.3993596574839741,
+        "lo": 0.3974952898619579,
+        "hi": 0.4012240251059903,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.04934310913085937,
+       "sim": {
+        "mean": 0.049251842007417224,
+        "lo": 0.049016461794911634,
+        "hi": 0.04948722221992281,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.04171534735883676,
+       "sim": {
+        "mean": 0.037166196546467384,
+        "lo": 0.03712553945065412,
+        "hi": 0.03720685364228065,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link H\u2192D",
+       "part": "h2d",
+       "model": 0.0004416274423742389,
+       "sim": {
+        "mean": 0.00044873447840056206,
+        "lo": 0.0004408615565169572,
+        "hi": 0.0004566074002841669,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "1% of the mean latency; utilisation 15%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Device DRAM",
+       "part": "dram",
+       "model": 0.004634767430139108,
+       "sim": {
+        "mean": 0.004191728395700554,
+        "lo": 0.004153649394000711,
+        "hi": 0.004229807397400398,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "11% of the mean latency; utilisation 41%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Compute",
+       "part": "compute",
+       "model": 0.004309333333333333,
+       "sim": {
+        "mean": 0.00022834917961824707,
+        "lo": 0.00022275380449699285,
+        "hi": 0.00023394455473950128,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "10% of the mean latency; utilisation 40%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.06922496925479331,
+       "sim": {
+        "mean": 0.06755560467182704,
+        "lo": 0.06688920918223314,
+        "hi": 0.06822200016142095,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.08215241202397618,
+       "sim": {
+        "mean": 0.06755560467182704,
+        "lo": 0.06688920918223314,
+        "hi": 0.06822200016142095,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.22 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.037166196546467384,
+       "lo": 0.03712553945065412,
+       "hi": 0.03720685364228065,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.03350621274466903,
+       "lo": 0.03348461821188826,
+       "hi": 0.0335278072774498,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.06755560467182704,
+       "lo": 0.06688920918223314,
+       "hi": 0.06822200016142095,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.08677480235950981,
+       "lo": 0.0843268879747273,
+       "hi": 0.08922271674429232,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.06755560467182704,
+       "lo": 0.06688920918223314,
+       "hi": 0.06822200016142095,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 1996257708.2734265,
+       "lo": 1986692928.4433439,
+       "hi": 2005822488.1035092,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0046987878234945,
+       "lo": 0.9970655477991048,
+       "hi": 1.0123320278478842,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "gpudb",
+   "name": "GPU database join over PCIe \u2717",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "h2d",
+       "model": 52319800415.800415,
+       "sim": {
+        "mean": 52320518412.710175,
+        "lo": 52315579097.00844,
+        "hi": 52325457728.41191,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "unbounded",
+       "check": "Unbounded latency: the backlog keeps growing",
+       "part": null,
+       "model": null,
+       "sim": {
+        "mean": 7.0016962205789754,
+        "lo": 6.973935609884693,
+        "hi": 7.029456831273258,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Overloaded: Link H\u2192D (382%)."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 43.36160886251493,
+       "lo": 43.28655018062053,
+       "hi": 43.436667544409325,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 43.35660086459502,
+       "lo": 43.277999066137376,
+       "hi": 43.43520266305267,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 78.74249841674212,
+       "lo": 78.59382636490633,
+       "hi": 78.89117046857791,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 79.3871815470554,
+       "lo": 79.23608297263468,
+       "hi": 79.53828012147613,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 78.74249841674212,
+       "lo": 78.59382636490633,
+       "hi": 78.89117046857791,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 48730518277.76638,
+       "lo": 48708666769.34378,
+       "hi": 48752369786.18898,
+       "n": 10
+      },
+      "drift": {
+       "mean": 7.0016962205789754,
+       "lo": 6.973935609884693,
+       "hi": 7.029456831273258,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "gpuhost",
+   "name": "Training data loader starving an accelerator \u2717",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "h2d",
+       "model": 26159900207.900208,
+       "sim": {
+        "mean": 26162479673.949043,
+        "lo": 26156979932.878387,
+        "hi": 26167979415.019703,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "unbounded",
+       "check": "Unbounded latency: the backlog keeps growing",
+       "part": null,
+       "model": null,
+       "sim": {
+        "mean": 7.10610767543875,
+        "lo": 6.938940674400486,
+        "hi": 7.273274676477014,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Overloaded: Link H\u2192D (153%)."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 2.5261961419123136,
+       "lo": 2.508845338833452,
+       "hi": 2.543546944991175,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 2.522461032496878,
+       "lo": 2.5016106920567527,
+       "hi": 2.543311372937003,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 4.601529162831451,
+       "lo": 4.572319851982954,
+       "hi": 4.630738473679948,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 4.640666262656958,
+       "lo": 4.612904618537866,
+       "hi": 4.66842790677605,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 4.601529162831451,
+       "lo": 4.572319851982954,
+       "hi": 4.630738473679948,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 25301288270.166702,
+       "lo": 25276689827.46738,
+       "hi": 25325886712.866028,
+       "n": 10
+      },
+      "drift": {
+       "mean": 7.10610767543875,
+       "lo": 6.938940674400486,
+       "hi": 7.273274676477014,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "hft",
+   "name": "Low-latency trading feed handler \u2717",
+   "percentile": 0.999,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "src",
+       "model": 2990897269.1807537,
+       "sim": {
+        "mean": 2994980909.8081646,
+        "lo": 2983320125.167668,
+        "hi": 3006641694.4486613,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "unbounded",
+       "check": "Unbounded latency: the backlog keeps growing",
+       "part": null,
+       "model": null,
+       "sim": {
+        "mean": 3.017646271904109,
+        "lo": 1.8632948173461639,
+        "hi": 4.171997726462054,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Overloaded: Network ingress (100%)."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 4.4687260055268085e-05,
+       "lo": 3.459756655957867e-05,
+       "hi": 5.47769535509575e-05,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 4.41196389384846e-05,
+       "lo": 3.2218424909852775e-05,
+       "hi": 5.602085296711643e-05,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 8.233157029078979e-05,
+       "lo": 6.611995629258224e-05,
+       "hi": 9.854318428899735e-05,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 8.647754180743242e-05,
+       "lo": 7.024482695315976e-05,
+       "hi": 0.00010271025666170508,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 8.647754180743242e-05,
+       "lo": 7.024482695315976e-05,
+       "hi": 0.00010271025666170508,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 2972052032.787037,
+       "lo": 2964546017.9810867,
+       "hi": 2979558047.592987,
+       "n": 10
+      },
+      "drift": {
+       "mean": 3.017646271904109,
+       "lo": 1.8632948173461639,
+       "hi": 4.171997726462054,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "isp",
+   "name": "Smartphone camera ISP + NPU",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 6801087116.370808,
+       "sim": {
+        "mean": 6801390885.099852,
+        "lo": 6800829758.013698,
+        "hi": 6801952012.186006,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.2756912193473764,
+       "sim": {
+        "mean": 0.27588735853155005,
+        "lo": 0.2755843751866227,
+        "hi": 0.2761903418764774,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.03515625,
+       "sim": {
+        "mean": 0.03518558328630613,
+        "lo": 0.035147292599619934,
+        "hi": 0.03522387397299233,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.010832798290364716,
+       "sim": {
+        "mean": 0.010761097789460834,
+        "lo": 0.01076042957405749,
+        "hi": 0.01076176600486418,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.011388629340652634,
+       "sim": {
+        "mean": 0.011197048336188686,
+        "lo": 0.011193463400496548,
+        "hi": 0.011200633271880823,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.011696223802523449,
+       "sim": {
+        "mean": 0.011197048336188686,
+        "lo": 0.011193463400496548,
+        "hi": 0.011200633271880823,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.04 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.010761097789460834,
+       "lo": 0.01076042957405749,
+       "hi": 0.01076176600486418,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.01075615900703042,
+       "lo": 0.010755486107030353,
+       "hi": 0.010756831907030485,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.011197048336188686,
+       "lo": 0.011193463400496548,
+       "hi": 0.011200633271880823,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.011361928020085088,
+       "lo": 0.011349619979474772,
+       "hi": 0.011374236060695405,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.011197048336188686,
+       "lo": 0.011193463400496548,
+       "hi": 0.011200633271880823,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 1876434990.8892527,
+       "lo": 1874364304.2939236,
+       "hi": 1878505677.4845817,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0000585202622674,
+       "lo": 0.9998719914053913,
+       "hi": 1.0002450491191435,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "linescan",
+   "name": "Line-scan machine-vision inspection",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "src",
+       "model": 12408718743.084751,
+       "sim": {
+        "mean": 12409013005.900286,
+        "lo": 12403790518.986668,
+        "hi": 12414235492.813904,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Network ingress",
+       "part": "src",
+       "model": 0.26407238876504685,
+       "sim": {
+        "mean": 0.26392530827421673,
+        "lo": 0.26375230886515105,
+        "hi": 0.2640983076832824,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.25052083333333336,
+       "sim": {
+        "mean": 0.25036867095327997,
+        "lo": 0.2501802566086965,
+        "hi": 0.2505570852978634,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.05657382017607158,
+       "sim": {
+        "mean": 0.05654049640167118,
+        "lo": 0.05648995576628596,
+        "hi": 0.056591037037056396,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.032768,
+       "sim": {
+        "mean": 0.032741658824980265,
+        "lo": 0.03271770794166473,
+        "hi": 0.0327656097082958,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.0007878762394529108,
+       "sim": {
+        "mean": 0.0007829319394468115,
+        "lo": 0.0007828237279847838,
+        "hi": 0.0007830401509088393,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.0008658913791632871,
+       "sim": {
+        "mean": 0.0008537046421190908,
+        "lo": 0.0008530234224530909,
+        "hi": 0.0008543858617850907,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.0009130210346637086,
+       "sim": {
+        "mean": 0.0008537046421190908,
+        "lo": 0.0008530234224530909,
+        "hi": 0.0008543858617850907,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.07 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.0007829319394468115,
+       "lo": 0.0007828237279847838,
+       "hi": 0.0007830401509088393,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.0007821720382878538,
+       "lo": 0.0007819689159503287,
+       "hi": 0.000782375160625379,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.0008537046421190908,
+       "lo": 0.0008530234224530909,
+       "hi": 0.0008543858617850907,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.00087885798048144,
+       "lo": 0.0008768115505845035,
+       "hi": 0.0008809044103783765,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.0008537046421190908,
+       "lo": 0.0008530234224530909,
+       "hi": 0.0008543858617850907,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 3274963315.6267357,
+       "lo": 3272545033.3203917,
+       "hi": 3277381597.9330797,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9994425564314449,
+       "lo": 0.998630410744559,
+       "hi": 1.0002547021183308,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "llm",
+   "name": "LLM decode on an edge accelerator (8B, INT4)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 183989982929.64246,
+       "sim": {
+        "mean": 183986432541.68634,
+        "lo": 183979212848.81445,
+        "hi": 183993652234.5582,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.6522094197154628,
+       "sim": {
+        "mean": 0.6522265197922839,
+        "lo": 0.652209037758799,
+        "hi": 0.6522440018257687,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.02,
+       "sim": {
+        "mean": 0.019993126553353446,
+        "lo": 0.019978674744406434,
+        "hi": 0.02000757836230046,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.02244140949956313,
+       "sim": {
+        "mean": 0.022440432777742127,
+        "lo": 0.022439420306603147,
+        "hi": 0.022441445248881108,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.02285985225443115,
+       "sim": {
+        "mean": 0.022865002737935923,
+        "lo": 0.02286168415787946,
+        "hi": 0.022868321317992386,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.02298998214993216,
+       "sim": {
+        "mean": 0.022865002737935923,
+        "lo": 0.02286168415787946,
+        "hi": 0.022868321317992386,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.01 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.022440432777742127,
+       "lo": 0.022439420306603147,
+       "hi": 0.022441445248881108,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.022438250347430255,
+       "lo": 0.022437052189166532,
+       "hi": 0.022439448505693977,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.022865002737935923,
+       "lo": 0.02286168415787946,
+       "hi": 0.022868321317992386,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.023015458329759042,
+       "lo": 0.023004773162170856,
+       "hi": 0.02302614349734723,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.022865002737935923,
+       "lo": 0.02286168415787946,
+       "hi": 0.022868321317992386,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 120001972676.52705,
+       "lo": 120001952997.56148,
+       "hi": 120001992355.49261,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0000456667702955,
+       "lo": 0.9998367315762657,
+       "hi": 1.0002546019643253,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "llmdc",
+   "name": "LLM decode on an 8-accelerator server (70B, batch 32)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 23105526712018.145,
+       "sim": {
+        "mean": 23105598062358.754,
+        "lo": 23104127575398.316,
+        "hi": 23107068549319.19,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.7963462694156803,
+       "sim": {
+        "mean": 0.7963424861707027,
+        "lo": 0.7963142423927546,
+        "hi": 0.7963707299486508,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.14876200101061143,
+       "sim": {
+        "mean": 0.14880680252945205,
+        "lo": 0.14872198801844422,
+        "hi": 0.1488916170404599,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.11358024691358025,
+       "sim": {
+        "mean": 0.11357122150211893,
+        "lo": 0.11355663887279083,
+        "hi": 0.11358580413144703,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.018448548155823835,
+       "sim": {
+        "mean": 0.018445070282799382,
+        "lo": 0.01844324035316457,
+        "hi": 0.018446900212434194,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.0192961921035498,
+       "sim": {
+        "mean": 0.019266781271846868,
+        "lo": 0.019259910861554454,
+        "hi": 0.019273651682139282,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.019518804429694444,
+       "sim": {
+        "mean": 0.019266781271846868,
+        "lo": 0.019259910861554454,
+        "hi": 0.019273651682139282,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.01 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.018445070282799382,
+       "lo": 0.01844324035316457,
+       "hi": 0.018446900212434194,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.018432841393909882,
+       "lo": 0.01843082104626398,
+       "hi": 0.018434861741555786,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.019266781271846868,
+       "lo": 0.019259910861554454,
+       "hi": 0.019273651682139282,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.01957315067095493,
+       "lo": 0.019546954606925113,
+       "hi": 0.01959934673498475,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.019266781271846868,
+       "lo": 0.019259910861554454,
+       "hi": 0.019273651682139282,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 18399953857583.43,
+       "lo": 18399945104418.42,
+       "hi": 18399962610748.438,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9999411864432268,
+       "lo": 0.9996486065510424,
+       "hi": 1.0002337663354113,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "llmserve",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "compute",
+       "model": 84641123282522.36,
+       "sim": {
+        "mean": 84668038897953.81,
+        "lo": 84611661706477.86,
+        "hi": 84724416089429.75,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.3593490155302004,
+       "sim": {
+        "mean": 0.3595581998848595,
+        "lo": 0.3592289439681376,
+        "hi": 0.3598874558015814,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.38387422496210205,
+       "sim": {
+        "mean": 0.38395572739933087,
+        "lo": 0.38350727659780476,
+        "hi": 0.384404178200857,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.09709037037037037,
+       "sim": {
+        "mean": 0.09714063016602344,
+        "lo": 0.09705672627099238,
+        "hi": 0.0972245340610545,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.04254458565375865,
+       "sim": {
+        "mean": 0.04202560759619496,
+        "lo": 0.042012414312999555,
+        "hi": 0.04203880087939037,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.048278353816406196,
+       "sim": {
+        "mean": 0.04706924161399258,
+        "lo": 0.047024407034299866,
+        "hi": 0.04711407619368529,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.04991330678743668,
+       "sim": {
+        "mean": 0.04706924161399258,
+        "lo": 0.047024407034299866,
+        "hi": 0.04711407619368529,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.06 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.04202560759619496,
+       "lo": 0.042012414312999555,
+       "hi": 0.04203880087939037,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.04193073818797473,
+       "lo": 0.041913384479146255,
+       "hi": 0.0419480918968032,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.04706924161399258,
+       "lo": 0.047024407034299866,
+       "hi": 0.04711407619368529,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.049047660697091544,
+       "lo": 0.04889427083104954,
+       "hi": 0.04920105056313355,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.04706924161399258,
+       "lo": 0.047024407034299866,
+       "hi": 0.04711407619368529,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 32510748081340.35,
+       "lo": 32481372657062.547,
+       "hi": 32540123505618.156,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0001050561673814,
+       "lo": 0.9989550150533374,
+       "hi": 1.0012550972814256,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "llmsplit",
+   "name": "Prefill and decode on separate pools (Llama 3.1 70B, 3,600-token prompts)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "decode pool",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "compute",
+       "model": 84703566611882.98,
+       "sim": {
+        "mean": 84654642881579.98,
+        "lo": 84572694180862.22,
+        "hi": 84736591582297.77,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.359638870602193,
+       "sim": {
+        "mean": 0.35969796361112333,
+        "lo": 0.35921317728502977,
+        "hi": 0.3601827499372169,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.3839007175341081,
+       "sim": {
+        "mean": 0.38404984647331897,
+        "lo": 0.38361946051283374,
+        "hi": 0.3844802324338042,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.09709037037037037,
+       "sim": {
+        "mean": 0.09710165637604616,
+        "lo": 0.0969706554778043,
+        "hi": 0.09723265727428802,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-out",
+       "part": "out",
+       "model": 0.031043368421052625,
+       "sim": {
+        "mean": 0.03104976548404052,
+        "lo": 0.031007568065505274,
+        "hi": 0.031091962902575765,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.04412411851441048,
+       "sim": {
+        "mean": 0.04361516598475472,
+        "lo": 0.04360655779768782,
+        "hi": 0.04362377417182162,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.049896434127098606,
+       "sim": {
+        "mean": 0.04870799659537397,
+        "lo": 0.04866331607745696,
+        "hi": 0.048752677113290975,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.0515969884269168,
+       "sim": {
+        "mean": 0.04870799659537397,
+        "lo": 0.04866331607745696,
+        "hi": 0.048752677113290975,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.06 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.04361516598475472,
+       "lo": 0.04360655779768782,
+       "hi": 0.04362377417182162,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.043523098421664484,
+       "lo": 0.04351324173638333,
+       "hi": 0.04353295510694564,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.04870799659537397,
+       "lo": 0.04866331607745696,
+       "hi": 0.048752677113290975,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.050693308128587945,
+       "lo": 0.050614602736841,
+       "hi": 0.05077201352033489,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.04870799659537397,
+       "lo": 0.04866331607745696,
+       "hi": 0.048752677113290975,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 32523495229850.57,
+       "lo": 32478828838584.9,
+       "hi": 32568161621116.242,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9994572966900975,
+       "lo": 0.9985532806900671,
+       "hi": 1.0003613126901278,
+       "n": 10
+      }
+     }
+    },
+    {
+     "name": "prefill pool",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "compute",
+       "model": 7511735060464.4,
+       "sim": {
+        "mean": 7515815541955.671,
+        "lo": 7505533735133.34,
+        "hi": 7526097348778.002,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.027715237945077978,
+       "sim": {
+        "mean": 0.027721590061966516,
+        "lo": 0.027684696205369817,
+        "hi": 0.027758483918563216,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.6636014795351186,
+       "sim": {
+        "mean": 0.6635103475737962,
+        "lo": 0.6624883494451024,
+        "hi": 0.6645323457024901,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.4077795555555555,
+       "sim": {
+        "mean": 0.4078912788465616,
+        "lo": 0.4073502192778964,
+        "hi": 0.40843233841522686,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-out",
+       "part": "out",
+       "model": 0.015521684210526313,
+       "sim": {
+        "mean": 0.01552601220395729,
+        "lo": 0.015506017167560558,
+        "hi": 0.015546007240354024,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.1153361208895838,
+       "sim": {
+        "mean": 0.11180806668132792,
+        "lo": 0.11177580620696975,
+        "hi": 0.11184032715568609,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Compute",
+       "part": "compute",
+       "model": 0.003272657999748627,
+       "sim": {
+        "mean": 0.00033690203196165655,
+        "lo": 0.0003192241420156762,
+        "hi": 0.0003545799219076369,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "3% of the mean latency; utilisation 66%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.13953753251002343,
+       "sim": {
+        "mean": 0.130383107293909,
+        "lo": 0.13019977964893525,
+        "hi": 0.13056643493888276,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.14792661721208028,
+       "sim": {
+        "mean": 0.130383107293909,
+        "lo": 0.13019977964893525,
+        "hi": 0.13056643493888276,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.13 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.11180806668132792,
+       "lo": 0.11177580620696975,
+       "hi": 0.11184032715568609,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.11137842393297319,
+       "lo": 0.11135409724129001,
+       "hi": 0.11140275062465636,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.130383107293909,
+       "lo": 0.13019977964893525,
+       "hi": 0.13056643493888276,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.14026581760246018,
+       "lo": 0.13911731539835823,
+       "hi": 0.14141431980656213,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.130383107293909,
+       "lo": 0.13019977964893525,
+       "hi": 0.13056643493888276,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 4986204178089.165,
+       "lo": 4979630517906.336,
+       "hi": 4992777838271.995,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0008001743840969,
+       "lo": 0.9996694254818688,
+       "hi": 1.001930923286325,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "moenoc",
+   "name": "Mixture-of-experts layer on an 8 \u00d7 8 mesh \u2717",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "compute",
+       "model": 2500000000000,
+       "sim": {
+        "mean": 2499738834857.838,
+        "lo": 2496738796561.5977,
+        "hi": 2502738873154.078,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": "The model's busiest part, On-chip interconnect, is not a queued stage in the simulation; this compares the busiest queued stage, Compute."
+      },
+      {
+       "kind": "unbounded",
+       "check": "Unbounded latency",
+       "part": null,
+       "model": null,
+       "sim": {
+        "mean": null,
+        "lo": null,
+        "hi": null,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "n/a",
+       "note": "Only the on-chip network is overloaded; the simulation queues its packets at the model's own utilisation, so both are unbounded by construction."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": null,
+       "lo": null,
+       "hi": null,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": null,
+       "lo": null,
+       "hi": null,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": null,
+       "lo": null,
+       "hi": null,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": null,
+       "lo": null,
+       "hi": null,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": null,
+       "lo": null,
+       "hi": null,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 0.0,
+       "lo": 0.0,
+       "hi": 0.0,
+       "n": 10
+      },
+      "drift": {
+       "mean": null,
+       "lo": null,
+       "hi": null,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "nvl72",
+   "name": "Rack-scale LLM inference (72 accelerators, one NVLink domain)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 529911850519031.2,
+       "sim": {
+        "mean": 529929273833322.5,
+        "lo": 529889254441270.25,
+        "hi": 529969293225374.8,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.7472941011078184,
+       "sim": {
+        "mean": 0.7472523595256144,
+        "lo": 0.7472310573073356,
+        "hi": 0.7472736617438932,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.44,
+       "sim": {
+        "mean": 0.440022415736039,
+        "lo": 0.439779493351349,
+        "hi": 0.440265338120729,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.6790123456790124,
+       "sim": {
+        "mean": 0.6789871013435104,
+        "lo": 0.6789597116117858,
+        "hi": 0.6790144910752349,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.03400888018755859,
+       "sim": {
+        "mean": 0.03397582112899037,
+        "lo": 0.033971255697386155,
+        "hi": 0.033980386560594586,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.03632438478492226,
+       "sim": {
+        "mean": 0.03621096562260604,
+        "lo": 0.03619569342429014,
+        "hi": 0.03622623782092194,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.036726186389168844,
+       "sim": {
+        "mean": 0.03621096562260604,
+        "lo": 0.03619569342429014,
+        "hi": 0.03622623782092194,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.01 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.03397582112899037,
+       "lo": 0.033971255697386155,
+       "hi": 0.033980386560594586,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.0339360024827684,
+       "lo": 0.033929709917630405,
+       "hi": 0.0339422950479064,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.03621096562260604,
+       "lo": 0.03619569342429014,
+       "hi": 0.03622623782092194,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.037048764669319924,
+       "lo": 0.03698525178503154,
+       "hi": 0.03711227755360831,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.03621096562260604,
+       "lo": 0.03619569342429014,
+       "hi": 0.03622623782092194,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 395982745333996.75,
+       "lo": 395982298434532.06,
+       "hi": 395983192233461.44,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.999719258037158,
+       "lo": 0.9993358075448697,
+       "hi": 1.0001027085294463,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "oran",
+   "name": "5G O-RAN distributed unit (L1 offload)",
+   "percentile": 0.999,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "src",
+       "model": 11963589076.723019,
+       "sim": {
+        "mean": 11963628074.647902,
+        "lo": 11959828107.301907,
+        "hi": 11967428041.993898,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Network ingress",
+       "part": "src",
+       "model": 0.5015217391304347,
+       "sim": {
+        "mean": 0.5018738777008818,
+        "lo": 0.5012187435734266,
+        "hi": 0.502529011828337,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.22935867309570312,
+       "sim": {
+        "mean": 0.22953761673122738,
+        "lo": 0.2292393811894986,
+        "hi": 0.22983585227295616,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.22329935213414637,
+       "sim": {
+        "mean": 0.2234364401943037,
+        "lo": 0.2231638204771826,
+        "hi": 0.22370905991142478,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.036,
+       "sim": {
+        "mean": 0.03602927730900851,
+        "lo": 0.035981541876617104,
+        "hi": 0.03607701274139992,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.03062248229980468,
+       "sim": {
+        "mean": 0.030644926707454345,
+        "lo": 0.030604528655748545,
+        "hi": 0.030685324759160144,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.00018212461552511718,
+       "sim": {
+        "mean": 0.00017754652182756577,
+        "lo": 0.00017752026815515072,
+        "hi": 0.00017757277549998083,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Network ingress",
+       "part": "src",
+       "model": 3.83468377291947e-06,
+       "sim": {
+        "mean": 2.891927736844754e-07,
+        "lo": 2.7864413744189316e-07,
+        "hi": 2.997414099270577e-07,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "2% of the mean latency; utilisation 50%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99.9",
+       "part": null,
+       "model": 0.00022858442630870965,
+       "sim": {
+        "mean": 0.00020951593912413858,
+        "lo": 0.0002081973348775046,
+        "hi": 0.00021083454337077255,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99.9",
+       "part": null,
+       "model": 0.0002458540536593192,
+       "sim": {
+        "mean": 0.00020951593912413858,
+        "lo": 0.0002081973348775046,
+        "hi": 0.00021083454337077255,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.17 \u00d7 the simulated p99.9."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.00017754652182756577,
+       "lo": 0.00017752026815515072,
+       "hi": 0.00017757277549998083,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.00017730640205674276,
+       "lo": 0.00017727464389807776,
+       "hi": 0.00017733816021540776,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.00019207069704807456,
+       "lo": 0.0001918950262265565,
+       "hi": 0.00019224636786959262,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.00020951593912413858,
+       "lo": 0.0002081973348775046,
+       "hi": 0.00021083454337077255,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.00020951593912413858,
+       "lo": 0.0002081973348775046,
+       "hi": 0.00021083454337077255,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 6004440987.563582,
+       "lo": 5996696740.9352,
+       "hi": 6012185234.191966,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9994636935295331,
+       "lo": 0.9988971701271238,
+       "hi": 1.0000302169319426,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "prefill",
+   "name": "LLM prefill on one accelerator (70B FP8, 2k-token prompts)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "compute",
+       "model": 549316406250,
+       "sim": {
+        "mean": 549597031658.7126,
+        "lo": 549042699861.66565,
+        "hi": 550151363455.7595,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.06606954648640187,
+       "sim": {
+        "mean": 0.06619601184584244,
+        "lo": 0.0658251005897753,
+        "hi": 0.06656692310190958,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.7281777777777778,
+       "sim": {
+        "mean": 0.7293468380227386,
+        "lo": 0.7252811707446074,
+        "hi": 0.7334125053008698,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.31206723308333745,
+       "sim": {
+        "mean": 0.31181908087597615,
+        "lo": 0.3082885742016387,
+        "hi": 0.3153495875503136,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Compute",
+       "part": "compute",
+       "model": 0.1723928742387908,
+       "sim": {
+        "mean": 0.17218004797122682,
+        "lo": 0.16862720678247872,
+        "hi": 0.17573288915997493,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "55% of the mean latency; utilisation 73%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 1.0100027241687415,
+       "sim": {
+        "mean": 1.0827080564711309,
+        "lo": 1.0491297769090093,
+        "hi": 1.1162863360332524,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 1.0193670490030111,
+       "sim": {
+        "mean": 1.0827080564711309,
+        "lo": 1.0491297769090093,
+        "hi": 1.1162863360332524,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "miss",
+       "note": "Stack is 0.94 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.31181908087597615,
+       "lo": 0.3082885742016387,
+       "hi": 0.3153495875503136,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.24582499599646326,
+       "lo": 0.24323080627922417,
+       "hi": 0.24841918571370236,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 1.0827080564711309,
+       "lo": 1.0491297769090093,
+       "hi": 1.1162863360332524,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 1.556917283322025,
+       "lo": 1.4315910416451976,
+       "hi": 1.6822435249988525,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 1.0827080564711309,
+       "lo": 1.0491297769090093,
+       "hi": 1.1162863360332524,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 400753772751.7943,
+       "lo": 398507624616.0261,
+       "hi": 402999920887.56244,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9982279408550276,
+       "lo": 0.9505087092009594,
+       "hi": 1.0459471725090959,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "radar",
+   "name": "Radar / SDR front end over 400 GbE",
+   "percentile": 0.999,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "src",
+       "model": 49634874972.33901,
+       "sim": {
+        "mean": 49655738865.544106,
+        "lo": 49603555270.28576,
+        "hi": 49707922460.80245,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Network ingress",
+       "part": "src",
+       "model": 0.644707980383415,
+       "sim": {
+        "mean": 0.6444741168535544,
+        "lo": 0.6435789511947492,
+        "hi": 0.6453692825123596,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.6116231282552083,
+       "sim": {
+        "mean": 0.611428445834486,
+        "lo": 0.6106378385261076,
+        "hi": 0.6122190531428643,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.12973533990659056,
+       "sim": {
+        "mean": 0.12973143041749152,
+        "lo": 0.12955649399687505,
+        "hi": 0.129906366838108,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.0768,
+       "sim": {
+        "mean": 0.0767751991233602,
+        "lo": 0.07668770516767688,
+        "hi": 0.07686269307904352,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.05273183186848958,
+       "sim": {
+        "mean": 0.052719267849931986,
+        "lo": 0.05265300654623183,
+        "hi": 0.05278552915363214,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 1.181488753995478e-05,
+       "sim": {
+        "mean": 1.1882533574830772e-05,
+        "lo": 1.1875969280042828e-05,
+        "hi": 1.1889097869618716e-05,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99.9",
+       "part": null,
+       "model": 1.4987650066827778e-05,
+       "sim": {
+        "mean": 1.5179791234825289e-05,
+        "lo": 1.5110266577983603e-05,
+        "hi": 1.5249315891666975e-05,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99.9",
+       "part": null,
+       "model": 1.7147599242388956e-05,
+       "sim": {
+        "mean": 1.5179791234825289e-05,
+        "lo": 1.5110266577983603e-05,
+        "hi": 1.5249315891666975e-05,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.13 \u00d7 the simulated p99.9."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 1.1882533574830772e-05,
+       "lo": 1.1875969280042828e-05,
+       "hi": 1.1889097869618716e-05,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 1.183806792037752e-05,
+       "lo": 1.1831194829647404e-05,
+       "hi": 1.1844941011107637e-05,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 1.396567180564634e-05,
+       "lo": 1.3937001011251637e-05,
+       "hi": 1.3994342600041043e-05,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 1.5179791234825289e-05,
+       "lo": 1.5110266577983603e-05,
+       "hi": 1.5249315891666975e-05,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 1.5179791234825289e-05,
+       "lo": 1.5110266577983603e-05,
+       "hi": 1.5249315891666975e-05,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 31987117792.784996,
+       "lo": 31951076317.388794,
+       "hi": 32023159268.1812,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9997939296164355,
+       "lo": 0.998626887187291,
+       "hi": 1.00096097204558,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "scan",
+   "name": "NVMe scan / filter offload",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "h2d",
+       "model": 52319800415.800415,
+       "sim": {
+        "mean": 52341736258.98265,
+        "lo": 52304912304.78541,
+        "hi": 52378560213.17989,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: SSD read",
+       "part": "src",
+       "model": 0.7142857142857143,
+       "sim": {
+        "mean": 0.7101863412215967,
+        "lo": 0.7061434502536809,
+        "hi": 0.7142292321895126,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.7645289103190104,
+       "sim": {
+        "mean": 0.7602165717870027,
+        "lo": 0.7564666605699857,
+        "hi": 0.7639664830040198,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.7076816293208916,
+       "sim": {
+        "mean": 0.7036622498068192,
+        "lo": 0.7002445091678434,
+        "hi": 0.7070799904457951,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.06666666666666667,
+       "sim": {
+        "mean": 0.06629138346112247,
+        "lo": 0.06597805437145599,
+        "hi": 0.06660471255078895,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.06591478983561198,
+       "sim": {
+        "mean": 0.06551585759139064,
+        "lo": 0.06517384676759061,
+        "hi": 0.06585786841519067,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.0003543796105023193,
+       "sim": {
+        "mean": 0.00027165168707659986,
+        "lo": 0.00026912774415244374,
+        "hi": 0.000274175630000756,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): SSD read",
+       "part": "src",
+       "model": 4.776785714285715e-05,
+       "sim": {
+        "mean": 4.694333068875111e-05,
+        "lo": 4.5436940366083914e-05,
+        "hi": 4.8449721011418304e-05,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "13% of the mean latency; utilisation 71%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link H\u2192D",
+       "part": "h2d",
+       "model": 6.242218902610742e-05,
+       "sim": {
+        "mean": 2.266771481807844e-05,
+        "lo": 2.156199134570503e-05,
+        "hi": 2.377343829045185e-05,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "18% of the mean latency; utilisation 76%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Device DRAM",
+       "part": "dram",
+       "model": 4.3920568232931696e-05,
+       "sim": {
+        "mean": 2.0486992700195915e-06,
+        "lo": 2.0159204069938968e-06,
+        "hi": 2.0814781330452863e-06,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "12% of the mean latency; utilisation 71%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.000844784394616412,
+       "sim": {
+        "mean": 0.0005771526988279874,
+        "lo": 0.0005572064864189993,
+        "hi": 0.0005970989112369754,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.0011520706726486796,
+       "sim": {
+        "mean": 0.0005771526988279874,
+        "lo": 0.0005572064864189993,
+        "hi": 0.0005970989112369754,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 2.00 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.00027165168707659986,
+       "lo": 0.00026912774415244374,
+       "hi": 0.000274175630000756,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.0002532747678528069,
+       "lo": 0.0002515237848839534,
+       "hi": 0.0002550257508216604,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.0005771526988279874,
+       "lo": 0.0005572064864189993,
+       "hi": 0.0005970989112369754,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.0007471329059971693,
+       "lo": 0.0006950902783685335,
+       "hi": 0.0007991755336258051,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.0005771526988279874,
+       "lo": 0.0005572064864189993,
+       "hi": 0.0005970989112369754,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 39771891150.0341,
+       "lo": 39578287622.239975,
+       "hi": 39965494677.82824,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0201097376540307,
+       "lo": 0.995290173458595,
+       "hi": 1.0449293018494663,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "stencil",
+   "name": "CFD stencil on a GPU-class part",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 763084800000.0001,
+       "sim": {
+        "mean": 763226793823.9371,
+        "lo": 763018427558.1482,
+        "hi": 763435160089.726,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.6552351717659688,
+       "sim": {
+        "mean": 0.6569547585068964,
+        "lo": 0.6533852561897043,
+        "hi": 0.6605242608240885,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.002573883195612893,
+       "sim": {
+        "mean": 0.002596795645027396,
+        "lo": 0.002572249636959317,
+        "hi": 0.002621341653095475,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Device DRAM",
+       "part": "dram",
+       "model": 0.001246147956411713,
+       "sim": {
+        "mean": 0.001269128973406807,
+        "lo": 0.0012445737573405858,
+        "hi": 0.0012936841894730282,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "48% of the mean latency; utilisation 66%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.007178469714505008,
+       "sim": {
+        "mean": 0.008622346431758032,
+        "lo": 0.008351873902650887,
+        "hi": 0.008892818960865176,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.0075434256109585375,
+       "sim": {
+        "mean": 0.008622346431758032,
+        "lo": 0.008351873902650887,
+        "hi": 0.008892818960865176,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "miss",
+       "note": "Stack is 0.87 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.002596795645027396,
+       "lo": 0.002572249636959317,
+       "hi": 0.002621341653095475,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.0020782227514553496,
+       "lo": 0.0020627491905252236,
+       "hi": 0.0020936963123854755,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.008622346431758032,
+       "lo": 0.008351873902650887,
+       "hi": 0.008892818960865176,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.012039023406606387,
+       "lo": 0.011082533012653866,
+       "hi": 0.012995513800558908,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.008622346431758032,
+       "lo": 0.008351873902650887,
+       "hi": 0.008892818960865176,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 501332791662.9649,
+       "lo": 498608810305.2108,
+       "hi": 504056773020.719,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9976441983668677,
+       "lo": 0.9578441466666503,
+       "hi": 1.037444250067085,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "tls",
+   "name": "400 GbE inline TLS / IPsec offload",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "src",
+       "model": 49634874972.33902,
+       "sim": {
+        "mean": 49642087024.648285,
+        "lo": 49450247574.49201,
+        "hi": 49833926474.80455,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Network ingress",
+       "part": "src",
+       "model": 0.8058849754792687,
+       "sim": {
+        "mean": 0.8073173827076598,
+        "lo": 0.8038962479687773,
+        "hi": 0.8107385174465424,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.7645289103190104,
+       "sim": {
+        "mean": 0.7651431438382664,
+        "lo": 0.7623559426391626,
+        "hi": 0.7679303450373702,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.13333333333333333,
+       "sim": {
+        "mean": 0.13347718441876674,
+        "lo": 0.1329387519356927,
+        "hi": 0.13401561690184077,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.7219632466634114,
+       "sim": {
+        "mean": 0.7228435931117907,
+        "lo": 0.7202428594028579,
+        "hi": 0.7254443268207235,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 8.376913595052328e-06,
+       "sim": {
+        "mean": 8.110957115020296e-06,
+        "lo": 8.09613426187179e-06,
+        "hi": 8.125779968168801e-06,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Network ingress",
+       "part": "src",
+       "model": 4.1026643480835876e-07,
+       "sim": {
+        "mean": 4.199150644724837e-07,
+        "lo": 4.0657257776107985e-07,
+        "hi": 4.332575511838876e-07,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": "5% of the mean latency; utilisation 81%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link H\u2192D",
+       "part": "h2d",
+       "model": 2.8553941864948597e-07,
+       "sim": {
+        "mean": 1.5117287860022248e-07,
+        "lo": 1.4937765268025847e-07,
+        "hi": 1.529681045201865e-07,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "3% of the mean latency; utilisation 76%."
+      },
+      {
+       "kind": "wait",
+       "check": "Queueing wait (Kingman): Link D\u2192H",
+       "part": "d2h",
+       "model": 2.0675961534263905e-07,
+       "sim": {
+        "mean": 6.863461809569267e-08,
+        "lo": 6.815618182141541e-08,
+        "hi": 6.911305436996992e-08,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": "2% of the mean latency; utilisation 72%."
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 1.4727358313467963e-05,
+       "sim": {
+        "mean": 1.3182833226209844e-05,
+        "lo": 1.3128726947575314e-05,
+        "hi": 1.3236939504844375e-05,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "miss",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 1.81952732574233e-05,
+       "sim": {
+        "mean": 1.3182833226209844e-05,
+        "lo": 1.3128726947575314e-05,
+        "hi": 1.3236939504844375e-05,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.38 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 8.110957115020296e-06,
+       "lo": 8.09613426187179e-06,
+       "hi": 8.125779968168801e-06,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 7.90311152465465e-06,
+       "lo": 7.888451211167686e-06,
+       "hi": 7.917771838141613e-06,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 1.3182833226209844e-05,
+       "lo": 1.3128726947575314e-05,
+       "hi": 1.3236939504844375e-05,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 1.5784766861735724e-05,
+       "lo": 1.558268405692301e-05,
+       "hi": 1.5986849666548436e-05,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 1.3182833226209844e-05,
+       "lo": 1.3128726947575314e-05,
+       "hi": 1.3236939504844375e-05,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 40006399177.26609,
+       "lo": 39857376797.93655,
+       "hi": 40155421556.59564,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9982014264241308,
+       "lo": 0.9896050757056739,
+       "hi": 1.0067977771425876,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "tp8pcie",
+   "name": "Tensor-parallel prefill on 8 PCIe cards \u2717",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "up",
+       "model": 1365333333333.3333,
+       "sim": {
+        "mean": 1365291582710.6846,
+        "lo": 1365128852692.1624,
+        "hi": 1365454312729.2065,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "unbounded",
+       "check": "Unbounded latency: the backlog keeps growing",
+       "part": null,
+       "model": null,
+       "sim": {
+        "mean": 6.9975059887174975,
+        "lo": 6.9648975719235775,
+        "hi": 7.0301144055114175,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Overloaded: Collective, scale-up (352%)."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 50.301386074419504,
+       "lo": 50.18032315223009,
+       "hi": 50.42244899660892,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 50.28771553895676,
+       "lo": 50.1429618386558,
+       "hi": 50.43246923925772,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 91.40705813255154,
+       "lo": 91.21696241964118,
+       "hi": 91.5971538454619,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 92.14000523531092,
+       "lo": 91.95955329857433,
+       "hi": 92.32045717204751,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 91.40705813255154,
+       "lo": 91.21696241964118,
+       "hi": 91.5971538454619,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 1274274277308.9646,
+       "lo": 1273775408945.0894,
+       "hi": 1274773145672.84,
+       "n": 10
+      },
+      "drift": {
+       "mean": 6.9975059887174975,
+       "lo": 6.9648975719235775,
+       "hi": 7.0301144055114175,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "train1k",
+   "name": "LLM training cluster (1,024 accelerators, 64 racks)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "dram",
+       "model": 5144748177420117,
+       "sim": {
+        "mean": 5144713459673150.0,
+        "lo": 5144171318337465.0,
+        "hi": 5145255601008835.0,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.7563441136104895,
+       "sim": {
+        "mean": 0.7563053906546302,
+        "lo": 0.7562644006817285,
+        "hi": 0.7563463806275319,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.6755555555555556,
+       "sim": {
+        "mean": 0.6755497594214974,
+        "lo": 0.675211168578944,
+        "hi": 0.6758883502640508,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.4691358024691358,
+       "sim": {
+        "mean": 0.46910059720414427,
+        "lo": 0.469078806694821,
+        "hi": 0.46912238771346754,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-out",
+       "part": "out",
+       "model": 0.6,
+       "sim": {
+        "mean": 0.5999364386492781,
+        "lo": 0.5998948670773712,
+        "hi": 0.5999780102211851,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.026639586640456205,
+       "sim": {
+        "mean": 0.026563592946822933,
+        "lo": 0.02656012339955381,
+        "hi": 0.026567062494092054,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.028823110054178876,
+       "sim": {
+        "mean": 0.02861024841646298,
+        "lo": 0.02858260307880236,
+        "hi": 0.0286378937541236,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.029394024836062054,
+       "sim": {
+        "mean": 0.02861024841646298,
+        "lo": 0.02858260307880236,
+        "hi": 0.0286378937541236,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.03 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.026563592946822933,
+       "lo": 0.02656012339955381,
+       "hi": 0.026567062494092054,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.026526569973648863,
+       "lo": 0.026521864082091038,
+       "hi": 0.026531275865206688,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.02861024841646298,
+       "lo": 0.02858260307880236,
+       "hi": 0.0286378937541236,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.02939735164927946,
+       "lo": 0.02933425086007124,
+       "hi": 0.02946045243848768,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.02861024841646298,
+       "lo": 0.02858260307880236,
+       "hi": 0.0286378937541236,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 3890903991579459.5,
+       "lo": 3890894210104042.0,
+       "hi": 3890913773054877.0,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9997429428563986,
+       "lo": 0.9990770738734828,
+       "hi": 1.0004088118393146,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "trainllm",
+   "name": "LLM training from the model\u2019s shape (Llama 3.1 70B, BF16, 1,024 accelerators)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "compute",
+       "model": 124470702908461.42,
+       "sim": {
+        "mean": 124502062057221.2,
+        "lo": 124372792147599.14,
+        "hi": 124631331966843.27,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.021928062756205645,
+       "sim": {
+        "mean": 0.021928284283720373,
+        "lo": 0.02192798444361019,
+        "hi": 0.021928584123830554,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.623233299804194,
+       "sim": {
+        "mean": 0.6236545623011059,
+        "lo": 0.6234281337035169,
+        "hi": 0.623880990898695,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-up",
+       "part": "up",
+       "model": 0.12389135802469135,
+       "sim": {
+        "mean": 0.12389313315143027,
+        "lo": 0.12389247641523063,
+        "hi": 0.12389378988762992,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Collective, scale-out",
+       "part": "out",
+       "model": 0.031924311805524325,
+       "sim": {
+        "mean": 0.0319249037576401,
+        "lo": 0.03192451002311192,
+        "hi": 0.031925297492168284,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 4.830335049836811,
+       "sim": {
+        "mean": 4.801944300377732,
+        "lo": 4.800582120247327,
+        "hi": 4.803306480508137,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 5.846142451631658,
+       "sim": {
+        "mean": 5.764099778663876,
+        "lo": 5.751399589475399,
+        "hi": 5.776799967852353,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 5.906503469455629,
+       "sim": {
+        "mean": 5.764099778663876,
+        "lo": 5.751399589475399,
+        "hi": 5.776799967852353,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.02 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 4.801944300377732,
+       "lo": 4.800582120247327,
+       "hi": 4.803306480508137,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 4.782973507037968,
+       "lo": 4.780803482146595,
+       "hi": 4.785143531929341,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 5.764099778663876,
+       "lo": 5.751399589475399,
+       "hi": 5.776799967852353,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 6.13097973042859,
+       "lo": 6.111652641623972,
+       "hi": 6.150306819233207,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 5.764099778663876,
+       "lo": 5.751399589475399,
+       "hi": 5.776799967852353,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 77575018374084.73,
+       "lo": 77574890685815.67,
+       "hi": 77575146062353.8,
+       "n": 10
+      },
+      "drift": {
+       "mean": 0.9992824414703152,
+       "lo": 0.9974112695234058,
+       "hi": 1.0011536134172245,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "trigger",
+   "name": "Particle-detector trigger board \u2717",
+   "percentile": 0.999,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "h2d",
+       "model": 52319800415.800415,
+       "sim": {
+        "mean": 52337019036.79143,
+        "lo": 52246233776.81024,
+        "hi": 52427804296.77261,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "unbounded",
+       "check": "Unbounded latency: the backlog keeps growing",
+       "part": null,
+       "model": null,
+       "sim": {
+        "mean": 6.764975802333922,
+        "lo": 6.721308760718804,
+        "hi": 6.808642843949039,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Overloaded: Network ingress (101%), Link H\u2192D (287%)."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.000616830614104694,
+       "lo": 0.0006148551608783914,
+       "hi": 0.0006188060673309966,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.0006167913524298097,
+       "lo": 0.0006140263260238112,
+       "hi": 0.0006195563788358083,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.0011159886923931823,
+       "lo": 0.0011131275109912111,
+       "hi": 0.0011188498737951535,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.0011263750680437154,
+       "lo": 0.0011235400523541602,
+       "hi": 0.0011292100837332706,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.0011263750680437154,
+       "lo": 0.0011235400523541602,
+       "hi": 0.0011292100837332706,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 48935078277.84331,
+       "lo": 48910315142.18445,
+       "hi": 48959841413.50217,
+       "n": 10
+      },
+      "drift": {
+       "mean": 6.764975802333922,
+       "lo": 6.721308760718804,
+       "hi": 6.808642843949039,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "ultrasound",
+   "name": "Ultrasound beamformer (128 channels)",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "src",
+       "model": 24817437486.169506,
+       "sim": {
+        "mean": 24829994517.219376,
+        "lo": 24812163575.57954,
+        "hi": 24847825458.859215,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Network ingress",
+       "part": "src",
+       "model": 0.41261310744538565,
+       "sim": {
+        "mean": 0.41264972591543403,
+        "lo": 0.41211242364794115,
+        "hi": 0.4131870281829269,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.3914388020833333,
+       "sim": {
+        "mean": 0.3914253878100268,
+        "lo": 0.39098451747848173,
+        "hi": 0.39186625814157183,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.03260996947910669,
+       "sim": {
+        "mean": 0.03261659432537322,
+        "lo": 0.03256458457587499,
+        "hi": 0.03266860407487145,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.2730666666666667,
+       "sim": {
+        "mean": 0.2730760668762414,
+        "lo": 0.27281384180940543,
+        "hi": 0.2733382919430774,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.02263997395833333,
+       "sim": {
+        "mean": 0.022647125420438584,
+        "lo": 0.02261582208516646,
+        "hi": 0.022678428755710706,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.00045164605630266234,
+       "sim": {
+        "mean": 0.0004460415925330779,
+        "lo": 0.0004459291543202907,
+        "hi": 0.00044615403074586504,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.0005206378184115141,
+       "sim": {
+        "mean": 0.0005072043788220016,
+        "lo": 0.0005067178297269406,
+        "hi": 0.0005076909279170625,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.0005675882631176653,
+       "sim": {
+        "mean": 0.0005072043788220016,
+        "lo": 0.0005067178297269406,
+        "hi": 0.0005076909279170625,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.12 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.0004460415925330779,
+       "lo": 0.0004459291543202907,
+       "hi": 0.00044615403074586504,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.0004450603216850646,
+       "lo": 0.0004449245896847557,
+       "hi": 0.0004451960536853735,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.0005072043788220016,
+       "lo": 0.0005067178297269406,
+       "hi": 0.0005076909279170625,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.0005302356381281737,
+       "lo": 0.0005285342113995565,
+       "hi": 0.0005319370648567908,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.0005072043788220016,
+       "lo": 0.0005067178297269406,
+       "hi": 0.0005076909279170625,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 10239352477.410847,
+       "lo": 10227457518.820498,
+       "hi": 10251247436.001194,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.000169343551963,
+       "lo": 0.9989808184232021,
+       "hi": 1.0013578686807239,
+       "n": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "video",
+   "name": "4 \u00d7 4K60 video analytics at the edge",
+   "percentile": 0.99,
+   "model_hash": "fnv1a32:09ae6119",
+   "pools": [
+    {
+     "name": "system",
+     "rows": [
+      {
+       "kind": "ceiling",
+       "check": "Ceiling: the most loaded queued stage sets the rate",
+       "part": "h2d",
+       "model": 6539975051.975052,
+       "sim": {
+        "mean": 6539647264.374415,
+        "lo": 6538708159.257051,
+        "hi": 6540586369.49178,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link H\u2192D",
+       "part": "h2d",
+       "model": 0.45657421875000004,
+       "sim": {
+        "mean": 0.4565108221665139,
+        "lo": 0.4558354209548717,
+        "hi": 0.4571862233781561,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Device DRAM",
+       "part": "dram",
+       "model": 0.3735396597663456,
+       "sim": {
+        "mean": 0.37343723183819605,
+        "lo": 0.3728628103430949,
+        "hi": 0.3740116533332972,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Compute",
+       "part": "compute",
+       "model": 0.022394880000000002,
+       "sim": {
+        "mean": 0.022385935535516526,
+        "lo": 0.022354180732440315,
+        "hi": 0.022417690338592738,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "util",
+       "check": "Utilisation: Link D\u2192H",
+       "part": "d2h",
+       "model": 0.022088320312499996,
+       "sim": {
+        "mean": 0.02207529384038543,
+        "lo": 0.022047937442151187,
+        "hi": 0.022102650238619674,
+        "n": 10
+       },
+       "w": 0.02,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "mean",
+       "check": "Mean latency",
+       "part": null,
+       "model": 0.003630688286491526,
+       "sim": {
+        "mean": 0.0035796236013814903,
+        "lo": 0.003579341026814912,
+        "hi": 0.0035799061759480685,
+        "n": 10
+       },
+       "w": 0.05,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "pct",
+       "check": "Latency p99",
+       "part": null,
+       "model": 0.003861507841939475,
+       "sim": {
+        "mean": 0.0037113724881104202,
+        "lo": 0.003710486657724782,
+        "hi": 0.0037122583184960585,
+        "n": 10
+       },
+       "w": 0.1,
+       "verdict": "pass",
+       "note": ""
+      },
+      {
+       "kind": "stack",
+       "check": "Tolerance stack bounds the p99",
+       "part": null,
+       "model": 0.004013843179372033,
+       "sim": {
+        "mean": 0.0037113724881104202,
+        "lo": 0.003710486657724782,
+        "hi": 0.0037122583184960585,
+        "n": 10
+       },
+       "w": null,
+       "verdict": "pass",
+       "note": "Stack is 1.08 \u00d7 the simulated p99."
+      }
+     ],
+     "sim": {
+      "mean_s": {
+       "mean": 0.0035796236013814903,
+       "lo": 0.003579341026814912,
+       "hi": 0.0035799061759480685,
+       "n": 10
+      },
+      "p50_s": {
+       "mean": 0.003578852340344163,
+       "lo": 0.003578489158845405,
+       "hi": 0.003579215521842921,
+       "n": 10
+      },
+      "p99_s": {
+       "mean": 0.0037113724881104202,
+       "lo": 0.003710486657724782,
+       "hi": 0.0037122583184960585,
+       "n": 10
+      },
+      "p999_s": {
+       "mean": 0.003757703044501781,
+       "lo": 0.003753337762758449,
+       "hi": 0.003762068326245113,
+       "n": 10
+      },
+      "pX_s": {
+       "mean": 0.0037113724881104202,
+       "lo": 0.003710486657724782,
+       "hi": 0.0037122583184960585,
+       "n": 10
+      },
+      "throughput_Bps": {
+       "mean": 2985483304.761615,
+       "lo": 2981091637.9959106,
+       "hi": 2989874971.527319,
+       "n": 10
+      },
+      "drift": {
+       "mean": 1.0000404277489472,
+       "lo": 0.9998176003085731,
+       "hi": 1.0002632551893214,
+       "n": 10
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

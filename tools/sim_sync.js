@@ -26,7 +26,9 @@ const check = process.argv.includes('--check');
   let html = fs.readFileSync(PAGE, 'utf8');
   html = embed(html, 'simSrc', fs.readFileSync(path.join(ROOT, 'sim', 'sim.py'), 'utf8'));
   const res = path.join(ROOT, 'sim', 'results.json');
-  html = embed(html, 'simResults', fs.existsSync(res) ? fs.readFileSync(res, 'utf8') : 'null\n');
+  // the page needs only the rows, at 4 significant figures
+  const small = (k, v) => k === 'sim' && v && v.mean_s ? undefined : typeof v === 'number' && !Number.isInteger(v) ? +v.toPrecision(4) : v;
+  html = embed(html, 'simResults', fs.existsSync(res) ? JSON.stringify(JSON.parse(fs.readFileSync(res, 'utf8')), small) + '\n' : 'null\n');
   put(PAGE, html);
 
   const browser = await puppeteer.launch({headless: true, args: ['--no-sandbox']});
