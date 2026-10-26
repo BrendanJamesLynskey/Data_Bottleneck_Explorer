@@ -4,7 +4,8 @@
 // Checks: no page errors; every published reference figure within tolerance; overhead breakdowns multiply out to the
 // model's capacities; every example matches its golden result within 2 %; the optimiser finds a design for each;
 // the rate sweep finds a design at every rate; compare pins A, reports the change and carries A in the link;
-// short links round-trip every example (changed or not) and old full-state links still load; the spec sheet prints on one A4 page.
+// short links round-trip every example (changed or not) and old full-state links still load; the spec sheet prints on one A4 page;
+// the LLM workload matches a hand calculation and follows the accelerator count; cost parts add up and the cost goal finds the cheapest.
 const puppeteer = require('puppeteer');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..'), GOLDEN = path.join(__dirname, 'golden.json');
@@ -69,13 +70,28 @@ const update = process.argv.includes('--update');
     const strip = o => { const c = clone(o); delete c.mod; return JSON.stringify(c); };
     let bad = [], longest = 0;
     for (const p of PRESETS) {
-      applyPreset(p.id); if (strip(unpackS(packS(S))) !== strip(S)) bad.push(p.id);
-      S.dev.units += 1; S.T *= 1.37; S.link.rtt = 0.1 + 0.2; S.vary.deadline = 'hard'; S.note = '42';
-      const t = packS(S); if (strip(unpackS(t)) !== strip(S)) bad.push(p.id + '*'); longest = Math.max(longest, t.length); delete S.note;
+      // compared after a model run: with the LLM workload on, the derived inputs are recomputed rather than stored
+      const back = t => { const r = unpackS(t); model(r); return strip(r); }, now = () => { model(S); return strip(S); };
+      applyPreset(p.id); if (back(packS(S)) !== now()) bad.push(p.id);
+      S.dev.units += 1; S.T *= 1.37; S.link.rtt = 0.1 + 0.2; S.vary.deadline = 'hard'; S.note = '42'; S.llm.users *= 3;
+      const t = packS(S); if (back(t) !== now()) bad.push(p.id + '*'); longest = Math.max(longest, t.length); delete S.note;
     }
     applyPreset('video'); S.T = 3e10; const want = strip(S);
     history.replaceState(null, '', '#s=' + enc(S)); S = clone(BASE); const legacy = loadHash() && strip(S) === want;
     return {bad, longest, legacy};
+  });
+  // LLM workload: Llama 3.1 70B FP8, 2,000 users at 20 tok/s, 500 per copy, 4k context, against the arithmetic done by hand
+  const llm = await page.evaluate(() => {
+    applyPreset('llmserve'); const m = model(S);
+    const hand = 2000 * 20 * (70.6e9 / 500 + 80 * 2048 * 1 * 4096);              // users × tok/s × (weights ÷ batch + KV per user)
+    const r16 = S.resident; S.scale.nodes = 4; model(S); const r32 = S.resident;   // twice the accelerators, half the data each
+    applyPreset('llmserve'); model(S); const T0 = S.T, T2 = model(atRate(S, 2 * T0)).T;
+    const c = costOf(S, model(S)), sum = Object.values(c.parts).reduce((a, b) => a + b, 0);
+    runTool('set_requirements', {rate_bytes_per_s: 1e12}); const off = !S.llm.on && S.T === 1e12;
+    applyPreset('llmserve');
+    const o = optimise(S, {goal: 'cost', practical: true, reticle: false, scale: true, onPackage: false});
+    return {T: S.T, hand, lat: S.lat, half: r32 / r16, sweep: T2 / T0, sum: sum / c.capex, unit: c.unit, off,
+      cheapest: !!o.best && o.front.every(x => x.C >= o.best.C)};
   });
   // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
   await page.setViewport({width: 711, height: 1039}); await page.emulateMediaType('print');
@@ -96,7 +112,7 @@ const update = process.argv.includes('--update');
     if (r.pass) console.log('ok   ' + line); else fail(line);
   }
   if (result.overflow.length) fail('text outside its block: ' + result.overflow.join('; '));
-  else console.log('ok   every diagram label fits inside its block, in all 28 examples');
+  else console.log(`ok   every diagram label fits inside its block, in all ${Object.keys(result.presets).length} examples`);
   for (const o of result.overhead) if (Math.abs(o.err) > 1e-9) fail(`overhead breakdown ${o.preset}/${o.kind} off by ${o.err}`);
   console.log(`ok   overhead breakdowns multiply out to the model's capacities (${result.overhead.length} checked)`);
   // deliberately broken examples (marked ✗) may have no fix in hardware, e.g. a hard deadline the host round trip alone exceeds
@@ -108,6 +124,11 @@ const update = process.argv.includes('--update');
   else console.log(`ok   rate sweep: designs at all ${sweep.n} rates, stepping through ${sweep.lines.join(' → ')}`);
   if (!(cmp.power && cmp.changed && cmp.hasA && cmp.back && cmp.cleared)) fail(`compare: ${JSON.stringify(cmp)}`);
   else console.log('ok   compare: pinned A against B, carried in the link, cleared');
+  const near = (a, b) => Math.abs(a / b - 1) < 1e-6;
+  if (!(near(llm.T, llm.hand) && near(llm.lat, 0.05) && near(llm.half, 0.5) && near(llm.sweep, 2) && llm.off)) fail(`LLM workload: ${JSON.stringify(llm)}`);
+  else console.log(`ok   LLM workload: rate matches the hand calculation (${(llm.T / 1e12).toFixed(1)} TB/s), follows the accelerator count and the sweep; setting the rate directly takes over`);
+  if (!(near(llm.sum, 1) && llm.cheapest && llm.unit > 0)) fail(`cost: ${JSON.stringify(llm)}`);
+  else console.log(`ok   cost: parts add up to the capital cost ($${llm.unit.toFixed(3)} per million tokens); the cost goal returns the cheapest design`);
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
   else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
   if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);

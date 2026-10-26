@@ -117,8 +117,10 @@ The *Checks* tab (under More) compares the model with published figures:
 | GB200 NVL72: about 120 kW per rack | Rack composition, liquid cooled | −5.0 % |
 | GB200 NVL72 compute tray: 6.3 kW maximum | Node composition: 4 GPUs, 2 Grace, NICs, DPUs, drives, 48→12 V | −3.0 % |
 
-Two more are calibration points rather than validations: energy per operation is set from the H100 (700 W)
-and B200 (1,000 W) TDPs. Every reference links its source in the app.
+Four more are calibration points rather than validations. Energy per operation is set from the H100 (700 W)
+and B200 (1,000 W) TDPs. The cost model's packaging price and effective defect density were chosen with two
+published build-cost estimates in view: H100 about $3,320 (Silicon Analysts, −7.4 %) and B200 about $6,400
+(Epoch AI, −7.6 %). Every reference links its source in the app.
 
 Fans and power conversion are no longer a flat 15 %. They follow the rack's cooling, read from its power limit.
 Air-cooled racks add 8 % for fans and lose 5 % in Titanium server supplies. Direct-liquid racks add 2 % for fans
@@ -132,7 +134,8 @@ model no longer pay for a network they don't use.
 checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
-spec sheet fits one A4 page, and that all 28 examples match their golden results within 2 %.
+spec sheet fits one A4 page, that the LLM workload matches a hand calculation, that the cost parts add up and the
+cost goal finds the cheapest design, and that all 29 examples match their golden results within 2 %.
 
 ## Design optimiser
 
@@ -190,6 +193,48 @@ black on white, on one A4 page. Printing from the browser's menu prints the shee
 design's share link, so a printed copy leads back to the live model.
 
 ![Spec sheet](spec.png)
+
+## LLM serving: from the model to the workload
+
+*LLM serving* (top of Inputs) derives the workload from the model instead of asking for bytes and op/B. Pick a
+model (Llama 3.1 8B, 70B or 405B, Mixtral 8×7B, DeepSeek-V3, or a custom shape), the weight and KV-cache
+precision, how many users decode at once, tokens per second per user, users per copy of the model (the batch)
+and the average context. Each copy reads every weight once per decode step, plus the KV cache of every user in
+its batch:
+
+- **rate** = users × tokens/s × (weights ÷ batch + KV cache per user), counted as DRAM reads;
+- **latency budget** = one decode step, 1 ÷ tokens/s;
+- **op/B** = batch × (2 × active parameters + attention over the context) ÷ bytes read per step;
+- **resident data** per accelerator = (copies × weights + every user's KV cache) ÷ accelerators;
+- **peer traffic** = two all-reduces of the activations per layer across the accelerators of one copy.
+
+The derived inputs are locked while it is on, and follow the accelerator count, so the optimiser and the rate
+sweep work as usual (the sweep scales the users). For Llama 3.1 70B at 8 bits, 2,000 users at 20 tokens/s,
+500 per copy and 4k-token contexts, that is 32.5 TB/s of reads, and 83 % of each step is KV cache rather than
+weights. The test suite checks the rate against the same sum done by hand. Prefill is not included. The new
+example *LLM serving from the model's shape* starts here, and the assistant has a matching `set_llm_workload` tool.
+
+## Cost
+
+The *Cost* tab, and a fifth figure in the strip at the top, put a price on the design.
+
+- **One accelerator, built:** the dies (wafer price, dies per wafer, yield from area and an effective defect
+  density; above the reticle the logic splits into dies that yield separately), device DRAM per GB, the
+  package (an interposer priced by the silicon on it for HBM parts), the package's yield loss, and the board.
+- **The system:** accelerators, scale-up fabric, network ports, hosts, and the facility, sized for full-load
+  power at $11–13 per watt by cooling type.
+- **Per year:** hardware written off over 4 years (adjustable), the facility over 15, and electricity at the
+  target power × PUE.
+- **Unit cost:** per million tokens with the LLM workload on, otherwise per PB processed.
+
+The default is build cost, what the parts cost to make. *Purchase price* adds a vendor gross margin on the
+accelerators (NVIDIA reports about 75 %). Electricity price, write-off period and the share of time at the
+target rate are under *Cost assumptions* in Inputs. Wafer, HBM, packaging and facility prices come from published
+2025–26 estimates (Epoch AI, Silicon Analysts, JLL, DigiTimes); fabric, network and host prices are rough
+assumptions. Cost also appears on the spec sheet and in Compare, and the optimiser can aim for the lowest cost
+a year.
+
+![Cost](cost.png)
 
 ## Short share links
 
@@ -274,6 +319,8 @@ would have to carry 4 TB/s to feed that link.
 - **Rate sweep**: the lowest-power practical DRAM at every rate from a hundredth to a hundred times the
   target, and the optimiser's cheapest whole design at each rate (see above).
 - **Compare**: pin a design as A and see how the current one differs (see above).
+- **Cost**: build cost of one accelerator, capital and running cost of the system, and cost per million tokens
+  or per PB (see above).
 - **PPA**: power broken down by component, a die-area estimate that switches to *pad-limited* when
   the memory and link PHYs need more edge than the logic provides, a reticle-limit check, and a DRAM
   design-space plot of power against PHY area.
@@ -287,11 +334,11 @@ would have to carry 4 TB/s to feed that link.
   full-duplex links, access-pattern efficiency, capacity, PCIe TLP efficiency, outstanding read tags
   (Little's law), DRAM concurrency, CPU cost per block, host memory on the data path, queueing,
   on-chip buffering, data-movement power, beachfront, HBM packaging and ECC.
-- **28 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
+- **29 example applications**, AI first, each with a note on what it shows. The ones marked ✗ are
   deliberately broken designs that illustrate a classic bottleneck:
   - *AI & LLMs*: rack-scale inference on 72 accelerators in one NVLink domain, a 1,024-accelerator
     training cluster over 32 racks, tensor-parallel prefill on 8 PCIe cards ✗, a mixture-of-experts
-    layer that overloads its mesh ✗, LLM decode on an
+    layer that overloads its mesh ✗, LLM serving derived from Llama 3.1 70B's shape, LLM decode on an
     8-accelerator server and at the edge, prefill on one accelerator, DLRM embedding lookups, and a data
     loader starving an accelerator ✗.
   - *Fundamentals*: the 1 TB/s question.
@@ -326,6 +373,8 @@ How each kind of component is treated:
   power-conversion losses set by the rack's cooling (about 14 % air-cooled, 8 % direct liquid).
 - **Area** is compute + SRAM + PHYs + 15 %. It is replaced by the pad-limited area when a square die
   would not have enough edge for the PHYs.
+- **Cost** is dies (wafer ÷ good dies per wafer, Poisson yield) + device DRAM + package + package yield loss +
+  board, then fabric, network, hosts and facility; per year, hardware and facility written off plus electricity.
 
 All catalogue numbers are indicative, first-order figures for a 5 nm-class accelerator (JEDEC data
 rates, public datasheets and published estimates). They are good for seeing which component limits
