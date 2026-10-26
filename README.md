@@ -211,8 +211,18 @@ its batch:
 The derived inputs are locked while it is on, and follow the accelerator count, so the optimiser and the rate
 sweep work as usual (the sweep scales the users). For Llama 3.1 70B at 8 bits, 2,000 users at 20 tokens/s,
 500 per copy and 4k-token contexts, that is 32.5 TB/s of reads, and 83 % of each step is KV cache rather than
-weights. The test suite checks the rate against the same sum done by hand. Prefill is not included. The new
-example *LLM serving from the model's shape* starts here, and the assistant has a matching `set_llm_workload` tool.
+weights. The test suite checks the rate against the same sum done by hand.
+
+*Include prefill* adds the prompts. Each request brings a prompt and gets a reply, so prompt tokens arrive at
+users × tokens/s × prompt ÷ reply. They are chunked into the same steps as decode (2,048 tokens a chunk, as vLLM
+and SGLang do), so they add no weight reads. They add arithmetic (2 × active parameters per token plus causal
+attention), KV-cache writes, and re-reads of each prompt's KV cache chunk by chunk. The context then averages the
+prompt plus half the reply, and the summary gives the shortest possible time to first token: one prompt alone on its
+copy's compute. With 3,600-token prompts and 1,000-token replies, prompts are about three quarters of the
+arithmetic, and the example becomes compute-bound.
+
+The new example *LLM serving from the model's shape* starts here, and the assistant has a matching
+`set_llm_workload` tool.
 
 ## Cost
 

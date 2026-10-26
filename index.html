@@ -618,7 +618,7 @@ const BASE = {
   scale:{perNode:1, nodes:1, racks:1, domain:'node', xUp:0, xOut:0, fabric:'nvl5', nic:'e800', nics:1, rackKW:40},
   noc:{topo:'mesh', tiles:64, width:512, ghz:2, hopNs:1.5, pattern:'local', xNoc:1, banks:64, bankB:64, pj:0.15, ports:8},
   vary:{deadline:'soft', pct:0.99, ca:1, jitter:'typical', corr:'partial', tol:0},
-  llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500},
+  llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500, prefill:false, prompt:2000, reply:500},
   cost:{basis:'build', margin:0.75, years:4, kwh:0.08, duty:1},
 };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -646,11 +646,11 @@ const PRESETS = [
     host:{dram:'ddr5_5600', units:12, cores:64, cpuUs:10}, acc:{tops:700, util:0.5, pj:0.5, topsMm2:3, sram:96},
     scale:{perNode:8, nodes:1, racks:1, domain:'node', xUp:0.3, xOut:0, fabric:'pcie_p2p', nic:'e400', nics:1, rackKW:20}}},
   {g:'AI & LLMs', id:'llmserve', name:'LLM serving from the model’s shape (Llama 3.1 70B FP8, 2,000 users)',
-   d:'The workload comes from the LLM serving inputs: four copies of the model on 16 H200-class accelerators (6 HBM3E stacks each), 500 users per copy at 20 tokens/s, 4k-token contexts. Every decode step reads the weights once and each user’s KV cache; at 500 users the KV cache, not the weights, is most of the traffic. Change the batch or the context and watch the DRAM and the cost per million tokens move.', p:{
+   d:'The workload comes from the LLM serving inputs: four copies of the model on 16 H200-class accelerators (6 HBM3E stacks each), 500 users per copy at 20 tokens/s, 4k-token contexts. Every decode step reads the weights once and each user’s KV cache; at 500 users the KV cache, not the weights, is most of the traffic. Change the batch or the context and watch the DRAM and the cost per million tokens move. Then switch on prefill (3,600-token prompts, 1,000-token replies): reading the prompts is about three quarters of the arithmetic, and compute becomes the limit.', p:{
     burst:1.1, pattern:'stream', dev:{dram:'hbm3e_80', units:6}, link:{id:'pcie5', lanes:16, count:1},
     host:{dram:'ddr5_4800', units:16, cores:112, cpuUs:10, base:1250}, acc:{tops:1979, util:0.5, pj:0.29, topsMm2:2.43, sram:50}, vary:{ca:0.2}, noc:{tiles:144, width:1024, ghz:2, banks:288, bankB:64, xNoc:0.5},
     scale:{perNode:8, nodes:2, racks:1, domain:'node', xOut:0, fabric:'nvl4', nic:'e400', nics:1, rackKW:40},
-    llm:{on:true}}},
+    llm:{on:true, prefill:false, prompt:3600, reply:1000}}},
   {g:'AI & LLMs', id:'llmdc', name:'LLM decode on an 8-accelerator server (70B, batch 32)',
    d:'A DGX H100-style node: eight H100-class accelerators (5 × HBM3 at 5.2 Gb/s, 3.35 TB/s each) with NVLink 4. Each decode step streams a shard of the weights from HBM, so HBM bandwidth sets the token rate; the tensor-parallel traffic is light.', p:{
     T:8*2.3e12, lat:50e-3, block:4e10, burst:1, resident:60, inR:0.00001, outR:0.00001, xR:1, xW:0.05, ops:64,
@@ -932,22 +932,32 @@ function nocCalc(nc, inT, outT, localT, burst){
   return {N, k, S, link, kind:t.kind, dem, cap, U, worst, hops, hopsEdge, hopsLocal, area};
 }
 
-/* LLM decode serving → the model's workload. Each copy of the model reads every weight once per decode step, plus the
+/* LLM serving → the model's workload. Each copy of the model reads every weight once per decode step, plus the
    KV cache of every user in its batch; users ÷ batch copies each run tokens/s steps per second. One "byte processed"
-   is one of those reads, so the DRAM reads per byte are 1 and the rest follows per byte read. Prefill is not included. */
+   is one of those reads, so the DRAM reads per byte are 1 and the rest follows per byte read.
+   Prefill, when included, is chunked into the same steps (as vLLM and SGLang do): each request brings a prompt and gets
+   `reply` tokens back, so prompt tokens arrive at users × tokens/s × prompt ÷ reply. Riding on decode steps, they add
+   no weight reads, only arithmetic, KV writes, and re-reads of the prompt's own KV cache chunk by chunk. */
+const LLM_CHUNK = 2048;   // prefill tokens per chunk
 function llmInfo(s){
   const L = s.llm, tp = topo(s);
-  const W = L.params*1e9*L.wBytes, kvTok = L.layers*L.kv*L.kvBytes, kvUser = kvTok*L.ctx;
+  const ctx = L.prefill ? L.prompt + L.reply/2 : L.ctx;                       // with prefill, the context is the prompt plus half the reply
+  const W = L.params*1e9*L.wBytes, kvTok = L.layers*L.kv*L.kvBytes, kvUser = kvTok*ctx;
   const copies = L.users/L.batch, step = W + L.batch*kvUser;                   // bytes one copy reads per step
-  const T = copies*L.tps*step, g = tp.nA/copies;                               // g = accelerators per copy (tensor parallel)
-  const opsTok = 2*L.active*1e9 + 4*L.layers*L.ctx*L.dModel;                    // weights, then attention over the context
-  const xUp = g>1 ? 4*(g-1)*L.layers*L.batch*L.dModel*L.actBytes/step : 0;     // two all-reduces of the activations per layer
-  return {W, kvTok, kvUser, copies, step, T, g, opsTok, xUp, tokens:L.users*L.tps, kvAll:L.users*kvUser};
+  const tokens = L.users*L.tps, g = tp.nA/copies;                              // g = accelerators per copy (tensor parallel)
+  const opsTok = 2*L.active*1e9 + 4*L.layers*ctx*L.dModel;                      // weights, then attention over the context
+  const pre = L.prefill ? tokens*L.prompt/L.reply : 0;                         // prompt tokens per second
+  const preOpsTok = 2*L.active*1e9 + 2*L.layers*L.prompt*L.dModel;              // causal: attention over half the prompt on average
+  const preReads = pre*(L.prompt/2)*kvTok/LLM_CHUNK;                           // each chunk re-reads the prompt's KV so far
+  const T = copies*L.tps*step + preReads, ops = tokens*opsTok + pre*preOpsTok, writes = (tokens + pre)*kvTok;
+  const xUp = g>1 ? 4*(g-1)*L.layers*L.dModel*L.actBytes*(tokens + pre)/T : 0; // two all-reduces of the activations per layer, per token
+  const ttft = L.prefill ? L.prompt*preOpsTok/(g*s.acc.tops*1e12*s.acc.util) : 0;   // a prompt alone on its copy's compute
+  return {ctx, W, kvTok, kvUser, copies, step, T, g, opsTok, ops, writes, xUp, tokens, pre, preOpsTok, preReads, ttft, kvAll:L.users*kvUser};
 }
 function llmApply(s){
   const i = llmInfo(s), tp = topo(s), L = s.llm;
   s.T = i.T; s.lat = 1/L.tps; s.block = i.T/tp.nA/L.tps; s.resident = (i.copies*i.W + i.kvAll)/tp.nA/1e9;
-  s.ops = L.batch*i.opsTok/i.step; s.xR = 1; s.xW = L.batch*i.kvTok/i.step; s.inR = s.outR = L.batch*4/i.step; s.scale.xUp = i.xUp;
+  s.ops = i.ops/i.T; s.xR = 1; s.xW = i.writes/i.T; s.inR = s.outR = (i.tokens + i.pre)*4/i.T; s.scale.xUp = i.xUp;
 }
 function model(s){
   if(s.llm && s.llm.on) llmApply(s);
@@ -1488,7 +1498,11 @@ function buildLlm(){
   ctl(el, {k:'llm.users', label:'Users decoding at once', type:'log', min:1, max:1e7, snap:v=>Math.round(snapLog(v)), fmt:fmtN});
   ctl(el, {k:'llm.tps', label:'Tokens per second, per user', type:'log', min:1, max:500, snap:v=>Math.round(snapLog(v)), fmt:v=>v+' tok/s', hint:'Sets the latency budget: one decode step in 1 ÷ this.'});
   ctl(el, {k:'llm.batch', label:'Users per copy of the model (batch)', type:'log', min:1, max:4096, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:fmtN, hint:'Bigger batches reuse each weight read across more users, but every user adds KV cache to read.'});
-  ctl(el, {k:'llm.ctx', label:'Average context per user', type:'log', min:128, max:1e6, snap:v=>Math.round(snapLog(v)), fmt:v=>fmtN(v)+' tokens'});
+  ctl(el, {k:'llm.prefill', label:'Include prefill (reading the prompts)', type:'toggle', rebuild:true});
+  if(S.llm.prefill){
+    ctl(el, {k:'llm.prompt', label:'Prompt per request', type:'log', min:16, max:1e6, snap:v=>Math.round(snapLog(v)), fmt:v=>fmtN(v)+' tokens'});
+    ctl(el, {k:'llm.reply', label:'Reply per request', type:'log', min:1, max:1e5, snap:v=>Math.max(1, Math.round(snapLog(v))), fmt:v=>fmtN(v)+' tokens', hint:'The context then averages the prompt plus half the reply.'});
+  } else ctl(el, {k:'llm.ctx', label:'Average context per user', type:'log', min:128, max:1e6, snap:v=>Math.round(snapLog(v)), fmt:v=>fmtN(v)+' tokens'});
   const det = document.createElement('details'); det.className = 'more'; det.innerHTML = '<summary>Model shape</summary>'; el.appendChild(det);
   const custom = () => { S.llm.model = 'custom'; };
   for(const c of [{k:'llm.params', label:'Parameters (total)', min:0.5, max:2000, fmt:v=>sig(v)+' B'}, {k:'llm.active', label:'Parameters used per token', min:0.5, max:2000, fmt:v=>sig(v)+' B', hint:'Lower than the total for mixture-of-experts models; at large batches every expert is still read each step.'},
@@ -1502,7 +1516,8 @@ function paintLlm(){
   const i = llmInfo(S), L = S.llm;
   el.innerHTML = `<b>${+sig(i.copies)}</b> cop${i.copies===1?'y':'ies'} of the model, each on <b>${+sig(i.g)}</b> accelerator${i.g===1?'':'s'} · weights <b>${fmtB(i.W)}</b> · KV cache <b>${fmtB(i.kvUser)}</b> per user, <b>${fmtB(i.kvAll)}</b> in all ·
     each step reads <b>${fmtB(i.step)}</b> per copy (${fmtPct(i.W/i.step)} weights) · <b>${fmtN(Math.round(i.tokens))}</b> tokens/s in all → <b>${fmtBps(i.T)}</b> of DRAM reads, <b>${sig(S.ops)}</b> op/B, step budget <b>${fmtT(S.lat)}</b>.
-    ${i.copies>topo(S).nA ? ' <i>More copies than accelerators: add accelerators or raise the batch.</i>' : ''} Prefill (reading prompts) is not included.`;
+    ${S.llm.prefill ? `Prefill adds <b>${fmtN(Math.round(i.pre))}</b> prompt tokens/s (${fmtPct(i.pre*i.preOpsTok/i.ops)} of the arithmetic); a prompt alone on one copy takes at least <b>${fmtT(i.ttft)}</b> before its first token.` : 'Prefill (reading the prompts) is not included.'}
+    ${i.copies>topo(S).nA ? ' <i>More copies than accelerators: add accelerators or raise the batch.</i>' : ''}`;
 }
 function buildCost(){
   const el = document.getElementById('co'); el.innerHTML = '';
@@ -2494,7 +2509,7 @@ function specHTML(){
     <div class="sh-verdict ${ok?'':'bad'}">${ok ? `${st==='warn' ? `Meets the rate, but above the ${fmtPct(S.ceil)} utilisation ceiling` : 'Meets the requirement'}. Most loaded: ${m.worst.name} at ${fmtPct(m.worst.U)}; it runs up to ${sig(m.maxT/m.T)}× the target rate.${fails.length ? ` ${fails.length} check${fails.length>1?'s fail':' fails'}: see open issues.` : ''}`
       : `Does not meet the requirement: ${[st==='bad' ? `${m.worst.name} is ${fmtPct(m.worst.U)} loaded` : '', latOk ? '' : `latency ${fmtT(lh)} against a ${fmtT(S.lat)} budget`].filter(Boolean).join('; ')}.`}</div>
     <div class="sh-cols">
-      <div><h3>Requirement</h3>${kv([S.llm.on && ['LLM decode', `${esc(LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom model')}, ${fmtN(S.llm.users)} users × ${S.llm.tps} tok/s, ${fmtN(S.llm.ctx)}-token context, ${S.llm.wBytes*8}-bit weights`], ['Rate', fmtBps(S.T)], ['Latency budget', `${fmtT(S.lat)} per block, ${S.vary.deadline==='hard' ? 'hard deadline' : 'p'+sig(S.vary.pct*100)+', soft'}`],
+      <div><h3>Requirement</h3>${kv([S.llm.on && ['LLM decode', `${esc(LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom model')}, ${fmtN(S.llm.users)} users × ${S.llm.tps} tok/s, ${S.llm.prefill ? `${fmtN(S.llm.prompt)}-token prompts, ${fmtN(S.llm.reply)}-token replies` : fmtN(S.llm.ctx)+'-token context, decode only'}, ${S.llm.wBytes*8}-bit weights`], ['Rate', fmtBps(S.T)], ['Latency budget', `${fmtT(S.lat)} per block, ${S.vary.deadline==='hard' ? 'hard deadline' : 'p'+sig(S.vary.pct*100)+', soft'}`],
         ['Block', fmtB(S.block)], ['Compute', sig(S.ops)+' op/B'], ['Host link per byte', `in ${sig(S.inR)} · out ${sig(S.outR)}`], ['Extra DRAM per byte', `read ${sig(S.xR)} · write ${sig(S.xW)}`],
         ['Resident per accelerator', fmtB(S.resident*1e9)], ['Data arrives from', m.srcName || 'host memory'], ['Utilisation ceiling', fmtPct(S.ceil)]])}</div>
       <div><h3>Result</h3>${kv([['Max sustainable', `${fmtBps(m.maxT)} (${sig(m.maxT/m.T)}×)`], ['Most loaded', `${m.worst.name}, ${fmtPct(m.worst.U)}`], ['Latency, '+latLabel(), `${fmtT(lh)} of ${fmtT(S.lat)}`],
@@ -2622,7 +2637,8 @@ const LLM_MAP = {
   layers:['llm.layers','int',1,512,'layers',v=>v], hidden_size:['llm.dModel','int',128,65536,'hidden size',fmtN],
   kv_values_per_token_per_layer:['llm.kv','int',16,131072,'KV numbers per token per layer',fmtN],
   weight_bytes_per_param:['llm.wBytes','enum',[2,1,0.5],null,'weights',v=>v*8+'-bit'], kv_bytes_per_value:['llm.kvBytes','enum',[2,1,0.5],null,'KV cache',v=>v*8+'-bit'],
-  context_tokens:['llm.ctx','int',16,4e6,'context',v=>fmtN(v)+' tokens'], users:['llm.users','int',1,1e8,'users',fmtN],
+  context_tokens:['llm.ctx','int',16,4e6,'context',v=>fmtN(v)+' tokens'], include_prefill:['llm.prefill','bool',null,null,'prefill',v=>v?'on':'off'],
+  prompt_tokens:['llm.prompt','int',1,4e6,'prompt',v=>fmtN(v)+' tokens'], reply_tokens:['llm.reply','int',1,1e6,'reply',v=>fmtN(v)+' tokens'], users:['llm.users','int',1,1e8,'users',fmtN],
   tokens_per_s_per_user:['llm.tps','num',0.1,1000,'tokens/s per user',v=>sig(v)], users_per_model_copy:['llm.batch','int',1,16384,'users per copy',fmtN],
 };
 function applyMap(map, input){
@@ -2653,7 +2669,8 @@ function agentSummary(){
     cost: (c=>({basis:S.cost.basis==='buy'?'purchase price':'build cost', capital:fmtUSD(c.capex), per_year:fmtUSD(c.perYear), unit_cost:fmtUSD(c.unit)+' '+c.unitName,
       accelerator_build_cost:fmtUSD(c.acc.total), electricity_per_year:fmtUSD(c.year.energy)}))(costOf(S, m)),
     llm_workload: S.llm.on ? (i=>({model:LLM_MODELS[S.llm.model] ? LLM_MODELS[S.llm.model].name : 'custom', copies_of_model:sig(i.copies), accelerators_per_copy:sig(i.g),
-      weights:fmtB(i.W), kv_cache_per_user:fmtB(i.kvUser), bytes_read_per_step_per_copy:fmtB(i.step), tokens_per_s_total:fmtN(Math.round(i.tokens)), step_budget:fmtT(S.lat)}))(llmInfo(S)) : 'off',
+      weights:fmtB(i.W), kv_cache_per_user:fmtB(i.kvUser), bytes_read_per_step_per_copy:fmtB(i.step), tokens_per_s_total:fmtN(Math.round(i.tokens)), step_budget:fmtT(S.lat),
+      prefill: S.llm.prefill ? {prompt_tokens_per_s:fmtN(Math.round(i.pre)), share_of_arithmetic:fmtPct(i.pre*i.preOpsTok/i.ops), min_time_to_first_token:fmtT(i.ttft)} : 'not included'}))(llmInfo(S)) : 'off',
     failing_checks: considerations(m).filter(c=>c.lvl==='bad').map(c=>c.title),
     feasible_dram_per_accelerator_by_power: sizeDram(S,m).filter(r=>r.feas!=='bad').sort((a,b)=>a.power-b.power).slice(0,5)
       .map(r=>({dram_type:r.id, units:r.n, bus_bits:r.width, power:fmtW(r.power), phy_area:fmtA(r.phy), verdict:TAGS[r.feas]})),

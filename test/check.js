@@ -87,10 +87,14 @@ const update = process.argv.includes('--update');
     const r16 = S.resident; S.scale.nodes = 4; model(S); const r32 = S.resident;   // twice the accelerators, half the data each
     applyPreset('llmserve'); model(S); const T0 = S.T, T2 = model(atRate(S, 2 * T0)).T;
     const c = costOf(S, model(S)), sum = Object.values(c.parts).reduce((a, b) => a + b, 0);
+    // prefill: prompt tokens = users × tok/s × prompt ÷ reply; the arithmetic adds up across decode and prefill
+    S.llm.prefill = true; model(S); const i = llmInfo(S);
+    const pre = { tok: i.pre / (2000 * 20 * 3600 / 1000), ops: S.ops * S.T / (i.tokens * i.opsTok + i.pre * i.preOpsTok), ctx: i.ctx, limit: model(S).worst.k };
+    S.llm.prefill = false;
     runTool('set_requirements', {rate_bytes_per_s: 1e12}); const off = !S.llm.on && S.T === 1e12;
     applyPreset('llmserve');
     const o = optimise(S, {goal: 'cost', practical: true, reticle: false, scale: true, onPackage: false});
-    return {T: S.T, hand, lat: S.lat, half: r32 / r16, sweep: T2 / T0, sum: sum / c.capex, unit: c.unit, off,
+    return {T: S.T, hand, lat: S.lat, half: r32 / r16, sweep: T2 / T0, sum: sum / c.capex, unit: c.unit, off, pre,
       cheapest: !!o.best && o.front.every(x => x.C >= o.best.C)};
   });
   // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
@@ -127,6 +131,8 @@ const update = process.argv.includes('--update');
   const near = (a, b) => Math.abs(a / b - 1) < 1e-6;
   if (!(near(llm.T, llm.hand) && near(llm.lat, 0.05) && near(llm.half, 0.5) && near(llm.sweep, 2) && llm.off)) fail(`LLM workload: ${JSON.stringify(llm)}`);
   else console.log(`ok   LLM workload: rate matches the hand calculation (${(llm.T / 1e12).toFixed(1)} TB/s), follows the accelerator count and the sweep; setting the rate directly takes over`);
+  if (!(near(llm.pre.tok, 1) && near(llm.pre.ops, 1) && llm.pre.ctx === 4100 && llm.pre.limit === 'compute')) fail(`prefill: ${JSON.stringify(llm.pre)}`);
+  else console.log('ok   prefill: prompt tokens and arithmetic add up, and prompts make compute the limit in the LLM example');
   if (!(near(llm.sum, 1) && llm.cheapest && llm.unit > 0)) fail(`cost: ${JSON.stringify(llm)}`);
   else console.log(`ok   cost: parts add up to the capital cost ($${llm.unit.toFixed(3)} per million tokens); the cost goal returns the cheapest design`);
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
