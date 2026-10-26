@@ -1580,9 +1580,11 @@ function paneChecks(){
 
 /* Model vs simulation. sim/sim.py (embedded in #simSrc) runs a design as SimPy queues; the Checks tab shows the committed
    run over every example (sim/results.json, embedded in #simResults) and runs the current design in the browser:
-   Pyodide in a Web Worker, fetched only on the first click (about 10 MB), with SimPy from PyPI. Export downloads the
+   Pyodide in a Web Worker, fetched only on the first click (about 10 MB), with SimPy's wheel from this site (py/,
+   checked against PyPI's SHA-256 before it is installed). Export downloads the
    spec and the simulator as a zip to run on the host. */
 const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/', SIMPY = 'simpy==4.1.1';
+const SIMPY_WHL = {file:'simpy-4.1.1-py3-none-any.whl', sha256:'7c5ae380240fd2238671160e4830956f8055830a8317edf5c05e495b3823cd88'};   // PyPI's digest
 const SIM_WEB = {runs:10, blocks:10000, warm:1000};   // capped so a run takes about a minute; CI uses 20,000 blocks
 const simText = id => { const e = document.getElementById(id); return e ? e.textContent.replace(/^\n/, '') : ''; };
 let simJson; const simCommitted = () => simJson !== undefined ? simJson : (simJson = JSON.parse(simText('simResults') || 'null'));
@@ -1612,11 +1614,16 @@ function simExport(){
 }
 const SIM_WORKER = `let py = null;
 self.onmessage = async e => {
-  const {spec, src, opt, base, simpy} = e.data;
+  const {spec, src, opt, base, whl} = e.data;
   try{
     if(!py){
       postMessage({stage:'Loading Python (Pyodide, about 10 MB, once)'}); importScripts(base + 'pyodide.js'); py = await loadPyodide({indexURL: base});
-      postMessage({stage:'Installing SimPy'}); await py.loadPackage('micropip'); await py.pyimport('micropip').install(simpy);
+      postMessage({stage:'Installing SimPy'});
+      const res = await fetch(whl.url); if(!res.ok) throw new Error('SimPy wheel: HTTP ' + res.status);
+      const b = new Uint8Array(await res.arrayBuffer()), d = [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map(x => x.toString(16).padStart(2, '0')).join('');
+      if(d !== whl.sha256) throw new Error('SimPy wheel failed its SHA-256 check');
+      py.FS.writeFile('/tmp/' + whl.file, b); await py.loadPackage('micropip');
+      await py.pyimport('micropip').install.callKwargs('emfs:/tmp/' + whl.file, {deps: false});
     }
     py.FS.writeFile('/home/pyodide/sim.py', src);
     py.globals.set('spec_json', JSON.stringify(spec)); py.globals.set('opt_json', JSON.stringify(opt));
@@ -1633,7 +1640,7 @@ function simStart(){
   try{ if(!simWorker){ simWorker = new Worker(URL.createObjectURL(new Blob([SIM_WORKER], {type:'text/javascript'}))); simWorker.onmessage = simMsg;
     simWorker.onerror = e=>{ simRun = {...simRun, state:'error', error:e.message || 'the simulation worker failed'}; simPaint(); }; } }
   catch(e){ simRun = {...simRun, state:'error', error:String(e.message || e)}; simPaint(); return; }
-  simWorker.postMessage({spec, src:simText('simSrc'), opt:SIM_WEB, base:PYODIDE, simpy:SIMPY}); simPaint();
+  simWorker.postMessage({spec, src:simText('simSrc'), opt:SIM_WEB, base:PYODIDE, whl:{...SIMPY_WHL, url:new URL('py/' + SIMPY_WHL.file, location.href).href}}); simPaint();
 }
 function simMsg(e){
   const d = e.data;
@@ -1663,7 +1670,7 @@ function simThisHTML(){
   const how = `<p class="note">Runs in your browser: ${SIM_WEB.runs} seeded runs of ${fmtN(SIM_WEB.blocks)} blocks per pool. The first run fetches Python (Pyodide, about 10 MB) and SimPy; nothing else leaves the page. To run it yourself, export and then: <code>${esc(SIM_RUN_LINE)}</code></p>`;
   let body = '';
   if(busy) body = `<div role="status" aria-live="polite"><label for="simProg" class="note" style="display:block; margin:0 0 6px">${esc(r.stage)}${r.state==='running' ? ` · run ${r.done} of ${r.total}` : ''}</label><progress id="simProg" max="${r.total}" ${r.state==='running' ? `value="${r.done}"` : ''}></progress></div>`;
-  else if(r.state==='error') body = `<p class="note" role="alert">The simulation didn’t run: ${esc(r.error)}. It needs a connection to cdn.jsdelivr.net and pypi.org the first time.</p>`;
+  else if(r.state==='error') body = `<p class="note" role="alert">The simulation didn’t run: ${esc(r.error)}. It needs a connection to cdn.jsdelivr.net (for Python) the first time, and the page served over http(s), not opened as a file.</p>`;
   else if(r.state==='done'){
     const rows = r.result.pools.flatMap(p=>p.rows), np = rows.filter(x=>x.verdict==='pass').length, nm = rows.filter(x=>x.verdict==='miss').length;
     body = `<p class="note" role="status">${stale ? '<b>The design has changed since this run.</b> ' : ''}${np} of ${rows.length} checks agree${nm ? `, ${nm} miss` : ''}; ${sig(r.secs)} s.</p>${simRowsHTML(r.result.pools, 'This design: model against simulation')}`;

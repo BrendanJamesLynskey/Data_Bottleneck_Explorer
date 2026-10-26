@@ -486,7 +486,7 @@ footer{border-top:1px solid var(--l1); padding:22px 24px 40px; color:var(--t3); 
 </svg></div></figure>
 <h3>Three ways to run it</h3>
 <ol class="steps">
-  <li><b>In your browser.</b> Click <i>Simulate</i> (next to <i>Spec sheet</i>), then <i>Simulate this design</i>. The first time, it fetches Python (Pyodide, about 10 MB) and the SimPy library; after that it is quick. A progress bar counts the runs; the page stays usable. Nothing about your design leaves the page.</li>
+  <li><b>In your browser.</b> Click <i>Simulate</i> (next to <i>Spec sheet</i>), then <i>Simulate this design</i>. The first time, it fetches Python (Pyodide, about 10 MB, from the jsdelivr CDN) and the SimPy library (from this site); after that it is quick. A progress bar counts the runs; the page stays usable. Nothing about your design leaves the page.</li>
   <li><b>On your computer.</b> Click <i>Export simulation</i>, unzip, and run <code>pip install simpy==4.1.1 &amp;&amp; python sim.py design.json --runs 200 --seed 1 --json out.json</code>. More runs give tighter confidence intervals.</li>
   <li><b>For every example, automatically.</b> The project re-simulates all 32 examples on every change and publishes the table on the Checks tab.</li>
 </ol>
@@ -555,7 +555,7 @@ footer{border-top:1px solid var(--l1); padding:22px 24px 40px; color:var(--t3); 
 
 <section aria-labelledby="faq">
 <h2 id="faq"><span class="n">17</span>Questions</h2>
-<details><summary>Is my design or data sent anywhere?</summary><p>No. The app is a single static page and calculates everything in your browser. Only two optional features use the network: the assistant (to the AI provider you choose, with your key) and the in-browser simulation (to download Python and SimPy, not to send your design).</p></details>
+<details><summary>Is my design or data sent anywhere?</summary><p>No. The app is a single static page and calculates everything in your browser. Only two optional features use the network: the assistant (to the AI provider you choose, with your key) and the in-browser simulation (to download Python from the jsdelivr CDN; SimPy comes from this site, checked against PyPI’s fingerprint). Neither sends your design.</p></details>
 <details><summary>Why does the maximum rate show less than the target?</summary><p>A part is over 100 % at the peak. The system can then sustain the target ÷ that load. Fix the bottleneck, lower the peak-to-average ratio if your traffic allows, or add accelerators.</p></details>
 <details><summary>What is the difference between the utilisation ceiling and 100 %?</summary><p>100 % is the physical limit. The ceiling (80 % by default) is headroom you choose to keep, because queueing delay rises steeply near 100 % and real traffic has surprises. Parts above the ceiling are dashed; above 100 %, solid and bright.</p></details>
 <details><summary>Why is my latency “unbounded”?</summary><p>Some part is loaded to 100 % or more on average, so its queue grows without limit. The weakest-link strip shows which.</p></details>

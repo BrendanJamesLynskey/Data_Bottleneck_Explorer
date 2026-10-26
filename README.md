@@ -197,7 +197,9 @@ above cover.
   - pytest checks it against M/M/1, M/D/1 and a packet-level M/M/1, and checks that a fixed seed repeats exactly.
 - **In the browser.** *Simulate* (or *Simulate this design* on the Checks tab) runs the same `sim.py` under Pyodide
   0.27.7 in a Web Worker: 10 runs of 10,000 blocks per pool, with a progress bar.
-  - Python (about 10 MB) and SimPy are fetched on the first click, never on page load.
+  - Python (Pyodide from jsdelivr, about 10 MB) and SimPy are fetched on the first click, never on page load. SimPy's
+    wheel is served by the site itself (`py/simpy-4.1.1-py3-none-any.whl`, verified against PyPI's SHA-256 when
+    committed and again in the worker before it is installed), so nothing comes from PyPI.
   - The result is a model-vs-simulation table judged by the same rule.
 - **Every example, in CI.** `sim/compare.py` runs all 32 examples (10 runs × 20,000 blocks, seed 1) and writes
   `sim/results.json`, which the Checks tab shows. CI re-runs it and fails if any verdict or figure changes.
@@ -239,6 +241,7 @@ Files:
 - `sim/examples/*.json`: each example's exported spec.
 - `sim/results.json`: the committed run.
 - `sim/requirements.txt`: pinned SimPy and pytest.
+- `py/simpy-4.1.1-py3-none-any.whl`: SimPy for the in-browser run, served from the site.
 - `tools/sim_sync.js`: re-exports the specs and embeds `sim.py` and the results in the page; `--check` in
   `npm test`.
 - `test/sim.js`: the in-browser run end to end, at desktop and phone width (`npm run test:sim`).

@@ -1,22 +1,36 @@
 // The in-browser simulation, end to end in headless Chrome: Pyodide and SimPy load in the worker, a design simulates and
 // the model-vs-simulation table appears, at desktop and phone width; the export zip holds design.json and sim.py.
+// The page is served over a local HTTP server, as on the site, because SimPy's wheel comes from the site itself (py/);
+// the test checks that it does, that the committed wheel matches PyPI's SHA-256, and that nothing is fetched from PyPI.
 //   node test/sim.js [--shots DIR]
 // Needs the network the first time (cdn.jsdelivr.net, pypi.org). Chrome keeps its profile, and so its HTTP cache, in
 // ~/.cache/hw-explorer-sim (or $SIM_CACHE), so later runs and CI (which caches that folder) skip the downloads.
 // Request interception isn't used: it stalls the worker's requests.
 const puppeteer = require('puppeteer');
-const fs = require('fs'), os = require('os'), path = require('path'), {execFileSync} = require('child_process');
+const fs = require('fs'), os = require('os'), path = require('path'), http = require('http'), crypto = require('crypto'), {execFileSync} = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const CACHE = process.env.SIM_CACHE || path.join(os.homedir(), '.cache', 'hw-explorer-sim');
+const WHL = 'simpy-4.1.1-py3-none-any.whl', WHL_SHA = '7c5ae380240fd2238671160e4830956f8055830a8317edf5c05e495b3823cd88';   // PyPI's digest
+const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.webp': 'image/webp', '.whl': 'application/octet-stream'};
 const shots = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
 
 (async () => {
+  // a static server for the repository, recording what it serves
+  const served = [];
+  const server = http.createServer((req, res) => {
+    const f = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    if (!f.startsWith(ROOT) || !fs.existsSync(f) || !fs.statSync(f).isFile()) { res.writeHead(404); return res.end(); }
+    served.push(path.relative(ROOT, f)); res.writeHead(200, {'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream'}); fs.createReadStream(f).pipe(res);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const BASE = `http://127.0.0.1:${server.address().port}/`;
   const browser = await puppeteer.launch({headless: true, args: ['--no-sandbox'], userDataDir: CACHE, protocolTimeout: 600000});
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  const pypi = []; page.on('request', r => { if (/pypi\.org|pythonhosted\.org/.test(r.url())) pypi.push(r.url()); });
   await page.setViewport({width: 1400, height: 1000});
-  await page.goto('file://' + path.join(ROOT, 'index.html'), {waitUntil: 'domcontentloaded'});
+  await page.goto(BASE + 'index.html', {waitUntil: 'domcontentloaded'});
   await new Promise(r => setTimeout(r, 500));
 
   let fails = 0;
@@ -56,6 +70,11 @@ print(spec['schema'], len(spec['pools'][0]['stages']), src == open(sys.argv[2]).
   else console.log(`ok   in-browser run: Pyodide and SimPy in a worker, ${r.rows} rows (${r.status.trim()}) in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   if (running.state === 'running' && !running.prog) fail('no progress bar while running');
   if (running.state === 'running' && !running.busy) fail('the button stays enabled while running');
+  const sha = crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, 'py', WHL))).digest('hex');
+  if (sha !== WHL_SHA) fail(`py/${WHL} does not match PyPI's SHA-256`);
+  if (r.state === 'done' && !served.includes('py/' + WHL)) fail('SimPy was not loaded from the site');
+  if (pypi.length) fail('fetched from PyPI: ' + pypi.join(', '));
+  if (sha === WHL_SHA && served.includes('py/' + WHL) && !pypi.length) console.log('ok   SimPy comes from the site (py/), matches PyPI\'s SHA-256, and nothing is fetched from PyPI');
   if (errors.length) fail('page errors: ' + errors.join('; '));
 
   if (shots) {
@@ -71,7 +90,7 @@ print(spec['schema'], len(spec['pools'][0]['stages']), src == open(sys.argv[2]).
     await card('sim_desktop.png', 1400); await card('sim_phone.png', 390);
     console.log(`ok   screenshots in ${shots}`);
   }
-  await browser.close();
+  await browser.close(); server.close();
   console.log(fails ? `${fails} failure(s)` : 'all simulation checks passed');
   process.exit(fails ? 1 : 0);
 })();
