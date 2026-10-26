@@ -8,8 +8,10 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..'), PAGE = path.join(ROOT, 'index.html');
-const PROMPT = process.env.DEMO_PROMPT || 'Serve a 70B-parameter model to 2,000 users at 20 tokens/s each, with under 100 ms per token.';
-const ANSWERS = [/p99|target|soft/i, /liquid/i, /fp8/i, /batch/i];       // preferred options, matched against each question's options
+const PROMPT = process.env.DEMO_PROMPT || 'Serve Llama 3.1 70B to 2,000 users at 20 tokens/s each, with 2,000-token prompts, under 100 ms per token '
+  + 'and the first token within a second. Put prefill and decode on separate pools, then show me the chip inside each accelerator '
+  + '(compute array, voltage and clock) and check it stays under its junction-temperature limit.';
+const ANSWERS = [/p99|target|soft/i, /liquid/i, /fp8/i, /separate|split/i, /batch/i];       // preferred options, matched against each question's options
 const KEYS = {openai: process.env.OPENAI_API_KEY, google: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
   openrouter: process.env.OPENROUTER_API_KEY, anthropic: process.env.ANTHROPIC_API_KEY};
 const PROVIDER = process.env.DEMO_PROVIDER || Object.keys(KEYS).find(k => KEYS[k]);

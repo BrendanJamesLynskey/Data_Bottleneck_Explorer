@@ -66,10 +66,12 @@ starts from the nearest example.
 
 **Watch a demo** (next to *Design it*) replays an assistant session, with no API key needed. Its tool calls
 run for real, so the page changes as you watch. It is a recorded session with OpenAI gpt-6-sol (26 October
-2026). Asked to serve a 70B model to 2,000 users at 20 tokens/s each, under 100 ms per token, it starts from
-the LLM server example and asks three questions: precision, context length, and what the 100 ms means. It then
-runs the optimiser and trims the hardware. It ends on four 8-accelerator servers with three HBM3E stacks each:
-46 ms at p99, compute the limit at 54 %, 17 kW at full load. Every figure in its reply matches the model's
+2026). Asked to serve Llama 3.1 70B to 2,000 users at 20 tokens/s each with 2,000-token prompts, on separate
+prefill and decode pools, and to show the chip inside each accelerator, it starts from the split-pool example,
+sizes the prefill pool up to three racks, then sets the chip: four chiplets carrying 64 weight-stationary
+128×128 8-bit arrays at 0.75 V and 1 GHz. After the optimiser it trims the memory to three HBM4 stacks. It ends
+on 16 decode and 96 prefill accelerators: 47 ms per token at p99, a 59 ms minimum to first token, junction
+temperature 88 °C, and 17.8 kW per decode rack at full load. Every figure in its reply matches the model's
 replay of the session.
 
 `OPENAI_API_KEY=… node tools/record_demo.js` (or `GEMINI_API_KEY`, `OPENROUTER_API_KEY`,
