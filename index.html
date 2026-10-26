@@ -66,7 +66,12 @@ select option, select optgroup{background:var(--s1); color:var(--t1)}
 .kpi{padding:12px 16px; border-right:1px solid var(--l1); min-width:0}
 .kpi:last-child{border-right:none}
 .kpi .l{font-size:11px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em}
-.kpi[data-tab]{cursor:pointer} .kpi[data-tab]:hover .l{color:var(--t1)}
+.kpi[data-why]{cursor:pointer} .kpi[data-why]:hover .l,.kpi[aria-expanded="true"] .l{color:var(--t1)} .kpi[aria-expanded="true"]{box-shadow:inset 0 -2px 0 var(--t1)}
+.why{margin-top:10px; border-left:2px solid var(--t1); padding:6px 0 6px 14px; font-size:13px; color:var(--t2); line-height:1.6}
+.why:empty{display:none} .why h4{margin:0 0 4px; font-size:13px; font-weight:600; color:var(--t1)}
+.why .eq{font-family:var(--mono); font-size:12.5px; color:var(--t1); overflow-wrap:anywhere} .why .eq i{font-style:normal; color:var(--t3)}
+.why table{border-collapse:collapse; margin:4px 0; font-size:12.5px} .why td{padding:1px 14px 1px 0} .why td.n{text-align:right; font-family:var(--mono); color:var(--t1)}
+.why .x{float:right; background:none; border:none; color:var(--t3); cursor:pointer; font-size:16px; line-height:1}
 .kpi .v{font-family:var(--mono); font-size:19px; font-weight:500; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .kpi .s{font-size:12px; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .kpi.bad .v::after{content:" ▲"; font-size:12px; vertical-align:2px}
@@ -373,6 +378,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
   <form class="ask" id="askForm"><input id="askInput" autocomplete="off" aria-label="Describe the system"
     placeholder="Describe what the system has to do, e.g. “serve a 70B model at 3,000 tokens/s, under 50 ms per token”"><button class="btn">Design it</button><button type="button" class="btn demo" id="demoBtn">Watch a demo</button></form>
   <div class="verdict" id="verdict" aria-live="polite"></div>
+  <div class="why" id="why"></div>
   <div class="chain" id="chain"></div>
   <div class="cmp" id="cmp"></div>
   <div class="req-line" id="reqLine"></div>
@@ -1852,25 +1858,79 @@ function tick(ts){
    SUMMARY
    ===================================================================== */
 let scenOpen = false;
+/* "how is this worked out": click a headline figure for its calculation, with this design's numbers in it */
+let whyKey = null;
+const whyAttr = k => `data-why="${k}" role="button" tabindex="0" aria-expanded="${whyKey===k}" aria-controls="why" title="How this is worked out"`;
+function whyHTML(k, m){
+  const tp = m.tp, eq = (...p) => `<div class="eq">${p.join(' ')}</div>`, row = (l, v) => `<tr><td>${l}</td><td class="n">${v}</td></tr>`;
+  if(k==='worst' || k==='max'){
+    const c = m.worst, host = ['cpu','host','src'].includes(c.k), n = host ? tp.nN : tp.nA, pk = host ? m.bHost : S.burst, per = S.T/n*pk;   // a host's peak is smoothed over its streams
+    const unit = c.k==='compute' ? 'op' : c.k==='cpu' ? 'core·s' : 'B';
+    const cap = c.k==='dram' ? `${S.dev.units} × ${fmtBps(dramUnitBW(m.dev))} peak × ${fmtPct(m.devE)} efficiency`
+      : c.k==='compute' ? `${sig(S.acc.tops)} TOPS × ${fmtPct(S.acc.util)} achievable` : c.k==='host' ? `${S.host.units} × ${fmtBps(dramUnitBW(m.hd))} peak × ${fmtPct(m.hostE)} efficiency` : '';
+    const head = k==='max' ? `<h4>Max sustainable = target ÷ load on the most loaded part</h4>${eq(fmtBps(S.T), '÷', fmtPct(c.U), '=', `<b>${fmtBps(m.maxT)}</b>`)}<p>The load on ${esc(c.name)} is worked out like this:</p>`
+      : `<h4>Load = demand at the peak ÷ capacity</h4>`;
+    return head + eq(`<i>demand</i> = ${fmtBps(S.T)} ÷ ${fmtN(n)} ${host?'node':'accelerator'}${n>1?'s':''} × ${sig(pk)} peak-to-average${host && pk!==S.burst ? ' (smoothed over '+S.scale.perNode+' streams)' : ''} × ${sig(c.need/per)} ${unit} per byte = ${c.f(c.need)}`)
+      + eq(`<i>capacity</i> = ${cap ? cap+' = ' : ''}${c.f(c.have)}`) + eq(`<i>load</i> = ${c.f(c.need)} ÷ ${c.f(c.have)} = <b>${fmtPct(c.U)}</b>`, `<i>(ceiling ${fmtPct(S.ceil)})</i>`)
+      + `<p>Every part on the data path is worked out the same way; the most loaded sets the system. The weakest-link strip below shows the rate each part alone could carry.</p>`;
+  }
+  if(k==='lat'){
+    const ls = latencyStats(m);
+    return `<h4>Latency = one block (${fmtB(S.block)}) through every stage: fixed delay + transfer + queueing</h4><table>${m.stages.map(st=>row(esc(st.name), `${fmtT(st.fixed)} + ${fmtT(st.svc)} + ${isFinite(st.q)?fmtT(st.q):'∞'} = ${fmtT(st.t)}`)).join('')}${row('<b>Mean</b>', `<b>${fmtT(m.latency)}</b>`)}</table>
+      <p>Transfer = block ÷ that stage’s usable rate. Queueing is Kingman’s G/G/1 wait at the stage’s load. The headline ${latLabel()} (${ls.unbounded?'unbounded':fmtT(latHead(m))}) comes from ${S.vary.deadline==='hard' ? 'stacking each stage’s own worst case' : `a Monte Carlo of lognormal stage delays with ${S.vary.jitter} jitter`}; the Latency tab shows the distribution.</p>`;
+  }
+  if(k==='power'){
+    const A = m.A, H = m.H, OH = overhead(S), accW = m.pAcc*tp.nA, hostW = m.pNodeHost*tp.nN;
+    const items = [['Compute: ops/s × '+S.acc.pj+' pJ/op', A.compute], ['Device DRAM: traffic × '+m.dev.pj+' pJ/bit + standby', A.devDram], ['On-chip: hops × pJ/bit + SRAM reads', A.noc],
+      ['Leakage: '+fmtA(m.die)+' × '+S.acc.leak+' W/mm²', A.leak], ['Host link: traffic × pJ/bit + idle lanes', A.link], ['Scale-up fabric: traffic × pJ/bit + ports', A.up], ['Network: NIC, optics, switch port', A.out]].filter(x=>x[1]>0);
+    return `<h4>Power at the target = (per accelerator × ${fmtN(tp.nA)} + per host × ${fmtN(tp.nN)}) × (1 + fans and conversion)</h4>
+      <table>${items.map(([l,v])=>row(l, fmtW(v))).join('')}${row('<b>Per accelerator</b>', `<b>${fmtW(m.pAcc)}</b>`)}${row('Per host (fixed, memory, CPU, I/O)', fmtW(m.pNodeHost))}</table>
+      ${eq(`(${fmtW(m.pAcc)} × ${fmtN(tp.nA)} + ${fmtW(m.pNodeHost)} × ${fmtN(tp.nN)}) × ${(1+OH).toFixed(3)} = <b>${fmtW(m.Ptot)}</b>`)}
+      <p>Fans and conversion: ${(OH*100).toFixed(1)} % for ${coolOf(S).name} cooling, read from the ${S.scale.rackKW} kW rack limit. Full-load power (${fmtW(fullPower(S).total)}) runs every part at its peak instead.</p>`;
+  }
+  if(k==='cost'){
+    const c = costOf(S, m), llm = S.llm.on, work = (llm ? S.llm.users*S.llm.tps : m.T)*S.cost.duty*YEAR_S;
+    const big = v => v>=1e4 ? fmtN(Math.round(v)) : sig(v);
+    return `<h4>Cost ${c.unitName} = cost a year ÷ work a year</h4>
+      ${eq(`<i>a year</i> = ${fmtUSD(c.hw)} hardware ÷ ${S.cost.years} + ${fmtUSD(c.parts.facility)} facility ÷ ${COST.facYears} + ${fmtUSD(c.year.energy)} electricity = ${fmtUSD(c.perYear)}`)}
+      ${eq(`<i>work</i> = ${llm ? fmtN(Math.round(S.llm.users*S.llm.tps))+' tokens/s' : fmtBps(m.T)} × ${fmtPct(S.cost.duty)} of ${fmtN(Math.round(YEAR_S))} s = ${llm ? big(work/1e6)+' M tokens' : big(work/1e15)+' PB'}`)}
+      ${eq(`${fmtUSD(c.perYear)} ÷ ${llm ? big(work/1e6)+' M tokens' : big(work/1e15)+' PB'} = <b>${fmtUSD(c.unit)}</b>`)}
+      <p>${S.cost.basis==='buy' ? 'Purchase prices' : 'Build cost'}: one accelerator ${fmtUSD(c.acc.total*c.mark)} (dies, DRAM, package, yield loss, board). <a href="#" data-tab="cost">Open the Cost tab</a> for the breakdown and the prices used.</p>`;
+  }
+  return '';
+}
+function paintWhy(m){
+  const el = document.getElementById('why');
+  el.innerHTML = whyKey ? `<button class="x" id="whyClose" aria-label="Close">×</button>${whyHTML(whyKey, m)}` : '';
+}
+document.addEventListener('click', e=>{
+  if(e.target.id==='whyClose'){ whyKey = null; paintSummary(M); return; }
+  const k = e.target.closest('[data-why]'); if(!k) return;
+  whyKey = whyKey===k.dataset.why ? null : k.dataset.why; paintSummary(M);
+  const t = document.querySelector(`[data-why="${whyKey}"]`); if(t) t.focus();
+});
+document.addEventListener('keydown', e=>{ const k = e.target.closest && e.target.closest('[data-why]');
+  if(k && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); k.click(); } });
+
 function paintSummary(m){
   const w = m.worst, st = state(w.U), tp = m.tp;
   const ls = latencyStats(m), lh = latHead(m), latSt = lh>S.lat ? 'bad' : 'ok';
   const scope = ['cpu','host','src'].includes(w.k) ? (tp.nN>1?' per node':'') : (tp.nA>1?' per accelerator':'');
   const cost = costOf(S, m);
   document.getElementById('verdict').innerHTML = `
-    <div class="kpi hero ${st}"><div class="l">${st==='ok'?'Most loaded':st==='warn'?'Limiting (above ceiling)':'Bottleneck'}</div>
+    <div class="kpi hero ${st}" ${whyAttr('worst')}><div class="l">${st==='ok'?'Most loaded':st==='warn'?'Limiting (above ceiling)':'Bottleneck'}</div>
       <div class="v">${w.name} · ${fmtPct(w.U)}</div><div class="s">needs ${w.f(w.need)}, has ${w.f(w.have)}${scope}</div></div>
-    <div class="kpi ${m.maxT>=m.T?'ok':'bad'}"><div class="l">Max sustainable</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target</div></div>
-    <div class="kpi ${latSt}"><div class="l">Latency, ${latLabel()}</div><div class="v">${fmtT(lh)}</div><div class="s">${ls.unbounded?'queue unstable':S.vary.deadline==='hard'?'hard deadline · budget '+fmtT(S.lat):'worst-case stack '+fmtT(ls.stack)+' · budget '+fmtT(S.lat)}</div></div>
-    <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}"><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${fmtW(fullPower(S).total)} at full load${tp.nA>1?' · '+fmtW(fullPower(S).rack)+'/rack':' · '+sig(m.Ptot/m.T*1e12)+' pJ/B'}</div></div>
-    <div class="kpi" data-tab="cost" title="${S.cost.basis==='buy'?'Purchase prices':'Build cost'}; open the Cost tab"><div class="l">Cost ${cost.unitName.replace('million', 'M')}</div><div class="v">${fmtUSD(cost.unit)}</div><div class="s">${fmtUSD(cost.capex)} · ${fmtUSD(cost.perYear)}/yr</div></div>`;
+    <div class="kpi ${m.maxT>=m.T?'ok':'bad'}" ${whyAttr('max')}><div class="l">Max sustainable</div><div class="v">${fmtBps(m.maxT)}</div><div class="s">${sig(m.maxT/m.T)}× the target</div></div>
+    <div class="kpi ${latSt}" ${whyAttr('lat')}><div class="l">Latency, ${latLabel()}</div><div class="v">${fmtT(lh)}</div><div class="s">${ls.unbounded?'queue unstable':S.vary.deadline==='hard'?'hard deadline · budget '+fmtT(S.lat):'worst-case stack '+fmtT(ls.stack)+' · budget '+fmtT(S.lat)}</div></div>
+    <div class="kpi ${tp.nA>1&&fullPower(S).rack>S.scale.rackKW*1000?'bad':'ok'}" ${whyAttr('power')}><div class="l">Power</div><div class="v">${fmtW(m.Ptot)}</div><div class="s">${fmtW(fullPower(S).total)} at full load${tp.nA>1?' · '+fmtW(fullPower(S).rack)+'/rack':' · '+sig(m.Ptot/m.T*1e12)+' pJ/B'}</div></div>
+    <div class="kpi" ${whyAttr('cost')}><div class="l">Cost ${S.llm.on ? 'per M tokens' : 'per PB'}</div><div class="v">${fmtUSD(cost.unit)}</div><div class="s">${fmtUSD(cost.capex)} · ${fmtUSD(cost.perYear)}/yr</div></div>`;
   const p = PRESETS.find(x=>x.id===S.preset);
   const L = S.llm, lm = L.on ? `${esc(LLM_MODELS[L.model] ? LLM_MODELS[L.model].name : 'Custom LLM')} · ${fmtN(L.users)} users × ${L.tps} tok/s · ` : '';
   document.getElementById('reqLine').innerHTML = `<span>${lm}${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
     <button class="link" data-open="left">Edit inputs</button><button class="link" id="specBtn" title="A one-page summary to print or save as PDF">Spec sheet</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
   document.getElementById('scen').innerHTML = p && scenOpen ? esc(p.d) : '';
   const sm = document.getElementById('scenMore'); if(sm) sm.onclick = ()=>{ scenOpen = !scenOpen; paintSummary(M); };
-  paintChain(m);
+  paintWhy(m); paintChain(m);
 }
 /* the throughput chain: every component on the data path with the rate it alone could sustain; the weakest link sets the system */
 const CHAIN = [['src','Source'],['host','Host DRAM'],['cpu','Host CPU'],['link','Host link'],['noc','Interconnect'],['sram','SRAM'],['compute','Compute'],['dram','DRAM'],['up','Fabric'],['out','Network']];

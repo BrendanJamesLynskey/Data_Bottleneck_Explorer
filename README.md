@@ -141,7 +141,7 @@ model no longer pay for a network they don't use.
 checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
-spec sheet fits one A4 page, that the LLM workload matches a hand calculation, that the cost parts add up and the
+spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM workload matches a hand calculation, that the cost parts add up and the
 cost goal finds the cheapest design, and that all 29 examples match their golden results within 2 %.
 
 ## Design optimiser
@@ -200,6 +200,20 @@ black on white, on one A4 page. Printing from the browser's menu prints the shee
 design's share link, so a printed copy leads back to the live model.
 
 ![Spec sheet](spec.png)
+
+## How each figure is worked out
+
+Click any of the five figures at the top (most loaded part, maximum rate, latency, power, cost) and the sum behind
+it opens underneath, with this design's numbers in it:
+- **Load:** demand at the peak (rate ÷ accelerators × peak-to-average × bytes per byte) against capacity (for
+  example DRAM units × peak × efficiency).
+- **Latency:** every stage as fixed delay + transfer + queueing.
+- **Power:** each part's energy per bit or per operation, times the counts, plus fans and conversion.
+- **Cost:** a year's write-off and electricity divided by a year's work.
+
+The test suite checks that each explanation ends on exactly the figure shown, in every example.
+
+![How power is worked out](why.png)
 
 ## LLM serving: from the model to the workload
 

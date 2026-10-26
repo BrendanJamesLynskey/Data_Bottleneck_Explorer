@@ -97,6 +97,20 @@ const update = process.argv.includes('--update');
     return {T: S.T, hand, lat: S.lat, half: r32 / r16, sweep: T2 / T0, sum: sum / c.capex, unit: c.unit, off, pre,
       cheapest: !!o.best && o.front.every(x => x.C >= o.best.C)};
   });
+  // "how is this worked out": each explanation ends on the figure its headline box shows, in every example
+  const why = await page.evaluate(() => {
+    const bad = [];
+    for (const p of PRESETS) {
+      applyPreset(p.id);
+      for (const [k, i] of [['worst', 0], ['max', 1], ['power', 3], ['cost', 4]]) {
+        whyKey = k; paintSummary(M);
+        const shown = document.querySelectorAll('#verdict .kpi .v')[i].textContent, b = [...document.querySelectorAll('#why b')].map(x => x.textContent);
+        const want = k === 'worst' ? shown.split(' · ').pop() : shown;
+        if (!b.includes(want)) bad.push(`${p.id}/${k}: ${want} not in ${b.join(', ')}`);
+      }
+    }
+    whyKey = null; paintSummary(M); return bad;
+  });
   // spec sheet: laid out as print at the A4 text area (210 × 297 mm less 11 mm margins), every example fits one page
   await page.setViewport({width: 711, height: 1039}); await page.emulateMediaType('print');
   const spec = await page.evaluate(ids => {
@@ -136,6 +150,8 @@ const update = process.argv.includes('--update');
   else console.log('ok   prefill: prompt tokens and arithmetic add up, and prompts make compute the limit in the LLM example');
   if (!(near(llm.sum, 1) && llm.cheapest && llm.unit > 0)) fail(`cost: ${JSON.stringify(llm)}`);
   else console.log(`ok   cost: parts add up to the capital cost ($${llm.unit.toFixed(3)} per million tokens); the cost goal returns the cheapest design`);
+  if (why.length) fail(`explanations: ${why.slice(0, 3).join('; ')}`);
+  else console.log('ok   explanations: load, max rate, power and cost each work out to the figure shown, in every example');
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
   else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
   if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);
