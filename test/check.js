@@ -28,7 +28,7 @@ const update = process.argv.includes('--update');
   const demo = await page.evaluate(() => ({kind: DEMO.kind, msgs: document.querySelectorAll('#chatLog .msg').length, tools: [...document.querySelectorAll('#chatLog .msg.act')].length, design: designLine(S)}));
 
   const result = await page.evaluate(() => {
-    const out = {refs: runChecks().map(r => ({id: r.id, name: r.name, err: r.err, tol: r.tol, pass: r.pass, fitted: !!r.fitted})), presets: {}, overhead: [], optimiser: {}, overflow: []};
+    const out = {refs: runChecks().map(r => ({id: r.id, name: r.name, err: r.err, tol: r.tol, pass: r.pass, fitted: !!r.fitted, info: !!r.info})), presets: {}, overhead: [], optimiser: {}, overflow: []};
     for (const p of PRESETS) {
       applyPreset(p.id);
       const m = M, ls = latencyStats(m), fp = fullPower(S);
@@ -112,6 +112,7 @@ const update = process.argv.includes('--update');
   else console.log(`ok   ${demo.kind} demo replays (${demo.msgs} messages, ending on ${demo.design})`);
   if (errors.length) fail('page errors: ' + errors.join('; '));
   for (const r of result.refs) {
+    if (r.info) { console.log(`info indicative ${r.name}: ${(r.err * 100).toFixed(1)} % (not pass/fail)`); continue; }
     const line = `${r.fitted ? 'calibration' : 'reference  '} ${r.name}: ${(r.err * 100).toFixed(1)} % (±${r.tol * 100} %)`;
     if (r.pass) console.log('ok   ' + line); else fail(line);
   }

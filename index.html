@@ -1204,6 +1204,11 @@ const B200 = {dev:{dram:'hbm3e_80', units:8}, acc:{tops:4500, util:1, pj:0.17, t
 const DGX = {host:{dram:'ddr5_4800', units:16, base:1250}, scale:{perNode:8, nodes:1, racks:1, domain:'node', xUp:0.05, xOut:0.02, nic:'e400', nics:1, rackKW:40}};
 // GB200 runs its GPUs harder than HGX B200: 10 PFLOPS sparse FP8 per GPU in NVL72, so 5 dense; liquid cooled, 132 kW class
 // per compute tray: 2 Grace with their LPDDR5X 600 W; 2 BlueField-3 DPUs (over the 75 W a slot gives) 250 W; E1.S drives 120 W; BMC 30 W
+// other vendors, for bandwidth (exact arithmetic) and an indicative power check with energy per operation carried over
+// from the nearest calibrated NVIDIA part: H100's for 5 nm-class parts, B200's for MI355X; die densities likewise
+const MI300X = {dev:{dram:'hbm3_52', units:8}, acc:{tops:2615, util:1, pj:H100.acc.pj, topsMm2:H100.acc.topsMm2, sram:256, leak:0.02}, link:{id:'pcie5', lanes:16}};
+const MI355X = {dev:{dram:'hbm3e_80', units:8}, acc:{tops:5033, util:1, pj:B200.acc.pj, topsMm2:B200.acc.topsMm2, sram:256, leak:0.02}, link:{id:'pcie5', lanes:16}};
+const GAUDI3 = {dev:{dram:'hbm2e_36', units:8}, acc:{tops:1835, util:1, pj:H100.acc.pj, topsMm2:H100.acc.topsMm2, sram:96, leak:0.02}, link:{id:'pcie5', lanes:16}};
 const NVL72 = {acc:{tops:5000}, host:{dram:'lp5x_8533', units:16, base:1000}, scale:{perNode:4, nodes:18, racks:1, domain:'rack', xUp:0.1, xOut:0.02, nic:'e800', nics:1, rackKW:132}};
 const cfgOf = (...parts) => parts.reduce((a,p)=>merge(a, clone(p)), clone(BASE));
 const REFS = [
@@ -1242,6 +1247,27 @@ const REFS = [
   {id:'nvl72tray', name:'GB200 NVL72 compute tray, max', tests:'node composition: 4 GPUs, 2 Grace, NICs, DPUs, drives, fans, 48→12 V', pub:6.3e3, f:fmtW, tol:0.10,
    src:['SemiAnalysis: max TDP of each compute tray is 6.3 kW','https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component'],
    run:()=>{ const f = fullPower(cfgOf(B200, NVL72)); return (f.acc*4 + f.node)*(1+COOLING.liquid.fans)/TRAY_CONV; }, how:'DC power into the tray, after the power shelf'},
+  {id:'mi300xbw', name:'AMD MI300X HBM3 bandwidth', tests:'DRAM speed-grade arithmetic', pub:5.3e12, f:fmtBps, tol:0.02,
+   src:['AMD Instinct MI300X data sheet: 5.3 TB/s','https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-data-sheet.pdf'],
+   run:()=>8*dramUnitBW(DRAMS.hbm3_52), how:'8 stacks × 1024 bit × 5.2 Gb/s'},
+  {id:'mi355xbw', name:'AMD MI355X HBM3E bandwidth', tests:'DRAM speed-grade arithmetic', pub:8e12, f:fmtBps, tol:0.03,
+   src:['AMD Instinct MI355X brochure: 8 TB/s, 8192-bit','https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/product-briefs/amd-instinct-mi355x-gpu-brochure.pdf'],
+   run:()=>8*dramUnitBW(DRAMS.hbm3e_80), how:'8 stacks × 1024 bit × 8 Gb/s = 8.19 TB/s, which AMD rounds to 8'},
+  {id:'gaudi3bw', name:'Intel Gaudi 3 HBM2E bandwidth', tests:'DRAM speed-grade arithmetic', pub:3.7e12, f:fmtBps, tol:0.02,
+   src:['AnandTech: Gaudi 3, 128 GB HBM2E at 3.7 TB/s','https://www.anandtech.com/show/21342'],
+   run:()=>8*dramUnitBW(DRAMS.hbm2e_36), how:'8 stacks × 1024 bit × 3.6 Gb/s'},
+  {id:'v5pbw', name:'Google TPU v5p HBM2E bandwidth', tests:'DRAM speed-grade arithmetic', pub:2765e9, f:fmtBps, tol:0.02,
+   src:['Google Cloud TPU v5p: 2,765 GB/s, 95 GB','https://docs.cloud.google.com/tpu/docs/v5p'],
+   run:()=>6*dramUnitBW(DRAMS.hbm2e_36), how:'6 stacks × 1024 bit × 3.6 Gb/s'},
+  {id:'mi300xp', name:'AMD MI300X at full load', tests:'indicative: H100’s energy per operation on another vendor’s part', pub:750, f:fmtW, tol:0.25, info:true,
+   src:['AMD Instinct MI300X data sheet: 750 W maximum board power','https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-data-sheet.pdf'],
+   run:()=>fullPower(cfgOf(MI300X)).acc, how:'2,615 TFLOPS FP8 dense, 5.3 TB/s'},
+  {id:'mi355xp', name:'AMD MI355X at full load', tests:'indicative: B200’s energy per operation on another vendor’s part', pub:1400, f:fmtW, tol:0.25, info:true,
+   src:['AMD Instinct MI355X brochure: 1,400 W maximum board power','https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/product-briefs/amd-instinct-mi355x-gpu-brochure.pdf'],
+   run:()=>fullPower(cfgOf(MI355X)).acc, how:'5,033 TFLOPS FP8 dense, 8 TB/s'},
+  {id:'gaudi3p', name:'Intel Gaudi 3 at full load', tests:'indicative: H100’s energy per operation on another vendor’s part', pub:900, f:fmtW, tol:0.25, info:true,
+   src:['The Register: Gaudi 3 OAM, 900 W, 1,835 TFLOPS FP8 dense','https://www.theregister.com/2024/04/09/intel_gaudi_ai_accelerator/'],
+   run:()=>fullPower(cfgOf(GAUDI3)).acc, how:'1,835 TFLOPS FP8 dense, 3.7 TB/s'},
   {id:'h100cost', name:'H100 SXM build cost', tests:'calibration point: interposer $/mm² and effective defect density', pub:3320, f:fmtUSD, tol:0.25, fitted:true,
    src:['Silicon Analysts: H100 about $3,320 to make (2026 model)','https://siliconanalysts.com/analysis/nvidia-b200-blackwell-cost-breakdown'],
    run:()=>accCost(cfgOf(H100)).total, how:'814 mm² die, 80 GB HBM3, CoWoS-S, board; their estimate puts more in test and assembly'},
@@ -1252,11 +1278,12 @@ const REFS = [
 function runChecks(){
   return REFS.map(r=>{ const v = r.run(), err = v/r.pub - 1; return {...r, v, err, pass:Math.abs(err)<=r.tol}; });
 }
+const isValidation = r => !r.fitted && !r.info;   // calibration points and indicative rows are shown but not counted
 function paneChecks(){
-  const res = runChecks(), val = res.filter(r=>!r.fitted), np = val.filter(r=>r.pass).length;
-  return `<div class="answer">The model is checked against <b>${val.length}</b> published figures; <b>${np} of ${val.length}</b> fall within their tolerance. ${res.length-val.length} more are calibration points, where a parameter (energy per operation) was set to match a published TDP, so they show the fit rather than validate it. The same checks run in CI on every change.</div>
+  const res = runChecks(), val = res.filter(isValidation), np = val.filter(r=>r.pass).length, nf = res.filter(r=>r.fitted).length, ni = res.filter(r=>r.info).length;
+  return `<div class="answer">The model is checked against <b>${val.length}</b> published figures; <b>${np} of ${val.length}</b> fall within their tolerance. ${nf} more are calibration points, where a parameter (energy per operation, or a price) was set with a published figure in view, so they show the fit rather than validate it. ${ni} are indicative: one vendor’s energy per operation applied to another’s part, which shows how far that figure carries (about ±25 %) rather than passing or failing. The same checks run in CI on every change.</div>
     <div class="card"><div class="tbl-wrap"><table class="t wrap"><thead><tr><th>Reference</th><th>What it tests</th><th class="n">Published</th><th class="n">Model</th><th class="n">Error</th><th class="n">Tolerance</th><th></th></tr></thead><tbody>${
-      res.map(r=>`<tr><td>${r.name}<br><span class="note" style="margin:0">${esc(r.how)} · <a href="${r.src[1]}" target="_blank" rel="noopener">${esc(r.src[0])}</a></span></td><td style="white-space:normal">${r.tests}</td><td class="n">${r.f(r.pub)}</td><td class="n">${r.f(r.v)}</td><td class="n">${(r.err>=0?'+':'')+(r.err*100).toFixed(1)} %</td><td class="n">±${(r.tol*100).toFixed(0)} %</td><td>${r.fitted?tag('ok','calibration'):tag(r.pass?'ok':'bad', r.pass?'within':'outside')}</td></tr>`).join('')}</tbody></table></div></div>`;
+      res.map(r=>`<tr><td>${r.name}<br><span class="note" style="margin:0">${esc(r.how)} · <a href="${r.src[1]}" target="_blank" rel="noopener">${esc(r.src[0])}</a></span></td><td style="white-space:normal">${r.tests}</td><td class="n">${r.f(r.pub)}</td><td class="n">${r.f(r.v)}</td><td class="n">${(r.err>=0?'+':'')+(r.err*100).toFixed(1)} %</td><td class="n">${r.info?'—':'±'+(r.tol*100).toFixed(0)+' %'}</td><td>${r.fitted?tag('ok','calibration'):r.info?tag('ok','indicative'):tag(r.pass?'ok':'bad', r.pass?'within':'outside')}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 
 /* Design optimiser. Searches DRAM type, speed grade and count, host link, on-chip interconnect, scale-up fabric and
@@ -2392,8 +2419,8 @@ function update(){
   const rt = document.querySelector('.tab[data-t="rack"]'); if(rt){ rt.hidden = m.tp.nA===1; if(m.tp.nA===1 && tab==='rack'){ tab = 'sizing'; buildTabs(); return update(); } }
   saveHash();
   const cl = document.getElementById('checkedLine');
-  if(cl && !cl.dataset.done){ const r = runChecks().filter(x=>!x.fitted); cl.dataset.done = 1;
-    cl.innerHTML = `How this is checked: the model reproduces ${r.filter(x=>x.pass).length} of ${r.length} published reference figures within tolerance (DRAM bandwidths, STREAM, PCIe 5.0 copies, DGX H100 and NVL72 power), and a regression suite runs in CI. <a href="#" data-tab="checks">See the checks</a>.`; }
+  if(cl && !cl.dataset.done){ const r = runChecks().filter(isValidation); cl.dataset.done = 1;
+    cl.innerHTML = `How this is checked: the model reproduces ${r.filter(x=>x.pass).length} of ${r.length} published reference figures within tolerance (NVIDIA, AMD, Intel and Google memory bandwidths, STREAM, PCIe 5.0 copies, DGX H100 and NVL72 power), and a regression suite runs in CI. <a href="#" data-tab="checks">See the checks</a>.`; }
 }
 function buildAll(){
   ctlUpdaters.length = 0;
@@ -2502,7 +2529,7 @@ function specHTML(){
     + `<tr><td>Facility</td><td>power and cooling for ${fmtW(fp.total)} at full load</td><td class="n"></td><td class="n"></td><td class="n">${fmtUSD(CP.facility)}</td></tr>`
     + `<tr class="tot"><td colspan="3">System at the target rate</td><td class="n">${fmtW(m.Ptot)}</td><td class="n">${fmtUSD(cost.capex)}</td></tr>`;
   const loadRows = m.comps.map(c=>{ const s = state(c.U); return `<tr class="${s==='bad'?'over':''}"><td>${c.name}</td><td class="n">${c.f(c.need)}</td><td class="n">${c.f(c.have)}</td><td class="n">${fmtPct(c.U)}${s==='bad'?' over':s==='warn'?' tight':''}</td></tr>`; }).join('');
-  const chk = runChecks().filter(x=>!x.fitted);
+  const chk = runChecks().filter(isValidation);
   const issues = [...fails, ...tight].slice(0, 6);
   return `<div class="sh-top"><h2>${esc(name)}</h2><span class="sh-brand">Hardware System Design Explorer · spec sheet</span></div>
     <div class="sh-meta">${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})} · <a href="${esc(url)}">${esc(url)}</a></div>

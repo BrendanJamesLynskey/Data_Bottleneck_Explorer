@@ -111,6 +111,8 @@ The *Checks* tab (under More) compares the model with published figures:
 | H100 SXM: 3.35 TB/s HBM3 | DRAM speed-grade arithmetic (5 stacks at 5.2 Gb/s) | −0.7 % |
 | Apple M2 Max: 409.6 GB/s | LPDDR5-6400, 512-bit | 0.0 % |
 | Jetson AGX Orin: 204.8 GB/s | LPDDR5-6400, 256-bit | 0.0 % |
+| AMD MI300X: 5.3 TB/s · MI355X: 8 TB/s | HBM3 and HBM3E, 8 stacks | +0.5 %, +2.4 % (AMD rounds 8.19) |
+| Intel Gaudi 3: 3.7 TB/s · Google TPU v5p: 2,765 GB/s | HBM2E, 8 and 6 stacks | −0.4 %, 0.0 % |
 | EPYC Genoa STREAM Triad: about 376 GB/s per socket | DRAM efficiency model (refresh, row misses, turnaround) | +5.2 % |
 | PCIe 5.0 x16 pinned copies: 56.2 GB/s H→D, 55.1 GB/s D→H | PCIe protocol overheads | −0.2 %, +0.4 % |
 | DGX H100: 10.2 kW maximum | System composition: accelerators, hosts, switches, NICs, fans, power supplies | −18 % (a planning maximum) |
@@ -121,6 +123,11 @@ Four more are calibration points rather than validations. Energy per operation i
 and B200 (1,000 W) TDPs. The cost model's packaging price and effective defect density were chosen with two
 published build-cost estimates in view: H100 about $3,320 (Silicon Analysts, −7.4 %) and B200 about $6,400
 (Epoch AI, −7.6 %). Every reference links its source in the app.
+
+Three rows are indicative rather than pass/fail. They apply the energy per operation calibrated on NVIDIA parts
+(H100's for 5 nm-class chips, B200's for MI355X) to other vendors' accelerators at full load: AMD MI300X comes out
++24 % (750 W published), MI355X −22 % (1,400 W) and Intel Gaudi 3 −26 % (900 W). So one energy-per-operation figure
+carries across vendors to about ±25 %; to model a specific part closely, set its pJ/op from its own TDP.
 
 Fans and power conversion are no longer a flat 15 %. They follow the rack's cooling, read from its power limit.
 Air-cooled racks add 8 % for fans and lose 5 % in Titanium server supplies. Direct-liquid racks add 2 % for fans
