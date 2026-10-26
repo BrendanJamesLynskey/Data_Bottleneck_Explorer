@@ -331,7 +331,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 .spec-bar{max-width:210mm; margin:0 auto 10px; display:flex; gap:8px; justify-content:flex-end}
 .sheet{max-width:210mm; margin:0 auto; background:#fff; color:#111; padding:14mm 13mm; font-size:11px; line-height:1.4; color-scheme:light}
 .sheet h2{margin:0; font-size:19px; font-weight:600; letter-spacing:-.01em}
-.sheet h3{margin:12px 0 4px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#555}
+.sheet h3{margin:10px 0 3px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#555}
 .sheet .sh-top{display:flex; justify-content:space-between; gap:12px; align-items:baseline; border-bottom:2px solid #111; padding-bottom:6px}
 .sheet .sh-brand{font-size:10px; color:#555; white-space:nowrap}
 .sheet .sh-meta{margin-top:4px; color:#555; overflow-wrap:anywhere}
@@ -340,7 +340,7 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 .sheet .sh-verdict.bad{background:#111; color:#fff}
 .sheet .sh-cols{display:grid; grid-template-columns:1fr 1fr; gap:0 18px}
 .sheet table{width:100%; border-collapse:collapse}
-.sheet td,.sheet th{padding:2.5px 6px 2.5px 0; border-bottom:1px solid #ddd; text-align:left; vertical-align:top; font-weight:400}
+.sheet td,.sheet th{padding:2px 6px 2px 0; border-bottom:1px solid #ddd; text-align:left; vertical-align:top; font-weight:400}
 .sheet th{font-size:9.5px; color:#555; border-bottom:1px solid #111}
 .sheet td.n,.sheet th.n{text-align:right; font-family:var(--mono); white-space:nowrap; padding-right:0}
 .sheet .kv td:first-child{color:#555; width:46%}
@@ -2751,11 +2751,11 @@ function specHTML(){
   const partRows = parts.map(([n,d,q,w,c])=>`<tr><td>${n}</td><td>${esc(d)}</td><td class="n">${q===null?'':fmtN(q)}</td><td class="n">${w===null?'in die':fmtW(w)}</td><td class="n">${c===null?'in die':fmtUSD(c)}</td></tr>`).join('')
     + `<tr><td>Fans and conversion</td><td>${cool.name} cooling, ${cool.supply}</td><td class="n"></td><td class="n">${fmtW(sub*OH)}</td><td class="n"></td></tr>`
     + `<tr><td>Facility</td><td>power and cooling for ${fmtW(fp.total)} at full load</td><td class="n"></td><td class="n"></td><td class="n">${fmtUSD(CP.facility)}</td></tr>`
-    + (m.pre ? `<tr><td>Prefill pool</td><td>the same accelerators and hosts, ${S.llm.pre.perNode} per node × ${S.llm.pre.nodes} nodes × ${S.llm.pre.racks} rack${S.llm.pre.racks>1?'s':''}; facility, fans and conversion included</td><td class="n">${fmtN(m.pre.tp.nA)}</td><td class="n">${fmtW(m.pre.Ptot)}</td><td class="n">${fmtUSD(costOf(prefillState(S), m.pre).capex)}</td></tr>` : '')
+    + (m.pre ? `<tr><td>Prefill pool</td><td>same parts, ${S.llm.pre.perNode} × ${S.llm.pre.nodes} × ${S.llm.pre.racks}, all-in</td><td class="n">${fmtN(m.pre.tp.nA)}</td><td class="n">${fmtW(m.pre.Ptot)}</td><td class="n">${fmtUSD(costOf(prefillState(S), m.pre).capex)}</td></tr>` : '')
     + `<tr class="tot"><td colspan="3">System at the target rate</td><td class="n">${fmtW(Y.Ptot)}</td><td class="n">${fmtUSD(cost.capex)}</td></tr>`;
   const loadRows = m.comps.map(c=>{ const s = state(c.U); return `<tr class="${s==='bad'?'over':''}"><td>${c.name}</td><td class="n">${c.f(c.need)}</td><td class="n">${c.f(c.have)}</td><td class="n">${fmtPct(c.U)}${s==='bad'?' over':s==='warn'?' tight':''}</td></tr>`; }).join('');
   const chk = runChecks().filter(isValidation);
-  const issues = [...fails, ...tight].slice(0, 6);
+  const issues = [...fails, ...tight].slice(0, 5);
   return `<div class="sh-top"><h2>${esc(name)}</h2><span class="sh-brand">Hardware System Design Explorer · spec sheet</span></div>
     <div class="sh-meta">${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})} · <a href="${esc(url)}">${esc(url)}</a></div>
     <div class="sh-verdict ${ok?'':'bad'}">${ok ? `${st==='warn' ? `Meets the rate, but above the ${fmtPct(S.ceil)} utilisation ceiling` : 'Meets the requirement'}. Most loaded: ${wn} at ${fmtPct(Y.U)}; it runs up to ${sig(Y.maxT/m.T)}× the target rate.${fails.length ? ` ${fails.length} check${fails.length>1?'s fail':' fails'}: see open issues.` : ''}`
