@@ -1,0 +1,209 @@
+{
+ "schema": "hw-explorer-sim/1",
+ "explorer": {
+  "model_hash": "fnv1a32:09ae6119",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "LLM serving from the model’s shape (Llama 3.1 70B FP8, 2,000 users)",
+  "example": "llmserve",
+  "modified": false,
+  "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve",
+  "summary": "6 × HBM3E 8 Gb/s · PCIe 5.0 x16 · 2-D mesh NoC 1024-bit"
+ },
+ "workload": {
+  "arrival_cv": 0.2,
+  "stage_corr": 0.3,
+  "corr": "partial",
+  "jitter": "typical",
+  "percentile": 0.99,
+  "deadline": "soft"
+ },
+ "pools": [
+  {
+   "name": "system",
+   "accelerators": 16,
+   "rate_Bps": 32491545600000,
+   "block_B": 101536080000,
+   "block_rate": 20,
+   "peak_to_average": 1.1,
+   "host_peak_to_average": 1.0622494979899437,
+   "stages": [
+    {
+     "k": "cpu",
+     "name": "Host submit",
+     "level": "delay",
+     "fixed_s": 0.0000049999999999999996,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    },
+    {
+     "k": "h2d",
+     "name": "Link H→D",
+     "level": "block",
+     "fixed_s": 0.000001,
+     "fixed_cv": 0.15,
+     "svc_s": 9.55661137898763e-9,
+     "svc_cv": 0.15,
+     "extra_s": 0,
+     "util": 1.911322275797526e-7,
+     "wait_s": 5.708052406555013e-17
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "level": "block",
+     "fixed_s": 1.1e-7,
+     "fixed_cv": 0.3,
+     "svc_s": 0.017967450776510022,
+     "svc_cv": 0.0070774697669116786,
+     "extra_s": 0,
+     "util": 0.3593490155302004,
+     "wait_s": 0.0002018156924031196
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "level": "packet",
+     "fixed_s": 8.351183231361106e-9,
+     "fixed_cv": 0.3,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0.2105756846110026,
+     "wait_s": 1.4479684243105778e-10
+    },
+    {
+     "k": "compute",
+     "name": "Compute",
+     "level": "block",
+     "fixed_s": 0,
+     "fixed_cv": 0.1,
+     "svc_s": 0.019193711248105105,
+     "svc_cv": 0.1,
+     "extra_s": 0,
+     "util": 0.38387422496210205,
+     "wait_s": 0.0002989637557793912
+    },
+    {
+     "k": "up",
+     "name": "Collective, scale-up",
+     "level": "block",
+     "fixed_s": 0.000006,
+     "fixed_cv": 0.3,
+     "svc_s": 0.004854518518518519,
+     "svc_cv": 0.013615957076510449,
+     "extra_s": 0,
+     "util": 0.09709037037037037,
+     "wait_s": 0.000010488569813135141
+    },
+    {
+     "k": "d2h",
+     "name": "Link D→H",
+     "level": "block",
+     "fixed_s": 5e-7,
+     "fixed_cv": 0.15,
+     "svc_s": 9.040037790934243e-9,
+     "svc_cv": 0.15,
+     "extra_s": 3.7193298339843723e-10,
+     "util": 1.8823941548665361e-7,
+     "wait_s": 5.317786718963068e-17
+    },
+    {
+     "k": "cpu2",
+     "name": "Completion",
+     "level": "delay",
+     "fixed_s": 0.0000049999999999999996,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    }
+   ],
+   "parts": [
+    {
+     "k": "compute",
+     "name": "Accelerator compute",
+     "util_peak": 0.4222616474583123,
+     "util": 0.38387422496210205,
+     "on_path": true
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "util_peak": 0.39528391708322047,
+     "util": 0.3593490155302004,
+     "on_path": true
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "util_peak": 0.23163325307210286,
+     "util": 0.2105756846110026,
+     "on_path": false
+    },
+    {
+     "k": "sram",
+     "name": "SRAM bandwidth",
+     "util_peak": 0.1069476748238358,
+     "util": 0.09722515893075981,
+     "on_path": false
+    },
+    {
+     "k": "up",
+     "name": "Scale-up fabric",
+     "util_peak": 0.10679940740740741,
+     "util": 0.09709037037037037,
+     "on_path": true
+    },
+    {
+     "k": "cpu",
+     "name": "Host CPU",
+     "util_peak": 0.000015174992828427765,
+     "util": 0.000014285714285714284,
+     "on_path": false
+    },
+    {
+     "k": "host",
+     "name": "Host DRAM",
+     "util_peak": 7.177671858715133e-7,
+     "util": 6.757048953468259e-7,
+     "on_path": false
+    },
+    {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 2.1024545033772787e-7,
+     "util": 1.911322275797526e-7,
+     "on_path": true
+    }
+   ],
+   "analytic": {
+    "worst": {
+     "k": "compute",
+     "name": "Accelerator compute",
+     "util_peak": 0.4222616474583123
+    },
+    "max_rate_Bps": 76946475711383.95,
+    "ceiling_Bps": 84641123282522.36,
+    "path_ceiling_Bps": 84641123282522.36,
+    "unbounded": false,
+    "latency": {
+     "mean_s": 0.04254458565375865,
+     "p50_s": 0.042399303177091646,
+     "p99_s": 0.048278353816406196,
+     "p999_s": 0.050869743115926465,
+     "pX_s": 0.048278353816406196,
+     "stack_s": 0.04991330678743668,
+     "head_s": 0.048278353816406196
+    }
+   }
+  }
+ ]
+}

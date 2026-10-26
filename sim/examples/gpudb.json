@@ -1,0 +1,190 @@
+{
+ "schema": "hw-explorer-sim/1",
+ "explorer": {
+  "model_hash": "fnv1a32:09ae6119",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "GPU database join over PCIe ✗",
+  "example": "gpudb",
+  "modified": false,
+  "link": "https://hw-system-design-explorer.vercel.app/#d=gpudb",
+  "summary": "2 × HBM3 6.4 Gb/s · PCIe 5.0 x16 · 2-D mesh NoC 512-bit"
+ },
+ "workload": {
+  "arrival_cv": 1,
+  "stage_corr": 0.3,
+  "corr": "partial",
+  "jitter": "typical",
+  "percentile": 0.99,
+  "deadline": "soft"
+ },
+ "pools": [
+  {
+   "name": "system",
+   "accelerators": 1,
+   "rate_Bps": 200000000000,
+   "block_B": 256000000,
+   "block_rate": 781.25,
+   "peak_to_average": 1,
+   "host_peak_to_average": 1,
+   "stages": [
+    {
+     "k": "cpu",
+     "name": "Host submit",
+     "level": "delay",
+     "fixed_s": 0.000002,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    },
+    {
+     "k": "h2d",
+     "name": "Link H→D",
+     "level": "block",
+     "fixed_s": 0.000001,
+     "fixed_cv": 0.15,
+     "svc_s": 0.004892985026041667,
+     "svc_cv": 0.006781165060975849,
+     "extra_s": 0,
+     "util": 3.8226445515950522,
+     "wait_s": null
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "level": "block",
+     "fixed_s": 1.1e-7,
+     "fixed_cv": 0.3,
+     "svc_s": 0.0010007814101250258,
+     "svc_cv": 0.029988285712924636,
+     "extra_s": 0,
+     "util": 0.7818604766601764,
+     "wait_s": 0.0017951242690714495
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "level": "packet",
+     "fixed_s": 8.232394366197184e-9,
+     "fixed_cv": 0.3,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0.244140625,
+     "wait_s": 1.449177948829931e-9
+    },
+    {
+     "k": "compute",
+     "name": "Compute",
+     "level": "block",
+     "fixed_s": 0,
+     "fixed_cv": 0.1,
+     "svc_s": 0.0000064,
+     "svc_cv": 0.1,
+     "extra_s": 0,
+     "util": 0.005,
+     "wait_s": 1.6241206030150756e-8
+    },
+    {
+     "k": "d2h",
+     "name": "Link D→H",
+     "level": "block",
+     "fixed_s": 5e-7,
+     "fixed_cv": 0.15,
+     "svc_s": 0.0004628499348958333,
+     "svc_cv": 0.02204809926770744,
+     "extra_s": 0.0001904296875,
+     "util": 0.5103747049967448,
+     "wait_s": 0.00024134959498699551
+    },
+    {
+     "k": "cpu2",
+     "name": "Completion",
+     "level": "delay",
+     "fixed_s": 0.000002,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    }
+   ],
+   "parts": [
+    {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 3.8226445515950522,
+     "util": 3.8226445515950522,
+     "on_path": true
+    },
+    {
+     "k": "host",
+     "name": "Host DRAM",
+     "util_peak": 1.5927329676032325,
+     "util": 1.5927329676032325,
+     "on_path": false
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "util_peak": 0.7818604766601764,
+     "util": 0.7818604766601764,
+     "on_path": true
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "util_peak": 0.244140625,
+     "util": 0.244140625,
+     "on_path": false
+    },
+    {
+     "k": "sram",
+     "name": "SRAM bandwidth",
+     "util_peak": 0.20392922794117646,
+     "util": 0.20392922794117646,
+     "on_path": false
+    },
+    {
+     "k": "compute",
+     "name": "Accelerator compute",
+     "util_peak": 0.005,
+     "util": 0.005,
+     "on_path": true
+    },
+    {
+     "k": "cpu",
+     "name": "Host CPU",
+     "util_peak": 0.00009765624999999999,
+     "util": 0.00009765624999999999,
+     "on_path": false
+    }
+   ],
+   "analytic": {
+    "worst": {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 3.8226445515950522
+    },
+    "max_rate_Bps": 52319800415.800415,
+    "ceiling_Bps": 52319800415.800415,
+    "path_ceiling_Bps": 52319800415.800415,
+    "unbounded": true,
+    "latency": {
+     "mean_s": null,
+     "p50_s": null,
+     "p99_s": null,
+     "p999_s": null,
+     "pX_s": null,
+     "stack_s": null,
+     "head_s": null
+    }
+   }
+  }
+ ]
+}

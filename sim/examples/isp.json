@@ -1,0 +1,190 @@
+{
+ "schema": "hw-explorer-sim/1",
+ "explorer": {
+  "model_hash": "fnv1a32:09ae6119",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "Smartphone camera ISP + NPU",
+  "example": "isp",
+  "modified": false,
+  "link": "https://hw-system-design-explorer.vercel.app/#d=isp",
+  "summary": "4 × LPDDR5X-8533 · 1 × UCIe · AMBA AXI5 crossbar 256-bit"
+ },
+ "workload": {
+  "arrival_cv": 0.2,
+  "stage_corr": 0.3,
+  "corr": "partial",
+  "jitter": "typical",
+  "percentile": 0.99,
+  "deadline": "soft"
+ },
+ "pools": [
+  {
+   "name": "system",
+   "accelerators": 1,
+   "rate_Bps": 1875000000,
+   "block_B": 62500000,
+   "block_rate": 30,
+   "peak_to_average": 1.3,
+   "host_peak_to_average": 1.3,
+   "stages": [
+    {
+     "k": "cpu",
+     "name": "Host submit",
+     "level": "delay",
+     "fixed_s": 0.000009999999999999999,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    },
+    {
+     "k": "h2d",
+     "name": "Link H→D",
+     "level": "block",
+     "fixed_s": 5e-8,
+     "fixed_cv": 0.15,
+     "svc_s": 0.0002712673611111111,
+     "svc_cv": 0.0288,
+     "extra_s": 0,
+     "util": 0.008138020833333334,
+     "wait_s": 4.5436882361521365e-8
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "level": "block",
+     "fixed_s": 1.1e-7,
+     "fixed_cv": 0.3,
+     "svc_s": 0.009189707311579214,
+     "svc_cv": 0.009896244463216318,
+     "extra_s": 0,
+     "util": 0.2756912193473764,
+     "wait_s": 0.00007012823078913175
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "level": "packet",
+     "fixed_s": 8e-9,
+     "fixed_cv": 0.3,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0.09306066176470587,
+     "wait_s": 5.335697998479857e-11
+    },
+    {
+     "k": "compute",
+     "name": "Compute",
+     "level": "block",
+     "fixed_s": 0,
+     "fixed_cv": 0.1,
+     "svc_s": 0.001171875,
+     "svc_cv": 0.1,
+     "extra_s": 0,
+     "util": 0.03515625,
+     "wait_s": 0.0000010674974696356277
+    },
+    {
+     "k": "d2h",
+     "name": "Link D→H",
+     "level": "block",
+     "fixed_s": 2.5e-8,
+     "fixed_cv": 0.15,
+     "svc_s": 0.00010850694444444444,
+     "svc_cv": 0.04553679830642467,
+     "extra_s": 0,
+     "util": 0.003255208333333333,
+     "wait_s": 7.454731838304668e-9
+    },
+    {
+     "k": "cpu2",
+     "name": "Completion",
+     "level": "delay",
+     "fixed_s": 0.000009999999999999999,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    }
+   ],
+   "parts": [
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "util_peak": 0.3583985851515893,
+     "util": 0.2756912193473764,
+     "on_path": true
+    },
+    {
+     "k": "host",
+     "name": "Host DRAM",
+     "util_peak": 0.1297087329870035,
+     "util": 0.09977594845154115,
+     "on_path": false
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "util_peak": 0.12097886029411764,
+     "util": 0.09306066176470587,
+     "on_path": false
+    },
+    {
+     "k": "compute",
+     "name": "Accelerator compute",
+     "util_peak": 0.045703125,
+     "util": 0.03515625,
+     "on_path": true
+    },
+    {
+     "k": "sram",
+     "name": "SRAM bandwidth",
+     "util_peak": 0.014282226562500002,
+     "util": 0.010986328125000002,
+     "on_path": false
+    },
+    {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 0.010579427083333334,
+     "util": 0.008138020833333334,
+     "on_path": true
+    },
+    {
+     "k": "cpu",
+     "name": "Host CPU",
+     "util_peak": 0.000195,
+     "util": 0.00015,
+     "on_path": false
+    }
+   ],
+   "analytic": {
+    "worst": {
+     "k": "dram",
+     "name": "Device DRAM",
+     "util_peak": 0.3583985851515893
+    },
+    "max_rate_Bps": 5231605474.131391,
+    "ceiling_Bps": 6801087116.370808,
+    "path_ceiling_Bps": 6801087116.370808,
+    "unbounded": false,
+    "latency": {
+     "mean_s": 0.010832798290364716,
+     "p50_s": 0.010817947538949869,
+     "p99_s": 0.011388629340652634,
+     "p999_s": 0.0117344382094379,
+     "pX_s": 0.011388629340652634,
+     "stack_s": 0.011696223802523449,
+     "head_s": 0.011388629340652634
+    }
+   }
+  }
+ ]
+}

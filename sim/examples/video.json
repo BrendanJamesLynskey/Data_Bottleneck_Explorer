@@ -1,0 +1,190 @@
+{
+ "schema": "hw-explorer-sim/1",
+ "explorer": {
+  "model_hash": "fnv1a32:09ae6119",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "4 × 4K60 video analytics at the edge",
+  "example": "video",
+  "modified": false,
+  "link": "https://hw-system-design-explorer.vercel.app/#d=video",
+  "summary": "4 × LPDDR5-6400 · PCIe 4.0 x4 · AMBA AXI5 crossbar 256-bit"
+ },
+ "workload": {
+  "arrival_cv": 0.2,
+  "stage_corr": 0.3,
+  "corr": "partial",
+  "jitter": "typical",
+  "percentile": 0.99,
+  "deadline": "soft"
+ },
+ "pools": [
+  {
+   "name": "system",
+   "accelerators": 1,
+   "rate_Bps": 2985984000,
+   "block_B": 12441600,
+   "block_rate": 240,
+   "peak_to_average": 1.2,
+   "host_peak_to_average": 1.2,
+   "stages": [
+    {
+     "k": "cpu",
+     "name": "Host submit",
+     "level": "delay",
+     "fixed_s": 0.000004,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    },
+    {
+     "k": "h2d",
+     "name": "Link H→D",
+     "level": "block",
+     "fixed_s": 0.000001,
+     "fixed_cv": 0.15,
+     "svc_s": 0.001902392578125,
+     "svc_cv": 0.010875298537149141,
+     "extra_s": 0,
+     "util": 0.45657421875000004,
+     "wait_s": 0.00003206147610773442
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "level": "block",
+     "fixed_s": 1.1e-7,
+     "fixed_cv": 0.3,
+     "svc_s": 0.00155641524902644,
+     "svc_cv": 0.024046867817906176,
+     "extra_s": 0,
+     "util": 0.3735396597663456,
+     "wait_s": 0.000018829203607725757
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "level": "packet",
+     "fixed_s": 8e-9,
+     "fixed_cv": 0.3,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0.10977882352941178,
+     "wait_s": 6.412450045461275e-11
+    },
+    {
+     "k": "compute",
+     "name": "Compute",
+     "level": "block",
+     "fixed_s": 0,
+     "fixed_cv": 0.1,
+     "svc_s": 0.000093312,
+     "svc_cv": 0.1,
+     "extra_s": 0,
+     "util": 0.022394880000000002,
+     "wait_s": 5.343954833624441e-8
+    },
+    {
+     "k": "d2h",
+     "name": "Link D→H",
+     "level": "block",
+     "fixed_s": 5e-7,
+     "fixed_cv": 0.15,
+     "svc_s": 0.00001799560546875,
+     "svc_cv": 0.11181704925033796,
+     "extra_s": 0.00007403906249999998,
+     "util": 0.022088320312499996,
+     "wait_s": 1.067048303862503e-8
+    },
+    {
+     "k": "cpu2",
+     "name": "Completion",
+     "level": "delay",
+     "fixed_s": 0.000004,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    }
+   ],
+   "parts": [
+    {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 0.5478890625,
+     "util": 0.45657421875000004,
+     "on_path": true
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "util_peak": 0.44824759171961476,
+     "util": 0.3735396597663456,
+     "on_path": true
+    },
+    {
+     "k": "host",
+     "name": "Host DRAM",
+     "util_peak": 0.13755825349382306,
+     "util": 0.11463187791151921,
+     "on_path": false
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "util_peak": 0.13173458823529413,
+     "util": 0.10977882352941178,
+     "on_path": false
+    },
+    {
+     "k": "compute",
+     "name": "Accelerator compute",
+     "util_peak": 0.026873856,
+     "util": 0.022394880000000002,
+     "on_path": true
+    },
+    {
+     "k": "sram",
+     "name": "SRAM bandwidth",
+     "util_peak": 0.014429054117647059,
+     "util": 0.012024211764705884,
+     "on_path": false
+    },
+    {
+     "k": "cpu",
+     "name": "Host CPU",
+     "util_peak": 0.000288,
+     "util": 0.00024,
+     "on_path": false
+    }
+   ],
+   "analytic": {
+    "worst": {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 0.5478890625
+    },
+    "max_rate_Bps": 5449979209.97921,
+    "ceiling_Bps": 6539975051.975052,
+    "path_ceiling_Bps": 6539975051.975052,
+    "unbounded": false,
+    "latency": {
+     "mean_s": 0.003630688286491526,
+     "p50_s": 0.003622797799082253,
+     "p99_s": 0.003861507841939475,
+     "p999_s": 0.004007942601245759,
+     "pX_s": 0.003861507841939475,
+     "stack_s": 0.004013843179372033,
+     "head_s": 0.003861507841939475
+    }
+   }
+  }
+ ]
+}

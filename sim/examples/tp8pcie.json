@@ -1,0 +1,209 @@
+{
+ "schema": "hw-explorer-sim/1",
+ "explorer": {
+  "model_hash": "fnv1a32:09ae6119",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "Tensor-parallel prefill on 8 PCIe cards ✗",
+  "example": "tp8pcie",
+  "modified": false,
+  "link": "https://hw-system-design-explorer.vercel.app/#d=tp8pcie",
+  "summary": "12 × GDDR6 20 Gb/s · PCIe 5.0 x16 · 2-D mesh NoC 512-bit"
+ },
+ "workload": {
+  "arrival_cv": 1,
+  "stage_corr": 0.3,
+  "corr": "partial",
+  "jitter": "typical",
+  "percentile": 0.99,
+  "deadline": "soft"
+ },
+ "pools": [
+  {
+   "name": "system",
+   "accelerators": 8,
+   "rate_Bps": 4800000000000,
+   "block_B": 1000000000,
+   "block_rate": 600,
+   "peak_to_average": 1,
+   "host_peak_to_average": 1,
+   "stages": [
+    {
+     "k": "cpu",
+     "name": "Host submit",
+     "level": "delay",
+     "fixed_s": 0.0000049999999999999996,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    },
+    {
+     "k": "h2d",
+     "name": "Link H→D",
+     "level": "block",
+     "fixed_s": 0.000001,
+     "fixed_cv": 0.15,
+     "svc_s": 0.0000019113222757975262,
+     "svc_cv": 0.15,
+     "extra_s": 0,
+     "util": 0.0011467933654785156,
+     "wait_s": 1.1218912116695106e-9
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "level": "block",
+     "fixed_s": 1.5000000000000002e-7,
+     "fixed_cv": 0.3,
+     "svc_s": 0.0012685352925389157,
+     "svc_cv": 0.026636059570091963,
+     "extra_s": 0,
+     "util": 0.7611211755233493,
+     "wait_s": 0.0020223518853645555
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "level": "packet",
+     "fixed_s": 6.166913561958375e-9,
+     "fixed_cv": 0.3,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0.238055419921875,
+     "wait_s": 1.0500719391133964e-9
+    },
+    {
+     "k": "compute",
+     "name": "Compute",
+     "level": "block",
+     "fixed_s": 0,
+     "fixed_cv": 0.1,
+     "svc_s": 0.0005714285714285715,
+     "svc_cv": 0.1,
+     "extra_s": 0,
+     "util": 0.34285714285714286,
+     "wait_s": 0.00015055900621118015
+    },
+    {
+     "k": "up",
+     "name": "Collective, scale-up",
+     "level": "block",
+     "fixed_s": 0.000009,
+     "fixed_cv": 0.3,
+     "svc_s": 0.005859375,
+     "svc_cv": 0.012393546707863733,
+     "extra_s": 0,
+     "util": 3.515625,
+     "wait_s": null
+    },
+    {
+     "k": "d2h",
+     "name": "Link D→H",
+     "level": "block",
+     "fixed_s": 5e-7,
+     "fixed_cv": 0.15,
+     "svc_s": 0.0000018080075581868489,
+     "svc_cv": 0.15,
+     "extra_s": 7.438659667968757e-8,
+     "util": 0.0011294364929199218,
+     "wait_s": 1.045168143189315e-9
+    },
+    {
+     "k": "cpu2",
+     "name": "Completion",
+     "level": "delay",
+     "fixed_s": 0.0000049999999999999996,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    }
+   ],
+   "parts": [
+    {
+     "k": "up",
+     "name": "Scale-up fabric",
+     "util_peak": 3.515625,
+     "util": 3.515625,
+     "on_path": true
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "util_peak": 0.7611211755233493,
+     "util": 0.7611211755233493,
+     "on_path": true
+    },
+    {
+     "k": "compute",
+     "name": "Accelerator compute",
+     "util_peak": 0.34285714285714286,
+     "util": 0.34285714285714286,
+     "on_path": true
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "util_peak": 0.238055419921875,
+     "util": 0.238055419921875,
+     "on_path": false
+    },
+    {
+     "k": "sram",
+     "name": "SRAM bandwidth",
+     "util_peak": 0.18096852022058826,
+     "util": 0.18096852022058826,
+     "on_path": false
+    },
+    {
+     "k": "host",
+     "name": "Host DRAM",
+     "util_peak": 0.004633404996663949,
+     "util": 0.004633404996663949,
+     "on_path": false
+    },
+    {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 0.0011467933654785156,
+     "util": 0.0011467933654785156,
+     "on_path": true
+    },
+    {
+     "k": "cpu",
+     "name": "Host CPU",
+     "util_peak": 0.00075,
+     "util": 0.00075,
+     "on_path": false
+    }
+   ],
+   "analytic": {
+    "worst": {
+     "k": "up",
+     "name": "Scale-up fabric",
+     "util_peak": 3.515625
+    },
+    "max_rate_Bps": 1365333333333.3333,
+    "ceiling_Bps": 1365333333333.3333,
+    "path_ceiling_Bps": 1365333333333.3333,
+    "unbounded": true,
+    "latency": {
+     "mean_s": null,
+     "p50_s": null,
+     "p99_s": null,
+     "p999_s": null,
+     "pX_s": null,
+     "stack_s": null,
+     "head_s": null
+    }
+   }
+  }
+ ]
+}

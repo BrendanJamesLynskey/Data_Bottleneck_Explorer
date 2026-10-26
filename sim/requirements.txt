@@ -1,0 +1,3 @@
+# The simulator: pure Python, so it also runs under Pyodide (the page loads SimPy 4.1.1 with micropip)
+simpy==4.1.1
+pytest==8.3.5

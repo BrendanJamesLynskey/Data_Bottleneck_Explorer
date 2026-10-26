@@ -1,0 +1,209 @@
+{
+ "schema": "hw-explorer-sim/1",
+ "explorer": {
+  "model_hash": "fnv1a32:09ae6119",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "Line-scan machine-vision inspection",
+  "example": "linescan",
+  "modified": false,
+  "link": "https://hw-system-design-explorer.vercel.app/#d=linescan",
+  "summary": "4 × LPDDR5-6400 · PCIe 4.0 x8 · AMBA AXI5 crossbar 256-bit"
+ },
+ "workload": {
+  "arrival_cv": 0.2,
+  "stage_corr": 0.3,
+  "corr": "partial",
+  "jitter": "typical",
+  "percentile": 0.99,
+  "deadline": "soft"
+ },
+ "pools": [
+  {
+   "name": "system",
+   "accelerators": 1,
+   "rate_Bps": 3276800000,
+   "block_B": 4194304,
+   "block_rate": 781.25,
+   "peak_to_average": 1.2,
+   "host_peak_to_average": 1.2,
+   "stages": [
+    {
+     "k": "src",
+     "name": "Network ingress",
+     "level": "block",
+     "fixed_s": 0.000005,
+     "fixed_cv": 0.3,
+     "svc_s": 0.00033801265761925994,
+     "svc_cv": 0.05160060253599249,
+     "extra_s": 0,
+     "util": 0.26407238876504685,
+     "wait_s": 0.0000025872500834096125
+    },
+    {
+     "k": "cpu",
+     "name": "Host submit",
+     "level": "delay",
+     "fixed_s": 0.0000015,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    },
+    {
+     "k": "h2d",
+     "name": "Link H→D",
+     "level": "block",
+     "fixed_s": 0.000001,
+     "fixed_cv": 0.15,
+     "svc_s": 0.0003206666666666667,
+     "svc_cv": 0.026488926019436906,
+     "extra_s": 0,
+     "util": 0.25052083333333336,
+     "wait_s": 0.0000021813244151030817
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "level": "block",
+     "fixed_s": 1.1e-7,
+     "fixed_cv": 0.3,
+     "svc_s": 0.00007241448982537162,
+     "svc_cv": 0.1114829666338755,
+     "extra_s": 0,
+     "util": 0.05657382017607158,
+     "wait_s": 1.1383350164156548e-7
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "level": "packet",
+     "fixed_s": 8e-9,
+     "fixed_cv": 0.3,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0.0451764705882353,
+     "wait_s": 2.4603252833908332e-11
+    },
+    {
+     "k": "compute",
+     "name": "Compute",
+     "level": "block",
+     "fixed_s": 0,
+     "fixed_cv": 0.1,
+     "svc_s": 0.00004194304,
+     "svc_cv": 0.1,
+     "extra_s": 0,
+     "util": 0.032768,
+     "wait_s": 3.552378164494145e-8
+    },
+    {
+     "k": "d2h",
+     "name": "Link D→H",
+     "level": "block",
+     "fixed_s": 5e-7,
+     "fixed_cv": 0.15,
+     "svc_s": 3.033333333333333e-7,
+     "svc_cv": 0.15,
+     "extra_s": 0.00001248,
+     "util": 0.009986979166666667,
+     "wait_s": 9.56232271952091e-11
+    },
+    {
+     "k": "cpu2",
+     "name": "Completion",
+     "level": "delay",
+     "fixed_s": 0.0000015,
+     "fixed_cv": 0.6,
+     "svc_s": 0,
+     "svc_cv": 0,
+     "extra_s": 0,
+     "util": 0,
+     "wait_s": 0
+    }
+   ],
+   "parts": [
+    {
+     "k": "src",
+     "name": "Network ingress",
+     "util_peak": 0.3168868665180562,
+     "util": 0.26407238876504685,
+     "on_path": true
+    },
+    {
+     "k": "link",
+     "name": "Host link (H→D)",
+     "util_peak": 0.30062500000000003,
+     "util": 0.25052083333333336,
+     "on_path": true
+    },
+    {
+     "k": "dram",
+     "name": "Device DRAM",
+     "util_peak": 0.0678885842112859,
+     "util": 0.05657382017607158,
+     "on_path": true
+    },
+    {
+     "k": "noc",
+     "name": "On-chip interconnect",
+     "util_peak": 0.054211764705882355,
+     "util": 0.0451764705882353,
+     "on_path": false
+    },
+    {
+     "k": "compute",
+     "name": "Accelerator compute",
+     "util_peak": 0.0393216,
+     "util": 0.032768,
+     "on_path": true
+    },
+    {
+     "k": "sram",
+     "name": "SRAM bandwidth",
+     "util_peak": 0.006101082352941176,
+     "util": 0.005084235294117647,
+     "on_path": false
+    },
+    {
+     "k": "cpu",
+     "name": "Host CPU",
+     "util_peak": 0.0003515625,
+     "util": 0.00029296875,
+     "on_path": false
+    },
+    {
+     "k": "host",
+     "name": "Host DRAM",
+     "util_peak": 0.0001138705611980132,
+     "util": 0.00009489213433167767,
+     "on_path": false
+    }
+   ],
+   "analytic": {
+    "worst": {
+     "k": "src",
+     "name": "Network ingress",
+     "util_peak": 0.3168868665180562
+    },
+    "max_rate_Bps": 10340598952.570627,
+    "ceiling_Bps": 12408718743.084751,
+    "path_ceiling_Bps": 12408718743.084751,
+    "unbounded": false,
+    "latency": {
+     "mean_s": 0.0007878762394529108,
+     "p50_s": 0.0007864410104772587,
+     "p99_s": 0.0008658913791632871,
+     "p999_s": 0.0009020916052449394,
+     "pX_s": 0.0008658913791632871,
+     "stack_s": 0.0009130210346637086,
+     "head_s": 0.0008658913791632871
+    }
+   }
+  }
+ ]
+}
