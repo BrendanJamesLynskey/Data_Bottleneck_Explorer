@@ -231,6 +231,39 @@ Outcome, in two runs under the same rule:
      - **The exponential tail is heavier than near-regular queues have**, so six percentiles are 14–33 % high.
      - The one low miss is a TLS link wait at 1 % of the latency (−20 %).
 
+### Real traffic: the Azure LLM traces
+
+Microsoft publishes one-hour samples of two production LLM services (code completion and conversation) from the
+Splitwise paper (Patel et al., ISCA 2024; CC BY 4.0). They give each request's arrival time and its prompt and reply
+lengths. The two files are in `sim/traces/`, unchanged and SHA-256-pinned, with provenance in
+[`SOURCE.md`](sim/traces/SOURCE.md); a test checks their medians against the paper.
+
+`sim/trace_compare.py` replays them through the split-pool example's prefill pool (time to first token):
+- the design is moved to each trace's mean prompt at the same load;
+- each request is served for its own prompt, using the model's own service times at a grid of prompt lengths;
+- each run is a moving-block bootstrap of the trace, with 60-second segments, stretched to the design's rate.
+
+The model is judged twice, by a rule fixed before the first replay (in `sim/TOLERANCE.md`): once with the example's
+inputs, and once given the trace's measured arrival CV.
+
+**Outcome: 3 of 10 rows agree.** Both utilisation rows agree, as does code completion's mean once the model has
+its CV.
+
+- **With its own inputs**, the model understates time to first token by one to two orders of magnitude: 9× (mean)
+  and 63× (p99) for conversation, and 103× and 284× for code completion.
+- **The cause is load that swings over tens of seconds to minutes, not request-to-request randomness.**
+  - At the design's 66 % average load, 11 of the conversation trace's 58 minutes run above 90 %, and the busiest
+    reaches 126 %.
+  - The same prompts with random arrivals give a mean of 98 ms rather than 324 ms.
+  - Given the trace's arrival CV, Kingman gets code completion's mean right (its CV of 13 encodes its bursts) and
+    overstates its p99 1.9×. For conversation, whose gaps look random (CV 1.09), it stays 5.2× low on the mean
+    and 13.8× low on the p99.
+- **These figures are if anything optimistic.** The bootstrap breaks up busy spells longer than a minute: the
+  conversation trace in its original order gives a mean of 1.39 s and a p99 of 10.3 s.
+- **What it means in practice:** size prefill for its busiest minute, not its average.
+
+Decode isn't replayed: its steps are clocked and batched. That is for a cross-check against a serving simulator.
+
 ![Model vs simulation](sim.png)
 
 Files:
@@ -241,6 +274,8 @@ Files:
 - `sim/examples/*.json`: each example's exported spec.
 - `sim/results.json`: the committed run.
 - `sim/requirements.txt`: pinned SimPy and pytest.
+- `sim/traces/`: the Azure LLM traces and their source; `sim/azure_trace.py` loads and resamples them;
+  `sim/trace_compare.py` replays them and writes `sim/trace_results.json`; `sim/test_azure_trace.py` tests them.
 - `py/simpy-4.1.1-py3-none-any.whl`: SimPy for the in-browser run, served from the site.
 - `tools/sim_sync.js`: re-exports the specs and embeds `sim.py` and the results in the page; `--check` in
   `npm test`.

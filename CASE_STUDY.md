@@ -105,6 +105,15 @@ the change before re-running, with the rule unchanged.
     is 6 to 11 % high in five examples.
   - The exponential tail is heavier than near-regular queues have, so six percentiles are 14 to 33 % high.
 
+**Then real traffic.** I replayed Microsoft's published Azure LLM traces (Splitwise, ISCA 2024) through the
+split-pool example's prefill pool, under a rule fixed before the replay. With the example's own inputs, the model
+understates time to first token by one to two orders of magnitude: 9× to 284×.
+
+The arrival CV isn't the cause: conversation traffic looks random request to request. The cause is load that
+swings over minutes: at a 66 % average, 11 of 58 minutes run above 90 %. Kingman, even given the measured CV,
+can't see that. It is the most useful finding so far, and it points at the next change to the model: latency
+evaluated at the busiest minute's load, not the average.
+
 Behind that, a regression suite runs in GitHub Actions on every push:
 - **Regression:** all 32 examples against golden results within 2 %.
 - **Hand calculations:**

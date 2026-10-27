@@ -24,6 +24,7 @@ jobs:
       - run: pip install -r sim/requirements.txt
       - run: python -m pytest sim -q
       - run: python sim/compare.py --check --jobs 4
+      - run: python sim/trace_compare.py --check
   # the same simulator in the browser: Pyodide and SimPy, cached between runs
   browser-simulation:
     runs-on: ubuntu-latest

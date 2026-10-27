@@ -17,6 +17,7 @@ import argparse
 import json
 import math
 import os
+import random
 import statistics
 import sys
 
@@ -64,6 +65,37 @@ def replay(name: str) -> dict:
             "drift": sim.ci(per["drift"]), "util": {k: sim.ci(v) for k, v in util.items()}, "wait_s": {k: sim.ci(v) for k, v in wait.items()}}
 
 
+def diagnostics(name: str) -> dict:
+    """Not judged: why the replays come out as they do. The load each minute of the trace puts on the busiest stage
+    (at the design's average rate); the trace replayed once in its original order (no bootstrap); and the same prompts
+    with random (Poisson) arrivals at the same rate."""
+    with open(spec_path(name, "designed")) as f:
+        spec = json.load(f)
+    pool = sim.Pool.from_json(spec["pools"][0], spec["workload"])
+    busy = max((s for s in pool.servers()), key=lambda s: s.util)
+    tr = trace.load(name)
+    arr = trace.scale_to(list(zip(tr.t, tr.prompt)), pool.block_rate)
+    w = 60 * arr[-1][0] / tr.span
+    n = int(arr[-1][0] // w)
+    load = [0.0] * n
+    for t, p in arr:
+        if int(t // w) < n:
+            load[int(t // w)] += pool.svc_of(busy, p) / w
+    seed = SETTINGS["seed"]
+    warm = int(SETTINGS["warmup_share"] * len(arr))
+    orig = sorted(sim.run_once(pool, seed, 0, warm, arrivals=arr).latencies)
+    r = random.Random(seed)
+    t, pois = 0.0, []
+    for _, p in arr:
+        t += r.expovariate(pool.block_rate)
+        pois.append((t, p))
+    rand = sorted(sim.run_once(pool, seed, 0, warm, arrivals=pois).latencies)
+    return {"stage": busy.name, "minutes": n, "minute_load": {"mean": statistics.fmean(load), "max": max(load),
+            "over_0.9": sum(x > 0.9 for x in load)},
+            "original_order": {"mean_s": statistics.fmean(orig), "p99_s": sim.quantile(orig, 0.99)},
+            "poisson_arrivals": {"mean_s": statistics.fmean(rand), "p99_s": sim.quantile(rand, 0.99)}}
+
+
 def rows_for(name: str, res: dict) -> list[dict]:
     rows = []
     for variant, label in (("designed", "as designed"), ("traceca", "with the trace's arrival CV")):
@@ -108,7 +140,8 @@ def main(argv: list[str] | None = None) -> int:
     for name in trace.TRACES:
         res = replay(name)
         rows = rows_for(name, res)
-        traces.append({"name": name, "service": stats[name]["service"], "stats": stats[name], "sim": res, "rows": rows})
+        traces.append({"name": name, "service": stats[name]["service"], "stats": stats[name], "sim": res, "rows": rows,
+                       "diagnostics": diagnostics(name)})
         for r in rows:
             m = r["model"]
             print(f"{r['verdict']:4} {name}: {r['check']}  model {m if m is None else round(m, 6)}  "
