@@ -209,3 +209,16 @@ For the split design, as well:
 ±10 % for the deterministic rows: both are first-order models of the same hardware, and this is the band they
 should agree within if neither leaves out a first-order cost. The simulated rows use the same widening as the
 per-example checks.
+
+### Recorded after the first run
+
+Neither the rule nor the verdicts changed; a second run with the same seeds reproduced all 19 verdicts.
+- **Unjudged diagnostics added** to explain the misses:
+  - each step's parts on both sides (the explorer's stages; the simulator's arithmetic, memory and overhead, and
+    what bound the step);
+  - the prefill instances' busy shares and the mean wait for one.
+- **A default not listed above:** the simulator's power model. It bounds each device at 700 W with an illustrative
+  H100's coefficients, not the explorer's. It stretches the 70B decode steps at batch 500, which are close to
+  balanced, from the roofline's 19.4 ms to 22.3 ms.
+- **A finding about the simulator:** its prefill dispatcher measures load by waiting prompts alone, not the one in
+  service, so ties send new prompts to the first instance. That adds a 38 ms mean wait in the split design.

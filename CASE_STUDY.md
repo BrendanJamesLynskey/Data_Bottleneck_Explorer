@@ -118,6 +118,13 @@ longer understates the replays: it is at or above them, by up to 4×. But agains
 original order, the p99 is still 1.7× low, because busy minutes come in runs and each inherits the last one's
 queue.
 
+**Then another simulator.** I ran the LLM serving designs, on the same hardware figures, through
+Disaggregated_Inference_Sim, my own request-level serving simulator, under a rule fixed first. 6 of 19 rows agree,
+and the misses split cleanly. On step time the explorer is conservative, up to 1.9×, because it adds memory,
+arithmetic and the all-reduce in series where a roofline overlaps them. On memory it is optimistic by 11–13 %,
+because it counts every byte as usable. The cross-check also found a dispatch flaw in the other simulator: it sends
+new prompts to an instance that is already busy.
+
 Behind that, a regression suite runs in GitHub Actions on every push:
 - **Regression:** all 32 examples against golden results within 2 %.
 - **Hand calculations:**

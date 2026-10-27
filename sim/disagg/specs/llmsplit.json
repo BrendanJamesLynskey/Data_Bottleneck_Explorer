@@ -43,6 +43,17 @@
   "accelerators_per_copy": 4,
   "analytic": {
    "step_s": 0.043611370245749154,
+   "step_parts_s": {
+    "Host submit": 0.0000049999999999999996,
+    "Link H→D": 0.0000010439604123433432,
+    "Device DRAM": 0.017982053530109655,
+    "On-chip interconnect": 8.354776759661005e-9,
+    "Compute": 0.019195035876705405,
+    "Collective, scale-up": 0.004860518518518518,
+    "Collective, scale-out": 0.0015621684210526316,
+    "Link D→H": 5.415841738382975e-7,
+    "Completion": 0.0000049999999999999996
+   },
    "users_fit": 752.369950457317,
    "latency_mean_s": 0.04409068659838859,
    "latency_head_s": 0.05069743634038797,
@@ -57,6 +68,17 @@
   "nic_Bps_per_copy": 380000000000,
   "analytic": {
    "step_s": 0.11149950186840206,
+   "step_parts_s": {
+    "Host submit": 0.0000049999999999999996,
+    "Link H→D": 0.0000010439604123433432,
+    "Device DRAM": 0.0027716337945077984,
+    "On-chip interconnect": 1.059918802269259e-8,
+    "Compute": 0.06636014795351186,
+    "Collective, scale-up": 0.04078395555555556,
+    "Collective, scale-out": 0.0015721684210526317,
+    "Link D→H": 5.415841738382975e-7,
+    "Completion": 0.0000049999999999999996
+   },
    "ttft_mean_s": 0.11514820051047474,
    "ttft_pX_s": 0.14322868702363128,
    "ttft_head_s": 0.14322868702363128,

@@ -1,0 +1,626 @@
+{
+ "schema": "hw-explorer-sim/1/disagg",
+ "disagg_sim": {
+  "commit": "ba37774fe2315ca960d7471be352382e301f89a1",
+  "url": "https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim"
+ },
+ "rule": {
+  "step": 0.1,
+  "fit": 0.1,
+  "mean": 0.05,
+  "pct": 0.1
+ },
+ "settings": {
+  "runs": 10,
+  "seed": 1,
+  "lifetimes": 6,
+  "warmup_frac": 0.3333333333333333
+ },
+ "summary": {
+  "rows": 19,
+  "pass": 6
+ },
+ "designs": [
+  {
+   "id": "llmserve",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "cost": {
+    "decode_step_s": 0.02233526050411148,
+    "decode_parts_s": {
+     "arithmetic": 0.018916557420919657,
+     "memory": 0.01791905459904199,
+     "overhead": 0.0005,
+     "bound": "power"
+    },
+    "users_fit": 667.3447265625,
+    "memory_allowance": 0.9
+   },
+   "sim": {
+    "tpot_mean": {
+     "mean": 0.0050800176351072385,
+     "lo": 0.0050757073687160694,
+     "hi": 0.005084327901498408,
+     "n": 10
+    },
+    "tpot_p99": {
+     "mean": 0.005138320836806629,
+     "lo": 0.005132287818681038,
+     "hi": 0.0051443538549322205,
+     "n": 10
+    },
+    "ttft_mean": {
+     "mean": 0.10295506564548758,
+     "lo": 0.10156305702938821,
+     "hi": 0.10434707426158694,
+     "n": 10
+    },
+    "ttft_pX": {
+     "mean": 0.1312242084598793,
+     "lo": 0.13119786571324757,
+     "hi": 0.13125055120651105,
+     "n": 10
+    },
+    "prefill_wait": {
+     "mean": 0.03716827345504239,
+     "lo": 0.035776264838943014,
+     "hi": 0.03856028207114176,
+     "n": 10
+    },
+    "prefill_busy": [
+     0.9855097284937708,
+     0.9850990962565792,
+     0.6217922547035661,
+     8.644865374164636e-05
+    ]
+   },
+   "explorer_parts_s": {
+    "decode": {
+     "Host submit": 4.9999999999999996e-06,
+     "Link H\u2192D": 1.0095566113789876e-06,
+     "Device DRAM": 0.017967560776510023,
+     "On-chip interconnect": 8.351183231361106e-09,
+     "Compute": 0.019193711248105105,
+     "Collective, scale-up": 0.004860518518518519,
+     "Link D\u2192H": 5.090400377909343e-07,
+     "Completion": 4.9999999999999996e-06
+    },
+    "prefill": null
+   },
+   "requests": 12000,
+   "unfinished": 0,
+   "rows": [
+    {
+     "kind": "step",
+     "check": "Decode step, batch 500 at 4096 tokens of context",
+     "model": 0.042033317490966046,
+     "sim": 0.02233526050411148,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "fit",
+     "check": "Users per copy that fit in memory",
+     "model": 753.1046867370605,
+     "sim": 667.3447265625,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "budget",
+     "check": "Decode meets its budget (p99 per step against p99 time per output token)",
+     "model": 0.04910465055962048,
+     "sim": {
+      "mean": 0.005138320836806629,
+      "lo": 0.005132287818681038,
+      "hi": 0.0051443538549322205,
+      "n": 10
+     },
+     "budget": 0.05,
+     "model_meets": true,
+     "sim_meets": true,
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "llmserve_b128",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve,llm.users:512,llm.batch:128",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "cost": {
+    "decode_step_s": 0.00737429435666943,
+    "decode_parts_s": {
+     "arithmetic": 0.004842638699755432,
+     "memory": 0.00687429435666943,
+     "overhead": 0.0005,
+     "bound": "power"
+    },
+    "users_fit": 667.3447265625,
+    "memory_allowance": 0.9
+   },
+   "sim": {
+    "tpot_mean": {
+     "mean": 0.0038713395271605,
+     "lo": 0.003870311164078775,
+     "hi": 0.003872367890242225,
+     "n": 10
+    },
+    "tpot_p99": {
+     "mean": 0.003899552197793162,
+     "lo": 0.0038990396335227863,
+     "hi": 0.003900064762063538,
+     "n": 10
+    },
+    "ttft_mean": {
+     "mean": 0.06602069783690738,
+     "lo": 0.06600332226867632,
+     "hi": 0.06603807340513844,
+     "n": 10
+    },
+    "ttft_pX": {
+     "mean": 0.07412228509356425,
+     "lo": 0.07342574907033175,
+     "hi": 0.07481882111679675,
+     "n": 10
+    },
+    "prefill_wait": {
+     "mean": 0.00023390564646218887,
+     "lo": 0.00021653007823110607,
+     "hi": 0.00025128121469327163,
+     "n": 10
+    },
+    "prefill_busy": [
+     0.6651585714621634,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "explorer_parts_s": {
+    "decode": {
+     "Host submit": 4.9999999999999996e-06,
+     "Link H\u2192D": 1.0024464925130208e-06,
+     "Device DRAM": 0.006922934665297292,
+     "On-chip interconnect": 8.317798380456742e-09,
+     "Compute": 0.004913590079514907,
+     "Collective, scale-up": 0.0012487567407407406,
+     "Link D\u2192H": 5.023142496744792e-07,
+     "Completion": 4.9999999999999996e-06
+    },
+    "prefill": null
+   },
+   "requests": 3072,
+   "unfinished": 0,
+   "rows": [
+    {
+     "kind": "step",
+     "check": "Decode step, batch 128 at 4096 tokens of context",
+     "model": 0.013096794564093506,
+     "sim": 0.00737429435666943,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "fit",
+     "check": "Users per copy that fit in memory",
+     "model": 753.1046867370605,
+     "sim": 667.3447265625,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "budget",
+     "check": "Decode meets its budget (p99 per step against p99 time per output token)",
+     "model": 0.014674835079027252,
+     "sim": {
+      "mean": 0.003899552197793162,
+      "lo": 0.0038990396335227863,
+      "hi": 0.003900064762063538,
+      "n": 10
+     },
+     "budget": 0.05,
+     "model_meets": true,
+     "sim_meets": true,
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "llmserve_b32",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve,llm.users:128,llm.batch:32",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "cost": {
+    "decode_step_s": 0.004524034230102924,
+    "decode_parts_s": {
+     "arithmetic": 0.001210659674938858,
+     "memory": 0.004024034230102925,
+     "overhead": 0.0005,
+     "bound": "memory"
+    },
+    "users_fit": 667.3447265625,
+    "memory_allowance": 0.9
+   },
+   "sim": {
+    "tpot_mean": {
+     "mean": 0.0036507885573174095,
+     "lo": 0.003650351451750493,
+     "hi": 0.003651225662884326,
+     "n": 10
+    },
+    "tpot_p99": {
+     "mean": 0.003666057689710752,
+     "lo": 0.0036659488508350023,
+     "hi": 0.0036661665285865016,
+     "n": 10
+    },
+    "ttft_mean": {
+     "mean": 0.06578679219044511,
+     "lo": 0.06578679219044499,
+     "hi": 0.06578679219044524,
+     "n": 10
+    },
+    "ttft_pX": {
+     "mean": 0.06578679219046535,
+     "lo": 0.06578679219046535,
+     "hi": 0.06578679219046535,
+     "n": 10
+    },
+    "prefill_wait": {
+     "mean": 0.0,
+     "lo": 0.0,
+     "hi": 0.0,
+     "n": 10
+    },
+    "prefill_busy": [
+     0.16684607167542773,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "explorer_parts_s": {
+    "decode": {
+     "Host submit": 4.9999999999999996e-06,
+     "Link H\u2192D": 1.000611623128255e-06,
+     "Device DRAM": 0.0040727085738976945,
+     "On-chip interconnect": 8.279092755945792e-09,
+     "Compute": 0.0012283975198787267,
+     "Collective, scale-up": 0.00031668918518518516,
+     "Link D\u2192H": 5.005785624186197e-07,
+     "Completion": 4.9999999999999996e-06
+    },
+    "prefill": null
+   },
+   "requests": 768,
+   "unfinished": 0,
+   "rows": [
+    {
+     "kind": "step",
+     "check": "Decode step, batch 32 at 4096 tokens of context",
+     "model": 0.005629304748239908,
+     "sim": 0.004524034230102924,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "fit",
+     "check": "Users per copy that fit in memory",
+     "model": 753.1046867370605,
+     "sim": 667.3447265625,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "budget",
+     "check": "Decode meets its budget (p99 per step against p99 time per output token)",
+     "model": 0.006101762043121231,
+     "sim": {
+      "mean": 0.003666057689710752,
+      "lo": 0.0036659488508350023,
+      "hi": 0.0036661665285865016,
+      "n": 10
+     },
+     "budget": 0.05,
+     "model_meets": true,
+     "sim_meets": true,
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "llmserve_8b",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve,llm.model:l8,llm.params:8.03,llm.active:8.03,llm.layers:32,llm.dModel:4096",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "cost": {
+    "decode_step_s": 0.00676997938202693,
+    "decode_parts_s": {
+     "arithmetic": 0.002167423547246084,
+     "memory": 0.006269979382026929,
+     "overhead": 0.0005,
+     "bound": "memory"
+    },
+    "users_fit": 1901.2763671875,
+    "memory_allowance": 0.9
+   },
+   "sim": {
+    "tpot_mean": {
+     "mean": 0.0009454971190626368,
+     "lo": 0.0009452385926295104,
+     "hi": 0.0009457556454957632,
+     "n": 10
+    },
+    "tpot_p99": {
+     "mean": 0.0009569865176037572,
+     "lo": 0.0009562993592880808,
+     "hi": 0.0009576736759194336,
+     "n": 10
+    },
+    "ttft_mean": {
+     "mean": 0.007746625416869222,
+     "lo": 0.007746625416869207,
+     "hi": 0.007746625416869238,
+     "n": 10
+    },
+    "ttft_pX": {
+     "mean": 0.007746625416871211,
+     "lo": 0.007746625416871211,
+     "hi": 0.007746625416871211,
+     "n": 10
+    },
+    "prefill_wait": {
+     "mean": 0.0,
+     "lo": 0.0,
+     "hi": 0.0,
+     "n": 10
+    },
+    "prefill_busy": [
+     0.30894408148797364,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "explorer_parts_s": {
+    "decode": {
+     "Host submit": 4.9999999999999996e-06,
+     "Link H\u2192D": 1.0095566113789876e-06,
+     "Device DRAM": 0.006293234871820869,
+     "On-chip interconnect": 8.308711589002696e-09,
+     "Compute": 0.0023000863628094997,
+     "Collective, scale-up": 0.0009769037037037037,
+     "Link D\u2192H": 5.090400377909343e-07,
+     "Completion": 4.9999999999999996e-06
+    },
+    "prefill": null
+   },
+   "requests": 12000,
+   "unfinished": 0,
+   "rows": [
+    {
+     "kind": "step",
+     "check": "Decode step, batch 500 at 4096 tokens of context",
+     "model": 0.009581751843694832,
+     "sim": 0.00676997938202693,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "fit",
+     "check": "Users per copy that fit in memory",
+     "model": 2115.8531308174133,
+     "sim": 1901.2763671875,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "budget",
+     "check": "Decode meets its budget (p99 per step against p99 time per output token)",
+     "model": 0.010426020443490471,
+     "sim": {
+      "mean": 0.0009569865176037572,
+      "lo": 0.0009562993592880808,
+      "hi": 0.0009576736759194336,
+      "n": 10
+     },
+     "budget": 0.05,
+     "model_meets": true,
+     "sim_meets": true,
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "llmsplit",
+   "name": "Prefill and decode on separate pools (Llama 3.1 70B, 3,600-token prompts)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmsplit",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "cost": {
+    "decode_step_s": 0.02234040083179521,
+    "decode_parts_s": {
+     "arithmetic": 0.018917882049519958,
+     "memory": 0.017933547354214926,
+     "overhead": 0.0005,
+     "bound": "power"
+    },
+    "users_fit": 666.6936585365854,
+    "memory_allowance": 0.9,
+    "prefill_step_s": 0.06586179809277413,
+    "prefill_parts_s": {
+     "arithmetic": 0.06536179809277413,
+     "memory": 0.0015507320592503075,
+     "overhead": 0.0005,
+     "bound": "compute"
+    }
+   },
+   "sim": {
+    "tpot_mean": {
+     "mean": 0.005082062641194155,
+     "lo": 0.0050777394006130344,
+     "hi": 0.005086385881775276,
+     "n": 10
+    },
+    "tpot_p99": {
+     "mean": 0.0051402449464063565,
+     "lo": 0.005133392118098403,
+     "hi": 0.00514709777471431,
+     "n": 10
+    },
+    "ttft_mean": {
+     "mean": 0.10350576044458096,
+     "lo": 0.10225238927524345,
+     "hi": 0.10475913161391846,
+     "n": 10
+    },
+    "ttft_pX": {
+     "mean": 0.1313829256508356,
+     "lo": 0.13136368011665595,
+     "hi": 0.13140217118501524,
+     "n": 10
+    },
+    "prefill_wait": {
+     "mean": 0.03764396235180002,
+     "lo": 0.03639059118246251,
+     "hi": 0.038897333521137535,
+     "n": 10
+    },
+    "prefill_busy": [
+     0.985506129909923,
+     0.9851817518103235,
+     0.624668190147651,
+     0.00019471893279297066
+    ]
+   },
+   "explorer_parts_s": {
+    "decode": {
+     "Host submit": 4.9999999999999996e-06,
+     "Link H\u2192D": 1.0439604123433432e-06,
+     "Device DRAM": 0.017982053530109655,
+     "On-chip interconnect": 8.354776759661005e-09,
+     "Compute": 0.019195035876705405,
+     "Collective, scale-up": 0.004860518518518518,
+     "Collective, scale-out": 0.0015621684210526316,
+     "Link D\u2192H": 5.415841738382975e-07,
+     "Completion": 4.9999999999999996e-06
+    },
+    "prefill": {
+     "Host submit": 4.9999999999999996e-06,
+     "Link H\u2192D": 1.0439604123433432e-06,
+     "Device DRAM": 0.0027716337945077984,
+     "On-chip interconnect": 1.059918802269259e-08,
+     "Compute": 0.06636014795351186,
+     "Collective, scale-up": 0.04078395555555556,
+     "Collective, scale-out": 0.0015721684210526317,
+     "Link D\u2192H": 5.415841738382975e-07,
+     "Completion": 4.9999999999999996e-06
+    }
+   },
+   "requests": 12000,
+   "unfinished": 0,
+   "rows": [
+    {
+     "kind": "step",
+     "check": "Decode step, batch 500 at 4100 tokens of context",
+     "model": 0.043611370245749154,
+     "sim": 0.02234040083179521,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "fit",
+     "check": "Users per copy that fit in memory",
+     "model": 752.369950457317,
+     "sim": 666.6936585365854,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "budget",
+     "check": "Decode meets its budget (p99 per step against p99 time per output token)",
+     "model": 0.05069743634038797,
+     "sim": {
+      "mean": 0.0051402449464063565,
+      "lo": 0.005133392118098403,
+      "hi": 0.00514709777471431,
+      "n": 10
+     },
+     "budget": 0.05,
+     "model_meets": false,
+     "sim_meets": true,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "step",
+     "check": "Prefill of one 3,600-token prompt",
+     "model": 0.11149950186840206,
+     "sim": 0.06586179809277413,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "mean",
+     "check": "Mean time to first token",
+     "model": 0.11514820051047474,
+     "sim": {
+      "mean": 0.10350576044458096,
+      "lo": 0.10225238927524345,
+      "hi": 0.10475913161391846,
+      "n": 10
+     },
+     "w": 0.05,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "pct",
+     "check": "Time to first token, p99",
+     "model": 0.14322868702363128,
+     "sim": {
+      "mean": 0.1313829256508356,
+      "lo": 0.13136368011665595,
+      "hi": 0.13140217118501524,
+      "n": 10
+     },
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "budget",
+     "check": "Time to first token meets its budget (p99)",
+     "model": 0.14322868702363128,
+     "sim": {
+      "mean": 0.1313829256508356,
+      "lo": 0.13136368011665595,
+      "hi": 0.13140217118501524,
+      "n": 10
+     },
+     "budget": 2,
+     "model_meets": true,
+     "sim_meets": true,
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  }
+ ]
+}

@@ -43,6 +43,16 @@
   "accelerators_per_copy": 4,
   "analytic": {
    "step_s": 0.013096794564093506,
+   "step_parts_s": {
+    "Host submit": 0.0000049999999999999996,
+    "Link H→D": 0.0000010024464925130208,
+    "Device DRAM": 0.006922934665297292,
+    "On-chip interconnect": 8.317798380456742e-9,
+    "Compute": 0.004913590079514907,
+    "Collective, scale-up": 0.0012487567407407406,
+    "Link D→H": 5.023142496744792e-7,
+    "Completion": 0.0000049999999999999996
+   },
    "users_fit": 753.1046867370605,
    "latency_mean_s": 0.013132928975405012,
    "latency_head_s": 0.014674835079027252,

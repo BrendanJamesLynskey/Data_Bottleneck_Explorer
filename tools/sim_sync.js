@@ -1,7 +1,8 @@
 // Keep the simulation files in step with the page:  node tools/sim_sync.js [--check]
 //   1. export every example's design spec (simSpec, schema hw-explorer-sim/1) to sim/examples/<id>.json, in headless Chrome;
 //   2. embed sim/sim.py (for Export and the in-browser run), sim/results.json (the Checks tab's model-vs-simulation
-//      table) and sim/trace_results.json (its real-traffic table) in index.html, between their <script> tags;
+//      table), sim/trace_results.json (its real-traffic table) and sim/disagg_results.json (its serving-simulator
+//      cross-check) in index.html, between their <script> tags;
 //   3. export the real-traffic specs (simTraceSpec, from sim/traces/stats.json) to sim/traces/specs/;
 //   4. export the Disaggregated_Inference_Sim cross-check specs (simLlmSpec) to sim/disagg/specs/.
 // --check writes nothing and fails if any file is stale, so CI catches a model change that wasn't re-exported.
@@ -33,6 +34,8 @@ const check = process.argv.includes('--check');
   html = embed(html, 'simResults', fs.existsSync(res) ? JSON.stringify(JSON.parse(fs.readFileSync(res, 'utf8')), small) + '\n' : 'null\n');
   const tres = path.join(ROOT, 'sim', 'trace_results.json');
   html = embed(html, 'simTraceResults', fs.existsSync(tres) ? JSON.stringify(JSON.parse(fs.readFileSync(tres, 'utf8')), small) + '\n' : 'null\n');
+  const dres = path.join(ROOT, 'sim', 'disagg_results.json');
+  html = embed(html, 'simDisaggResults', fs.existsSync(dres) ? JSON.stringify(JSON.parse(fs.readFileSync(dres, 'utf8')), small) + '\n' : 'null\n');
   put(PAGE, html);
 
   const browser = await puppeteer.launch({headless: true, args: ['--no-sandbox']});
@@ -74,6 +77,6 @@ const check = process.argv.includes('--check');
 
   if (check) {
     if (stale.length) { console.log('FAIL simulation files out of step with the page (run node tools/sim_sync.js): ' + stale.join(', ')); process.exit(1); }
-    console.log(`ok   simulation files in step: ${specs.length} example specs, ${tspecs.length} real-traffic specs, ${lspecs.length} cross-check specs, sim.py and both results embedded in the page`);
+    console.log(`ok   simulation files in step: ${specs.length} example specs, ${tspecs.length} real-traffic specs, ${lspecs.length} cross-check specs, sim.py and all three results embedded in the page`);
   } else console.log(stale.length ? 'updated ' + stale.join(', ') : 'nothing to update');
 })();

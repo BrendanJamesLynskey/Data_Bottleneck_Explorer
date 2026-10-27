@@ -13,7 +13,8 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm test
-  # the simulator: its own tests, then every example against the committed model-vs-simulation results
+  # the simulator: its own tests, every example against the committed model-vs-simulation results, the real-traffic
+  # replays, and the cross-check against Disaggregated_Inference_Sim
   simulation:
     runs-on: ubuntu-latest
     steps:
@@ -25,6 +26,7 @@ jobs:
       - run: python -m pytest sim -q
       - run: python sim/compare.py --check --jobs 4
       - run: python sim/trace_compare.py --check
+      - run: python sim/disagg_compare.py --check --jobs 4
   # the same simulator in the browser: Pyodide and SimPy, cached between runs
   browser-simulation:
     runs-on: ubuntu-latest

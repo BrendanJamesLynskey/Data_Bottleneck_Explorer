@@ -93,8 +93,11 @@ def run(args: tuple[str, int]) -> dict:
     steady = done[int(len(done) * SETTINGS["warmup_frac"]):]
     pct = spec["workload"]["percentile"]
     tpot, ttft = sorted(r.tpot for r in steady if r.tpot is not None), sorted(r.ttft for r in steady)
+    # not judged: how evenly the prefill instances share the prompts, and how long a prompt waits for one
+    busy = [i.busy / res.horizon for i in res.instances if i.name.startswith("prefill")]
     return {"name": name, "requests": len(res.requests), "finished": len(done), "tpot_p99": sim.quantile(tpot, 0.99),
-            "tpot_mean": statistics.fmean(tpot), "ttft_mean": statistics.fmean(ttft), "ttft_pX": sim.quantile(ttft, pct)}
+            "tpot_mean": statistics.fmean(tpot), "ttft_mean": statistics.fmean(ttft), "ttft_pX": sim.quantile(ttft, pct),
+            "prefill_wait": statistics.fmean(r.prefill_start - r.arrival for r in steady), "prefill_busy": busy}
 
 
 def costs(spec: dict) -> dict:
@@ -103,9 +106,17 @@ def costs(spec: dict) -> dict:
     s = Simulation(config(spec), [])
     w, B = spec["workload"], round(spec["workload"]["batch"])
     cd = s.cost_for("decode")
-    out = {"decode_step_s": cd.decode_sum(round(B * w["ctx"]), B).time, "users_fit": cd.kv_capacity_tokens / w["ctx"]}
+    # not judged: each step's arithmetic and memory times (the roofline takes the larger), its fixed overhead, and what
+    # bound it ("power": the simulator's default power model, an illustrative H100's, stretched it to fit 700 W)
+    parts = lambda c, st: {"arithmetic": st.flops / c.flops_rate, "memory": st.bytes / c.byte_rate, "overhead": c.step_overhead,
+                           "bound": st.bound}
+    d = cd.decode_sum(round(B * w["ctx"]), B)
+    out = {"decode_step_s": d.time, "decode_parts_s": parts(cd, d), "users_fit": cd.kv_capacity_tokens / w["ctx"],
+           "memory_allowance": cd.mem_util}
     if spec["prefill"]:
-        out["prefill_step_s"] = s.cost_for("prefill").prefill([prompt_of(spec)]).time
+        cp = s.cost_for("prefill")
+        p = cp.prefill([prompt_of(spec)])
+        out["prefill_step_s"], out["prefill_parts_s"] = p.time, parts(cp, p)
     return out
 
 
@@ -158,9 +169,12 @@ def main(argv: list[str] | None = None) -> int:
         spec, runs = load(n), [r for r in out if r["name"] == n]
         cost = costs(spec)
         rows = rows_for(spec, cost, runs)
-        sims = {k: sim.ci([r[k] for r in runs]) for k in ("tpot_mean", "tpot_p99", "ttft_mean", "ttft_pX")}
+        sims = {k: sim.ci([r[k] for r in runs]) for k in ("tpot_mean", "tpot_p99", "ttft_mean", "ttft_pX", "prefill_wait")}
+        sims["prefill_busy"] = [statistics.fmean(r["prefill_busy"][i] for r in runs) for i in range(len(runs[0]["prefill_busy"]))]
         designs.append({"id": n, "name": spec["design"]["name"], "link": spec["design"]["link"],
                         "model_hash": spec["explorer"]["model_hash"], "cost": cost, "sim": sims,
+                        "explorer_parts_s": {"decode": spec["decode"]["analytic"]["step_parts_s"],
+                                             "prefill": spec["prefill"]["analytic"]["step_parts_s"] if spec["prefill"] else None},
                         "requests": runs[0]["requests"], "unfinished": sum(r["requests"] - r["finished"] for r in runs),
                         "rows": rows})
         for r in rows:

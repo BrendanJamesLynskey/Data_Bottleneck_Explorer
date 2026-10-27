@@ -275,7 +275,34 @@ model has the trace's CV and once it is figured for the busiest minute.
 - **What it means in practice:** size prefill for its busiest minute, not its average, and treat even that figure
   as a floor when busy minutes cluster.
 
-Decode isn't replayed: its steps are clocked and batched. That is for a cross-check against a serving simulator.
+Decode isn't replayed: its steps are clocked and batched. The cross-check below covers it.
+
+### Cross-check: Disaggregated_Inference_Sim
+
+`sim/disagg_compare.py` runs the explorer's LLM serving designs through
+[Disaggregated_Inference_Sim](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim) (pinned at
+`ba37774`), a SimPy simulator of prefill/decode serving with continuous batching and roofline steps.
+- **Same hardware:** the page exports each design (`simLlmSpec`, to `sim/disagg/specs/`) with the explorer's own
+  peak rates, efficiencies and memory, so the two tools differ only in how they model serving.
+- **Designs:** the two LLM examples plus three variants of `llmserve` (batch 128, batch 32, Llama 3.1 8B), fixed in
+  `sim/TOLERANCE.md` with the rule before the first run.
+
+**Outcome: 6 of 19 rows agree.** Every miss has a cause the stage breakdowns show:
+- **Step times: the explorer is conservative.** It adds memory, arithmetic and the tensor-parallel all-reduce in
+  series; the simulator takes the larger of memory and arithmetic, plus 0.5 ms, and leaves the all-reduce out.
+  - 70B decode at batch 500 is 1.88× the simulator's: 18.0 ms + 19.2 ms + 4.9 ms against a roofline's
+    max(18.9, 17.9) ms, which the simulator's default 700 W power model stretches to 22.3 ms.
+  - The gap shrinks where one cost dominates: 1.78× at batch 128, 1.24× at batch 32, 1.42× for 8B.
+  - Prefill arithmetic agrees within 2 % (66.4 against 65.4 ms); the explorer's extra is a 40.8 ms all-reduce.
+- **Memory: the explorer is optimistic,** by 11–13 %. It counts all of each device's memory as usable; the
+  simulator keeps 10 % back, as vLLM does by default.
+- **Budgets:** the simulator decodes as fast as it can, so its p99 time per output token is 1–5 ms against the
+  50 ms budget. The verdicts match for four of five designs; for `llmsplit` the explorer's p99 step of 50.7 ms is
+  just over.
+- **Time to first token** agrees at the p99 and is 11 % high on the mean, partly because two errors offset: the
+  explorer's all-reduce, and a 38 ms mean prefill wait in the simulator.
+- **A finding about the simulator:** its prefill dispatcher counts waiting prompts but not the one in service, so
+  new prompts pile onto the first instance (busy 99 %, 99 %, 62 %, 0 %).
 
 ![Model vs simulation](sim.png)
 
@@ -286,6 +313,8 @@ Files:
 - `sim/TOLERANCE.md`: the rule.
 - `sim/examples/*.json`: each example's exported spec.
 - `sim/results.json`: the committed run.
+- `sim/disagg_compare.py`, `sim/disagg/specs/*.json` and `sim/disagg_results.json`: the Disaggregated_Inference_Sim
+  cross-check.
 - `sim/requirements.txt`: pinned SimPy and pytest.
 - `sim/traces/`: the Azure LLM traces and their source; `sim/azure_trace.py` loads and resamples them;
   `sim/trace_compare.py` replays them and writes `sim/trace_results.json`; `sim/test_azure_trace.py` tests them.
