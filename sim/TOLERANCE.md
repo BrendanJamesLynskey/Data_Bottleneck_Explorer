@@ -60,3 +60,52 @@ the Checks tab's published-figure rows cover them.
 
 Arrivals are a renewal process with the design's arrival CV, at the average rate. The explorer's peak-to-average
 sizes capacity against the ceiling but has no duration, so it isn't simulated as a modulated process.
+
+## Real traffic: the Azure LLM traces
+
+Fixed on 2026-10-27, before the first replay. As above, neither the rule nor the settings change to make a row
+pass.
+
+`sim/trace_compare.py` replays Microsoft's two Azure LLM inference traces from 2023 (code completion and
+conversation; see `sim/traces/SOURCE.md`) and writes `sim/trace_results.json`.
+
+### What is replayed
+
+The traces drive the split-pool example's prefill pool (`llmsplit`), where a block is one request's prompt and its
+latency is the time to first token.
+
+**The design** is the example moved to each trace's mean prompt length, at the same prompt-token rate (the reply
+scales with the prompt), so the average load is the design's. Each stage's service time at any prompt length comes
+from the model itself: it is evaluated at a grid of prompt lengths (`simTraceSpec`), with linear interpolation
+between grid points.
+
+**Each run** is one replay:
+- a moving-block bootstrap of the trace (60-second segments drawn with replacement, seeded);
+- times stretched so the average request rate is the design's;
+- every request's own prompt length;
+- the design's jitter on top.
+
+One copy of the model receives the whole scaled stream. Load balancing across copies isn't modelled, which is the
+conservative choice.
+
+**Settings:**
+- 20 runs from seed 1;
+- the first 5 % of each replay discarded as warm-up;
+- 95 % confidence intervals over the runs, as above.
+
+### Rows and the rule
+
+Two sets of model figures per trace, against the same replays:
+
+| Model figures | Arrival CV | Question it answers |
+|---|---|---|
+| As designed | the example's own, 0.2 | Do the example's assumptions hold under real traffic? |
+| With the trace's arrival CV | measured from the trace | Given the right burstiness, does Kingman's formula and the composition hold? |
+
+Prompt-length variation has no input in the explorer, so neither set includes it. Where that matters, it shows as
+a miss.
+
+Rows and widening, as for the per-example checks:
+- mean time to first token: 5 %;
+- its p99: 10 %;
+- the busiest stage's utilisation (as designed only), which checks the replay carried the design's load: 2 %.

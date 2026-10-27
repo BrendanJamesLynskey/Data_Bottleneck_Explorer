@@ -34,6 +34,7 @@ Pure Python on SimPy 4.1.1, so the same file runs under CPython, in CI and in th
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import math
 import random
@@ -117,11 +118,22 @@ class Pool:
     arrival_cv: float
     corr: float
     stages: list[Stage] = field(default_factory=list)
+    svc_table: dict | None = None  # {"sizes": [...], "svc_s": {k: [...]}}: service at each block size, for replays
 
     @classmethod
     def from_json(cls, d: dict, w: dict) -> "Pool":
         return cls(name=d["name"], block_rate=d["block_rate"], block_bytes=d["block_B"], accelerators=d["accelerators"],
-                   arrival_cv=w["arrival_cv"], corr=w["stage_corr"], stages=[Stage.from_json(s) for s in d["stages"]])
+                   arrival_cv=w["arrival_cv"], corr=w["stage_corr"], stages=[Stage.from_json(s) for s in d["stages"]],
+                   svc_table=d.get("svc_by_size"))
+
+    def svc_of(self, s: Stage, size: float | None) -> float:
+        """Mean service of a block of this size at stage s: the model's own figures at a grid of sizes, linear
+        between grid points and beyond the ends. Without a size (renewal runs) it is the stage's design service."""
+        if size is None or not self.svc_table or s.k not in self.svc_table["svc_s"]:
+            return s.svc
+        xs, ys = self.svc_table["sizes"], self.svc_table["svc_s"][s.k]
+        i = min(max(bisect.bisect_right(xs, size) - 1, 0), len(xs) - 2)
+        return max(0.0, ys[i] + (ys[i + 1] - ys[i]) * (size - xs[i]) / (xs[i + 1] - xs[i]))
 
     def servers(self) -> list[Stage]:
         return [s for s in self.stages if s.level == "block" and s.occupancy > 0]
@@ -178,8 +190,12 @@ class RunResult:
     drift: float               # mean latency of the last tenth over the first tenth (after warm-up)
 
 
-def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None = None) -> RunResult:
-    """One seeded run of `blocks` blocks through the pool's stages; the first `warm` are not measured."""
+def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None = None,
+             arrivals: list[tuple[float, float]] | None = None) -> RunResult:
+    """One seeded run of `blocks` blocks through the pool's stages; the first `warm` are not measured. With
+    `arrivals`, a list of (time, size), blocks arrive at those times instead, each served for its own size."""
+    if arrivals is not None:
+        blocks = len(arrivals)
     env = simpy.Environment()
     rate = pool.block_rate if rate is None else rate
     d = Draws(seed, pool.arrival_cv, pool.corr)
@@ -209,7 +225,7 @@ def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None =
                 if i >= warm:
                     wsum[s.k] += w
             elif s.k in servers:
-                f = d.factor(z0, s.svc_cv, s.dist)
+                f = d.factor(z0, s.svc_cv, s.dist) * (pool.svc_of(s, arrivals[i][1]) / s.svc if arrivals is not None and s.svc > 0 else 1.0)
                 if delay > 0:
                     yield env.timeout(delay)
                     delay = 0.0
@@ -236,7 +252,7 @@ def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None =
         for i in range(blocks):
             arr[i] = t
             env.process(block(i))
-            g = d.gap(1 / rate)
+            g = arrivals[i + 1][0] - arrivals[i][0] if arrivals is not None and i + 1 < blocks else d.gap(1 / rate)
             t += g
             yield env.timeout(g)
 
