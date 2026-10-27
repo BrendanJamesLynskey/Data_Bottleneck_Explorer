@@ -191,9 +191,10 @@ class RunResult:
 
 
 def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None = None,
-             arrivals: list[tuple[float, float]] | None = None) -> RunResult:
+             arrivals: list[tuple[float, float]] | None = None, keep_order: bool = False) -> RunResult:
     """One seeded run of `blocks` blocks through the pool's stages; the first `warm` are not measured. With
-    `arrivals`, a list of (time, size), blocks arrive at those times instead, each served for its own size."""
+    `arrivals`, a list of (time, size), blocks arrive at those times instead, each served for its own size. Latencies
+    come back sorted, or in arrival order with keep_order."""
     if arrivals is not None:
         blocks = len(arrivals)
     env = simpy.Environment()
@@ -258,7 +259,9 @@ def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None =
 
     env.process(source())
     env.run()
-    lat = sorted(dep[i] - arr[i] for i in range(warm, blocks))
+    lat = [dep[i] - arr[i] for i in range(warm, blocks)]
+    if not keep_order:
+        lat.sort()
     meas = [dep[i] for i in range(warm, blocks)]
     if any(not math.isfinite(x) for x in meas):
         return RunResult([math.inf] * len(lat), 0.0, {k: math.nan for k in servers}, {k: math.inf for k in wsum}, rate, math.inf)

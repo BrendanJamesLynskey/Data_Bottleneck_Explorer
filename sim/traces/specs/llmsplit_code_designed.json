@@ -1,7 +1,7 @@
 {
  "schema": "hw-explorer-sim/1",
  "explorer": {
-  "model_hash": "fnv1a32:42c6d3a6",
+  "model_hash": "fnv1a32:2b7f7c7f",
   "url": "https://hw-system-design-explorer.vercel.app/"
  },
  "design": {
@@ -13,7 +13,8 @@
   "trace_variant": {
    "prompt": 2048,
    "reply": 568.8888888888889,
-   "ca": 0.2
+   "ca": 0.2,
+   "busiest": null
   }
  },
  "workload": {
@@ -22,7 +23,11 @@
   "corr": "partial",
   "jitter": "typical",
   "percentile": 0.99,
-  "deadline": "soft"
+  "deadline": "soft",
+  "busiest": {
+   "load": 1,
+   "window_s": 60
+  }
  },
  "pools": [
   {

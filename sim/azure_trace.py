@@ -72,14 +72,15 @@ def _q(xs: list[float], p: float) -> float:
     return s[min(len(s) - 1, int(p * len(s)))]
 
 
-def peak_to_average(t: list[float], window: float) -> float:
-    """Busiest window's request count over the average window's, over whole windows of the trace."""
+def peak_to_average(t: list[float], window: float, weight: list[float] | None = None) -> float:
+    """Busiest window's request count (or total weight, e.g. prompt tokens) over the average window's, over whole
+    windows of the trace."""
     n = int((t[-1] - t[0]) // window)
-    counts = [0] * n
-    for x in t:
+    counts = [0.0] * n
+    for j, x in enumerate(t):
         i = int((x - t[0]) // window)
         if i < n:
-            counts[i] += 1
+            counts[i] += 1 if weight is None else weight[j]
     return max(counts) / statistics.fmean(counts)
 
 
@@ -89,6 +90,8 @@ def stats(tr: Trace) -> dict:
     return {"name": tr.name, "service": tr.service, "requests": len(tr.t), "span_s": tr.span,
             "rate_per_s": (len(tr.t) - 1) / tr.span, "arrival_cv": _cv(gaps),
             "peak_to_average": {f"{w:g}s": peak_to_average(tr.t, w) for w in (1.0, 10.0, 60.0)},
+            # the busiest minute's prompt tokens over the average minute's: the load the busiest-spell input takes
+            "token_peak_to_average": {"60s": peak_to_average(tr.t, 60.0, tr.prompt)},
             "prompt": {"mean": statistics.fmean(tr.prompt), "p50": _q(tr.prompt, 0.5), "p99": _q(tr.prompt, 0.99), "cv": _cv(tr.prompt)},
             "reply": {"mean": statistics.fmean(tr.reply), "p50": _q(tr.reply, 0.5), "p99": _q(tr.reply, 0.99), "cv": _cv(tr.reply)}}
 

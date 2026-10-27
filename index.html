@@ -653,6 +653,27 @@ function stageJit(k, s){ const cls = {src:s.src.startsWith('net')?'net':'ssd', c
   return JIT[cls][JIT_LEVEL[s.vary.jitter]]; }
 // peak of n bursty streams with pairwise correlation r: the excess over the mean shrinks by √(r + (1−r)/n)
 const smoothBurst = (burst, n, s) => 1 + (burst-1)*Math.sqrt(CORR[s.vary.corr] + (1-CORR[s.vary.corr])/Math.max(1,n));
+/* Busiest spell (pointwise-stationary fluid approximation, Wang, Nicol & Feldman 1996): a queue whose load rises from
+   its average u to u·M for W seconds, starting from its steady state at u. The blocks present, x (waiting and in
+   service), follow dx/dt = (ρp − ρ(x))/svc, where ρ(x) inverts Kingman's steady state x = ρ + c·ρ²/(1−ρ),
+   c = (ca² + cs²)/2, and a block arriving then waits Kingman's wait at ρ(x), (x − ρ)·svc/ρ. Returns that wait averaged
+   over the spell: finite when ρp ≥ 1 (the queue then grows by (ρp − 1)/svc blocks a second), and Kingman's at u·M
+   once W is long against the queue's settling time. */
+function spellWait(svc, u, M, W, c){
+  const rp = u*M, rho = x => 2*x/((1 + x) + Math.sqrt(Math.max(0, (1 + x)**2 - 4*(1 - c)*x))), wt = x => { const r = rho(x); return r>0 ? (x - r)*svc/r : 0; };
+  const xp = rp<1 ? rp + c*rp*rp/(1 - rp) : Infinity;
+  let x = u + c*u*u/(1 - u), t = 0, acc = 0, w0 = wt(x);
+  for(let i=0; i<20000 && t<W; i++){
+    const xn = xp<Infinity ? xp - (xp - x)*0.99 : x + 0.01*Math.max(x, 1);
+    if(xp<Infinity && xp - xn <= 1e-12*xp) break;                         // settled at ρp's steady state
+    const den = rp - rho((x + xn)/2); if(!(den>0)) break;
+    const dt = svc*(xn - x)/den, w1 = wt(xn);
+    if(t + dt >= W){ const f = (W - t)/dt; acc += (W - t)*(w0 + w0 + f*(w1 - w0))/2; t = W; break; }
+    acc += dt*(w0 + w1)/2; t += dt; x = xn; w0 = w1;
+  }
+  return (acc + Math.max(0, W - t)*w0)/W;
+}
+const spellName = W => W>=60 ? (W===60 ? 'minute' : sig(W/60)+' minutes') : sig(W)+' s';
 
 /* =====================================================================
    STATE + PRESETS
@@ -669,7 +690,7 @@ const BASE = {
   nvme:{id:'g5', count:4},
   scale:{perNode:1, nodes:1, racks:1, domain:'node', xUp:0, xOut:0, fabric:'nvl5', nic:'e800', nics:1, rackKW:40},
   noc:{topo:'mesh', tiles:64, width:512, ghz:2, hopNs:1.5, pattern:'local', xNoc:1, banks:64, bankB:64, pj:0.15, ports:8},
-  vary:{deadline:'soft', pct:0.99, ca:1, jitter:'typical', corr:'partial', tol:0},
+  vary:{deadline:'soft', pct:0.99, ca:1, jitter:'typical', corr:'partial', tol:0, peak:1, peakS:60},
   llm:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, kv:2048, wBytes:1, kvBytes:1, actBytes:2, ctx:4096, users:2000, tps:20, batch:500, prefill:false, prompt:2000, reply:500, disagg:false, ttft:2, pre:{perNode:8, nodes:1, racks:1}},
   train:{on:false, model:'l70', params:70.6, active:70.6, layers:80, dModel:8192, prec:2, tps:7e5, seq:8192, gbatch:4194304, micro:1, tp:8, pp:4, vpp:1, recompute:false, zero:true, total:15e12},
   cost:{basis:'build', margin:0.75, years:4, kwh:0.08, duty:1},
@@ -1234,10 +1255,13 @@ function modelCore(s){
   const B = s.block, Ua = k => U[k]/(['src','host','cpu'].includes(k) ? bHost : s.burst);
   // Kingman (G/G/1): wait ≈ (ca² + cs²)/2 · ρ/(1−ρ) · service; cs = the stage's own jitter. ca starts as the arrival
   // burstiness; each queued stage then passes on its departures' CV, cd² = ρ²·cs² + (1−ρ²)·ca² (Whitt's linking
-  // equation): a busy, steady stage spaces blocks out, so the queue after it forms less (found by the simulation)
-  let caq = s.vary.ca; const qin = {};
-  const q = (svc, u, k) => { const cs = svcCv(k, svc, s); qin[k] = {ca:caq, u};
-    if(u>=1) return Infinity; const w = svc*u/(1-u)*(caq**2 + cs**2)/2; caq = Math.sqrt(u*u*cs*cs + (1-u*u)*caq*caq); return w; };
+  // equation): a busy, steady stage spaces blocks out, so the queue after it forms less (found by the simulation).
+  // Busiest spell (vary.peak = M > 1): each wait is averaged over a spell of M × the average load lasting vary.peakS
+  // (spellWait); a stage downstream of a queue sees at most that queue's capacity, 1/u times the average rate
+  let caq = s.vary.ca, mcap = Infinity; const qin = {}, M = s.vary.peak||1, W = s.vary.peakS||60;
+  const q = (svc, u, k) => { const cs = svcCv(k, svc, s), Mk = Math.min(M, mcap), up = Math.min(1, u*Mk); qin[k] = {ca:caq, u, up};
+    if(u>=1) return Infinity; const w = Mk>1 ? spellWait(svc, u, Mk, W, (caq**2 + cs**2)/2) : svc*u/(1-u)*(caq**2 + cs**2)/2;
+    caq = Math.sqrt(up*up*cs*cs + (1-up*up)*caq*caq); if(u>0) mcap = Math.min(mcap, 1/u); return w; };
   const stages = [];
   if(dem.src!==undefined){
     const svc = B*s.inR/srcBW, base = s.src.startsWith('net') ? 5e-6 : 80e-6;
@@ -1280,9 +1304,10 @@ function modelCore(s){
   const d2dBps = xFrac*((inT + outT) + localT*(nc.pattern==='uniform' ? 1 : 0.3))*s.burst/D2D.eff;
   { const fixed = 2*nocHops*nc.hopNs*1e-9 + 64/nocLink + xFrac*D2D.latNs*1e-9, u = U.noc/s.burst;
     // the network's packets queue among all its traffic, which arrives with the workload's own burstiness
-    qin.noc = {ca:s.vary.ca, u};
-    stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip interconnect', fixed, svc:0, q:u>=1?Infinity:fixed*u/(1-u)*(s.vary.ca**2 + stageJit('noc', s)**2)/2});
-    stages.forEach(st=>{ if(qin[st.k]){ st.ca = qin[st.k].ca; st.u = qin[st.k].u; } });
+    qin.noc = {ca:s.vary.ca, u, up:Math.min(1, u*M)};
+    stages.splice(stages.findIndex(st=>st.k==='compute'), 0, {k:'noc', name:'On-chip interconnect', fixed, svc:0,
+      q:u>=1 ? Infinity : M>1 ? spellWait(fixed, u, M, W, (s.vary.ca**2 + stageJit('noc', s)**2)/2) : fixed*u/(1-u)*(s.vary.ca**2 + stageJit('noc', s)**2)/2});
+    stages.forEach(st=>{ if(qin[st.k]){ st.ca = qin[st.k].ca; st.u = qin[st.k].u; st.up = qin[st.k].up; } });
     stages.forEach(st=>st.t = st.fixed+st.svc+st.q); latency = stages.reduce((a,st)=>a+st.t,0); }
 
   // area of one accelerator die
@@ -1338,7 +1363,7 @@ function latencyStats(m){
   for(const st of m.stages){
     if(st.fixed>0) parts.push({mean:st.fixed, ln:lnParams(stageJit(st.k, S)), name:st.name});
     if(st.svc>0) parts.push({mean:st.svc, ln:lnParams(svcCv(st.k, st.svc, S)), name:st.name+' (transfer)'});
-    if(st.q>0) parts.push({mean:st.q, wait:Math.min(1, st.u), name:st.name+' (queue)'});
+    if(st.q>0) parts.push({mean:st.q, wait:Math.min(1, st.up ?? st.u), name:st.name+' (queue)'});
   }
   // tolerance stack: every part at its own percentile, as if the bad cases all coincide
   const stack = parts.reduce((a,p)=>a + (p.wait ? waitAt(p.mean, p.wait, pct) : p.mean*Math.exp(p.ln[0]+p.ln[1]*z)), 0);
@@ -1358,7 +1383,7 @@ function latencyStats(m){
 }
 const latHead = m => { const ls = latencyStats(m); return ls.unbounded ? Infinity : ls.head; };
 const pctName = p => 'p'+(+(p*100).toFixed(2));
-const latLabel = () => S.vary.deadline==='hard' ? 'worst case' : pctName(S.vary.pct);
+const latLabel = () => (S.vary.deadline==='hard' ? 'worst case' : pctName(S.vary.pct)) + ((S.vary.peak||1)>1 ? ', busiest '+spellName(S.vary.peakS||60) : '');
 // catalogue tolerance: capacities uncertain by ±tol (≈ 2σ, independent per component); share of draws that stay under the ceiling and under 100 %
 function tolStats(m){
   if(m._ts) return m._ts;
@@ -1400,7 +1425,7 @@ function simPool(name, s, m){
 }
 // FNV-1a over the model's source and tables: names the explorer version that computed a spec
 function modelHash(){
-  const src = [modelCore, model, modelOne, latencyStats, svcCv, stageJit, smoothBurst, simPool, simSpec].map(f=>f.toString()).join('') + JSON.stringify([JIT, CORR, Z, JIT_TAU]);
+  const src = [modelCore, model, modelOne, latencyStats, svcCv, stageJit, smoothBurst, spellWait, simPool, simSpec].map(f=>f.toString()).join('') + JSON.stringify([JIT, CORR, Z, JIT_TAU]);
   let h = 0x811c9dc5; for(let i=0;i<src.length;i++){ h ^= src.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return 'fnv1a32:'+(h>>>0).toString(16).padStart(8, '0');
 }
@@ -1410,15 +1435,20 @@ function simSpec(s){
   if(split){ const ps = prefillState(s); pools.push(simPool('prefill pool', ps, model(ps))); }
   return {schema:SIM_SCHEMA, explorer:{model_hash:modelHash(), url:SIM_URL},
     design:{name: p ? p.name : 'Custom design', example: p ? p.id : null, modified: !!(p && s===S && isModified()), link:SIM_URL+'#d='+packS(s), summary:designLine(s)},
-    workload:{arrival_cv:s.vary.ca, stage_corr:CORR[s.vary.corr], corr:s.vary.corr, jitter:s.vary.jitter, percentile:s.vary.pct, deadline:s.vary.deadline}, pools};
+    workload:{arrival_cv:s.vary.ca, stage_corr:CORR[s.vary.corr], corr:s.vary.corr, jitter:s.vary.jitter, percentile:s.vary.pct, deadline:s.vary.deadline,
+      busiest:{load:s.vary.peak||1, window_s:s.vary.peakS||60}}, pools};
 }
 
 /* Real-traffic spec (sim/trace_compare.py): an LLM design's prefill pool, where a block is one request's prompt, with
    each stage's service time at a grid of prompt lengths (the model run at each), so a trace's prompts can be replayed.
    The design is moved to the trace's mean prompt at the same prompt-token rate (the reply scales with it), and ca,
-   if given, replaces the arrival burstiness. Kept out of modelHash: it changes none of the per-example specs. */
-function simTraceSpec(s, prompt, ca){
+   if given, replaces the arrival burstiness. busy = {load, rate}, if given, sets the busiest spell to the trace's busiest
+   minute: its load ÷ the average, lasting a trace minute at the design's rate (the replay stretches the trace's times
+   by its request rate ÷ the design's block rate). Kept out of modelHash: it changes none of the per-example specs. */
+function simTraceSpec(s, prompt, ca, busy){
   const d = clone(s); d.llm.reply = s.llm.reply*prompt/s.llm.prompt; d.llm.prompt = prompt; if(ca!==undefined) d.vary.ca = ca;
+  if(busy){ const lam = withS(d, ()=>{ const ps = prefillState(d); return simPool('prefill pool', ps, model(ps)).block_rate; });
+    d.vary.peak = busy.load; d.vary.peakS = 60*busy.rate/lam; }
   return withS(d, ()=>{
     const ps = prefillState(d), pool = simPool('prefill pool', ps, model(ps));
     const sizes = [...new Set([16, 32, 64, 128, 256, 512, 1024, ...Array.from({length:16}, (_, i)=>(i + 1)*2048), prompt])].sort((a, b)=>a - b);
@@ -1427,7 +1457,7 @@ function simTraceSpec(s, prompt, ca){
       const m = model(c); for(const k in svc) svc[k].push(m.stages.find(st=>st.k===k).svc); }
     pool.svc_by_size = {unit:'prompt tokens', sizes, svc_s:svc}; pool.size_mean = prompt;
     const sp = simSpec(d);
-    return {...sp, design:{...sp.design, trace_variant:{prompt, reply:d.llm.reply, ca:d.vary.ca}}, workload:{...sp.workload, arrival_cv:d.vary.ca}, pools:[pool]};
+    return {...sp, design:{...sp.design, trace_variant:{prompt, reply:d.llm.reply, ca:d.vary.ca, busiest:busy ? {load:d.vary.peak, window_s:d.vary.peakS} : null}}, workload:{...sp.workload, arrival_cv:d.vary.ca}, pools:[pool]};
   });
 }
 
@@ -1956,6 +1986,8 @@ function buildVary(){
   ctl(el, {k:'vary.pct', label:'Percentile', type:'select', num:true, options:{0.99:'p99',0.999:'p99.9',0.9999:'p99.99'}});
   ctl(el, {k:'vary.jitter', label:'Jitter in each stage', type:'select', options:{low:'Low (tuned, isolated)',typical:'Typical',high:'High (shared, interrupts, refresh)'}});
   ctl(el, {k:'vary.ca', label:'Arrival burstiness (CV)', type:'range', min:0, max:3, step:0.05, fmt:v=>v.toFixed(2), hint:'0 = perfectly regular, 1 = random (Poisson), above 1 = bursty.'});
+  ctl(el, {k:'vary.peak', label:'Busiest spell (load ÷ average)', type:'range', min:1, max:4, step:0.05, fmt:v=>v.toFixed(2)+'×', hint:'Latency is figured for the busiest spell, starting from the average load; 1 = the average. Real traffic swings over minutes: see Checks, Real traffic.'});
+  ctl(el, {k:'vary.peakS', label:'Busiest spell lasts', type:'select', num:true, options:{1:'1 s', 10:'10 s', 60:'1 minute', 600:'10 minutes'}});
   ctl(el, {k:'vary.corr', label:'Do peaks line up?', type:'select', options:{full:'Yes, fully correlated (worst case)',partial:'Partly (ρ = 0.3)',indep:'No, independent'}, hint:'Independent peaks smooth out where many streams share a resource.'});
   ctl(el, {k:'vary.tol', label:'Catalogue tolerance', type:'select', num:true, options:{0:'Off',0.1:'± 10 %',0.2:'± 20 %',0.3:'± 30 %'}, hint:'Uncertainty in every capacity figure; gives the chance the design holds.'});
 }
@@ -2411,7 +2443,7 @@ function whyHTML(k, m, plain){
   if(k==='lat'){
     const ls = latencyStats(m);
     return `<h2>Latency = one block (${fmtB(S.block)}) through every stage: fixed delay + transfer + queueing</h2><table>${m.stages.map(st=>row(esc(st.name), `${fmtT(st.fixed)} + ${fmtT(st.svc)} + ${isFinite(st.q)?fmtT(st.q):'∞'} = ${fmtT(st.t)}`)).join('')}${row('<b>Mean</b>', `<b>${fmtT(m.latency)}</b>`)}</table>
-      <p>Transfer = block ÷ that stage’s usable rate. Queueing is Kingman’s G/G/1 wait at the stage’s load, with each stage’s arrivals smoothed by the busy stage before it. The headline ${latLabel()} (${ls.unbounded?'unbounded':fmtT(latHead(m))}) comes from ${S.vary.deadline==='hard' ? 'stacking each stage’s own worst case' : `a Monte Carlo of stage delays (lognormal times with ${S.vary.jitter} jitter, exponential-tailed queue waits)`}; the Latency tab shows the distribution.</p>`;
+      <p>Transfer = block ÷ that stage’s usable rate. Queueing is Kingman’s G/G/1 wait at the stage’s load, with each stage’s arrivals smoothed by the busy stage before it${(S.vary.peak||1)>1 ? `, averaged over a busiest ${spellName(S.vary.peakS||60)} at ${sig(S.vary.peak)}× the average load` : ''}. The headline ${latLabel()} (${ls.unbounded?'unbounded':fmtT(latHead(m))}) comes from ${S.vary.deadline==='hard' ? 'stacking each stage’s own worst case' : `a Monte Carlo of stage delays (lognormal times with ${S.vary.jitter} jitter, exponential-tailed queue waits)`}; the Latency tab shows the distribution.</p>`;
   }
   if(k==='power'){
     const A = m.A, H = m.H, OH = overhead(S), accW = m.pAcc*tp.nA, hostW = m.pNodeHost*tp.nN;
@@ -3094,7 +3126,7 @@ function paneModel(){
   <div class="card span"><h3>Scale-up fabrics (per accelerator, per direction)</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Fabric</th><th class="n">Raw</th><th class="n">Efficiency</th><th class="n">pJ/bit</th><th class="n">Switch W/acc.</th><th class="n">Max domain</th></tr></thead><tbody>${fb}</tbody></table></div>
   <p class="note">Scale-out traffic is charged 15 pJ/bit (NIC, optics, switches) plus NIC power per port.</p></div>
   <div class="card span"><h3>Overheads in this configuration</h3><div class="cols">${['h2d','d2h','dram','noc'].concat(M&&M.tp.dom>1&&M.xUp>0?['fabric']:[]).concat(M&&M.xOut>0?['nic']:[]).concat(S.src.startsWith('net')?['eth']:[]).map(k=>`<div>${ohTable(overheads(k, M))}</div>`).join('')}</div></div>
-  <div class="card span"><h3>Variability</h3><p style="margin:0;color:var(--t2)">Sizing uses the peak-to-average ratio, except that a resource shared by n independent streams sees a smoothed peak: the excess over the mean shrinks by √(ρ + (1−ρ)/n), where ρ is the chosen correlation (1 = peaks coincide, the worst case). Queueing waits use Kingman's G/G/1 approximation, (c<sub>a</sub>² + c<sub>s</sub>²)/2 · ρ/(1−ρ) · service time, with each stage's jitter c<sub>s</sub>. The first queue sees the arrival burstiness c<sub>a</sub>; each later one sees the departures of the queue before it, c<sub>d</sub>² = ρ²c<sub>s</sub>² + (1−ρ²)c<sub>a</sub>² (Whitt's linking equation), so a busy, steady stage smooths the traffic after it. Latency is sampled by Monte Carlo (10,000 to 40,000 draws depending on the percentile; lognormal fixed and transfer times, and queue waits that are zero with probability 1 − ρ and otherwise exponential, all correlated as chosen). A discrete-event simulation checks these shortcuts on the Checks tab. Fixed latencies carry the full jitter; long transfers average it out, their CV shrinking as √(duration ÷ 10 µs), while compute keeps its full, data-dependent jitter; a soft deadline is judged at the chosen percentile, a hard one at the worst-case stack of per-stage percentiles. Catalogue tolerance draws every capacity independently within ±tol (2σ) and reports how often the design holds and which component is weakest. Jitter CVs (low / typical / high): ${Object.entries(JIT).map(([k,v])=>k+' '+v.join('/')).join(', ')}.</p></div>
+  <div class="card span"><h3>Variability</h3><p style="margin:0;color:var(--t2)">Sizing uses the peak-to-average ratio, except that a resource shared by n independent streams sees a smoothed peak: the excess over the mean shrinks by √(ρ + (1−ρ)/n), where ρ is the chosen correlation (1 = peaks coincide, the worst case). Queueing waits use Kingman's G/G/1 approximation, (c<sub>a</sub>² + c<sub>s</sub>²)/2 · ρ/(1−ρ) · service time, with each stage's jitter c<sub>s</sub>. The first queue sees the arrival burstiness c<sub>a</sub>; each later one sees the departures of the queue before it, c<sub>d</sub>² = ρ²c<sub>s</sub>² + (1−ρ²)c<sub>a</sub>² (Whitt's linking equation), so a busy, steady stage smooths the traffic after it. With a busiest spell set, each wait is averaged over a spell of that many times the average load, starting from the average's steady state, by the pointwise-stationary fluid approximation (Wang, Nicol &amp; Feldman, 1996): the queue moves at the rate arrivals exceed what it serves, its service share read from Kingman's steady state, so a spell above 100 % gives a finite, growing queue rather than an unbounded one. Latency is sampled by Monte Carlo (10,000 to 40,000 draws depending on the percentile; lognormal fixed and transfer times, and queue waits that are zero with probability 1 − ρ and otherwise exponential, all correlated as chosen). A discrete-event simulation checks these shortcuts on the Checks tab. Fixed latencies carry the full jitter; long transfers average it out, their CV shrinking as √(duration ÷ 10 µs), while compute keeps its full, data-dependent jitter; a soft deadline is judged at the chosen percentile, a hard one at the worst-case stack of per-stage percentiles. Catalogue tolerance draws every capacity independently within ±tol (2σ) and reports how often the design holds and which component is weakest. Jitter CVs (low / typical / high): ${Object.entries(JIT).map(([k,v])=>k+' '+v.join('/')).join(', ')}.</p></div>
   <div class="card span"><h3>On-chip interconnect</h3><p style="margin:0;color:var(--t2)">Traffic entering or leaving the die (DRAM, host link, peers) meets the interconnect at the edge; tile-to-tile traffic follows the chosen pattern. Networks-on-chip (mesh, torus, ring, crossbar, and AMBA CHI as a coherent mesh) are checked at the edge channels (4k for a k × k grid), the bisection (k channels per direction for a mesh, 2k for a torus, 2 for a ring, with 1/16 of edge traffic and a pattern-dependent share of tile traffic crossing) and each tile's port. AMBA AXI and ACE are crossbars of masters and memory-side slave ports with independent read and write channels, checked at the memory ports, the master ports and tile-to-tile traffic through the crossbar. AXI4-Stream is a set of parallel pipelines, checked at their entries and busiest link. AHB and APB are shared buses: every transfer in either direction takes the one bus. Usable share of a link: ${Object.values(NOC_TOPO).map(t=>t.name.replace(/ \(.*\)/,'')+' '+(t.eff*100).toFixed(0)+' %').join(', ')}. Energy ${BASE.noc.pj} pJ/bit per hop plus ${SRAM_PJ} pJ/bit per SRAM access.</p></div></div>`;
 }
 
@@ -4059,9 +4091,10 @@ class RunResult:
 
 
 def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None = None,
-             arrivals: list[tuple[float, float]] | None = None) -> RunResult:
+             arrivals: list[tuple[float, float]] | None = None, keep_order: bool = False) -> RunResult:
     """One seeded run of `blocks` blocks through the pool's stages; the first `warm` are not measured. With
-    `arrivals`, a list of (time, size), blocks arrive at those times instead, each served for its own size."""
+    `arrivals`, a list of (time, size), blocks arrive at those times instead, each served for its own size. Latencies
+    come back sorted, or in arrival order with keep_order."""
     if arrivals is not None:
         blocks = len(arrivals)
     env = simpy.Environment()
@@ -4126,7 +4159,9 @@ def run_once(pool: Pool, seed: int, blocks: int, warm: int, rate: float | None =
 
     env.process(source())
     env.run()
-    lat = sorted(dep[i] - arr[i] for i in range(warm, blocks))
+    lat = [dep[i] - arr[i] for i in range(warm, blocks)]
+    if not keep_order:
+        lat.sort()
     meas = [dep[i] for i in range(warm, blocks)]
     if any(not math.isfinite(x) for x in meas):
         return RunResult([math.inf] * len(lat), 0.0, {k: math.nan for k in servers}, {k: math.inf for k in wsum}, rate, math.inf)

@@ -109,3 +109,25 @@ Rows and widening, as for the per-example checks:
 - mean time to first token: 5 %;
 - its p99: 10 %;
 - the busiest stage's utilisation (as designed only), which checks the replay carried the design's load: 2 %.
+
+### Added 2026-10-27: the busiest minute
+
+Added after the first replay, which showed that load swings over minutes drive the misses, and before any replay
+of this row. The explorer gained a busiest-spell input (how much busier than average, and for how long): each
+queue's wait is averaged over that spell, starting from the average's steady state, by the pointwise-stationary
+fluid approximation (Wang, Nicol & Feldman, 1996). At 1×, the default, every figure is unchanged.
+
+A third set of model figures per trace, against the same replays and under the same rule:
+
+| Model figures | Arrival CV | Busiest spell | Question it answers |
+|---|---|---|---|
+| For the trace's busiest minute | the example's own, 0.2 | the busiest minute's prompt tokens ÷ the average minute's, lasting one trace minute at the design's rate | Does designing for the busiest minute give a safe figure under real traffic? |
+
+The model's figures here describe the busiest minute, while the replay's describe the whole hour. The bootstrap
+includes the trace's busiest minute in only some replays. So this row is expected to sit at or above the replay,
+and a miss on the high side is the conservative kind. Not judged, but reported: the replay's own latency for the
+requests arriving in its busiest minute, from the original-order run.
+
+I had seen the diagnostics before choosing the method (the busiest minute's load, 126 % and 280 % of the busiest
+stage's capacity at the design's average). The method and its inputs follow from them, with nothing fitted to
+the replay's latencies.

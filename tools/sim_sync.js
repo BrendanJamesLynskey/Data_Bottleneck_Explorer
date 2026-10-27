@@ -41,11 +41,13 @@ const check = process.argv.includes('--check');
   await page.goto('file://' + PAGE, {waitUntil: 'domcontentloaded'});
   await new Promise(r => setTimeout(r, 500));
   const specs = await page.evaluate(() => PRESETS.map(p => { applyPreset(p.id); return [p.id, simSpec(S)]; }));
-  // real-traffic specs: the split-pool example at each trace's mean prompt, as designed and with the trace's arrival CV
+  // real-traffic specs: the split-pool example at each trace's mean prompt, as designed, with the trace's arrival CV,
+  // and as designed but figured for the trace's busiest minute (its prompt tokens ÷ the average minute's)
   const stats = JSON.parse(fs.readFileSync(path.join(ROOT, 'sim', 'traces', 'stats.json'), 'utf8'));
   const tspecs = await page.evaluate(st => { applyPreset('llmsplit'); const base = clone(S), out = [];
     for (const [name, t] of Object.entries(st)) { const prompt = Math.round(t.prompt.mean);
-      out.push([`llmsplit_${name}_designed`, simTraceSpec(base, prompt)], [`llmsplit_${name}_traceca`, simTraceSpec(base, prompt, t.arrival_cv)]); }
+      out.push([`llmsplit_${name}_designed`, simTraceSpec(base, prompt)], [`llmsplit_${name}_traceca`, simTraceSpec(base, prompt, t.arrival_cv)],
+               [`llmsplit_${name}_busiest`, simTraceSpec(base, prompt, undefined, {load: t.token_peak_to_average['60s'], rate: t.rate_per_s})]); }
     return out; }, stats);
   await browser.close();
   fs.mkdirSync(EX, {recursive: true});

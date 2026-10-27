@@ -1,7 +1,7 @@
 {
  "schema": "hw-explorer-sim/1",
  "explorer": {
-  "model_hash": "fnv1a32:42c6d3a6",
+  "model_hash": "fnv1a32:2b7f7c7f",
   "url": "https://hw-system-design-explorer.vercel.app/"
  },
  "design": {
@@ -17,7 +17,11 @@
   "corr": "partial",
   "jitter": "typical",
   "percentile": 0.99,
-  "deadline": "soft"
+  "deadline": "soft",
+  "busiest": {
+   "load": 1,
+   "window_s": 60
+  }
  },
  "pools": [
   {

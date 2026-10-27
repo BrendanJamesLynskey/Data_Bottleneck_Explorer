@@ -7,8 +7,9 @@ which the Checks tab shows.
     python sim/trace_compare.py --check       CI: re-run and fail if anything differs from the committed file
 
 The specs come from the page (simTraceSpec, exported by tools/sim_sync.js to sim/traces/specs/): the split-pool
-example moved to each trace's mean prompt at the same prompt-token rate, once as designed and once with the trace's
-measured arrival CV. Both share the simulated pool; only the model's figures differ.
+example moved to each trace's mean prompt at the same prompt-token rate, as designed, with the trace's measured
+arrival CV, and as designed but figured for the trace's busiest minute. All share the simulated pool; only the
+model's figures differ.
 """
 
 from __future__ import annotations
@@ -67,8 +68,8 @@ def replay(name: str) -> dict:
 
 def diagnostics(name: str) -> dict:
     """Not judged: why the replays come out as they do. The load each minute of the trace puts on the busiest stage
-    (at the design's average rate); the trace replayed once in its original order (no bootstrap); and the same prompts
-    with random (Poisson) arrivals at the same rate."""
+    (at the design's average rate); the trace replayed once in its original order (no bootstrap), overall and for the
+    requests arriving in its busiest minute; and the same prompts with random (Poisson) arrivals at the same rate."""
     with open(spec_path(name, "designed")) as f:
         spec = json.load(f)
     pool = sim.Pool.from_json(spec["pools"][0], spec["workload"])
@@ -83,7 +84,10 @@ def diagnostics(name: str) -> dict:
             load[int(t // w)] += pool.svc_of(busy, p) / w
     seed = SETTINGS["seed"]
     warm = int(SETTINGS["warmup_share"] * len(arr))
-    orig = sorted(sim.run_once(pool, seed, 0, warm, arrivals=arr).latencies)
+    seq = sim.run_once(pool, seed, 0, warm, arrivals=arr, keep_order=True).latencies
+    top = max(range(n), key=lambda i: load[i])
+    peak = sorted(x for (t, _), x in zip(arr[warm:], seq) if int(t // w) == top)
+    orig = sorted(seq)
     r = random.Random(seed)
     t, pois = 0.0, []
     for _, p in arr:
@@ -92,22 +96,25 @@ def diagnostics(name: str) -> dict:
     rand = sorted(sim.run_once(pool, seed, 0, warm, arrivals=pois).latencies)
     return {"stage": busy.name, "minutes": n, "minute_load": {"mean": statistics.fmean(load), "max": max(load),
             "over_0.9": sum(x > 0.9 for x in load)},
-            "original_order": {"mean_s": statistics.fmean(orig), "p99_s": sim.quantile(orig, 0.99)},
+            "original_order": {"mean_s": statistics.fmean(orig), "p99_s": sim.quantile(orig, 0.99),
+                               "busiest_minute": {"requests": len(peak), "mean_s": statistics.fmean(peak), "p99_s": sim.quantile(peak, 0.99)}},
             "poisson_arrivals": {"mean_s": statistics.fmean(rand), "p99_s": sim.quantile(rand, 0.99)}}
 
 
 def rows_for(name: str, res: dict) -> list[dict]:
     rows = []
-    for variant, label in (("designed", "as designed"), ("traceca", "with the trace's arrival CV")):
+    for variant, label in (("designed", "as designed"), ("traceca", "with the trace's arrival CV"),
+                           ("busiest", "for the trace's busiest minute")):
         with open(spec_path(name, variant)) as f:
             spec = json.load(f)
         p = spec["pools"][0]
         lat, pname = p["analytic"]["latency"], f"p{spec['workload']['percentile'] * 100:g}"
-        ca = spec["workload"]["arrival_cv"]
+        ca, b = spec["workload"]["arrival_cv"], spec["design"]["trace_variant"]["busiest"]
+        label += f" ({b['load']:.3g}× load for {b['window_s']:.2g} s, arrival CV {ca:.2g})" if b else f" (arrival CV {ca:.2g})"
         for kind, check, model, simc in (("mean", "Mean time to first token", lat["mean_s"], res["mean_s"]),
                                          ("pct", f"Time to first token, {pname}", lat["pX_s"], res["pX_s"])):
             ok = model is not None and sim.judge(model, simc, RULE[kind]) == "pass"
-            rows.append({"kind": kind, "variant": variant, "check": f"{check}, model {label} (arrival CV {ca:.2g})",
+            rows.append({"kind": kind, "variant": variant, "check": f"{check}, model {label}",
                          "model": model, "sim": simc, "w": RULE[kind], "verdict": "pass" if ok else "miss",
                          "note": "" if model is not None else "The model calls this unbounded."})
         if variant == "designed":   # the load the replay put on the busiest stage, against the model's
