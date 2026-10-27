@@ -1461,6 +1461,33 @@ function simTraceSpec(s, prompt, ca, busy){
   });
 }
 
+/* Cross-check spec (sim/disagg_compare.py, against Disaggregated_Inference_Sim): an LLM serving design's hardware,
+   model shape, pools and workload, with the explorer's figures for them. The device is given as the model sees it
+   (8-bit dense rate and its utilisation, DRAM peak and this traffic's efficiency, capacity), so the simulator runs the
+   same hardware. Step times are the stages' fixed and transfer times summed, without queueing. Kept out of modelHash:
+   it changes none of the per-example specs. */
+const DISAGG_MODELS = {l8:'llama3-8b', l70:'llama3-70b'};
+function simLlmSpec(s){
+  return withS(s, ()=>{
+    const m = model(s), L = s.llm, i = llmInfo(s), raw = s.dev.units*dramUnitBW(m.dev);
+    const steps = mm => mm.stages.reduce((a, st)=>a + st.fixed + st.svc, 0);
+    const lat = (st, mm) => withS(st, ()=>{ const ls = latencyStats(mm); return ls.unbounded ? {mean_s:null, pX_s:null, head_s:null} : {mean_s:mm.latency, pX_s:ls.pX, head_s:latHead(mm)}; });
+    const dl = lat(s, m), split = !!m.pre;
+    const out = {schema:'hw-explorer-disagg/1', explorer:{model_hash:modelHash(), url:SIM_URL},
+      design:{name:(PRESETS.find(x=>x.id===s.preset)||{}).name || 'Custom design', example:s.preset || null, link:SIM_URL+'#d='+packS(s)},
+      model:{key:L.model, disagg:DISAGG_MODELS[L.model] || null, params:L.params, active:L.active, layers:L.layers, d_model:L.dModel, kv:L.kv, w_bytes:L.wBytes, kv_bytes:L.kvBytes},
+      device:{peak_8bit_ops:s.acc.tops*1e12, util:s.acc.util, dram_peak_Bps:raw, dram_eff:m.devBW/raw, capacity_B:m.devCap*1e9},
+      workload:{users:L.users, tps:L.tps, batch:L.batch, ctx:i.ctx, prefill:!!L.prefill, prompt:L.prompt, reply:L.reply, arrival_cv:s.vary.ca, percentile:s.vary.pct},
+      decode:{copies:i.copies, accelerators_per_copy:i.g, analytic:{step_s:steps(m), users_fit:(i.g*m.devCap*1e9 - i.W)/i.kvUser,
+        latency_mean_s:dl.mean_s, latency_head_s:dl.head_s, head_label:latLabel(), budget_s:1/L.tps, meets:dl.head_s!==null && dl.head_s<=1/L.tps}},
+      prefill:null};
+    if(split){ const ps = prefillState(s), p = m.pre, pi = withS(ps, ()=>llmInfo(ps)), pl = lat(ps, p), nic = NICS[s.scale.nic];
+      out.prefill = {copies:topo(ps).nA/pi.g, accelerators_per_copy:pi.g, nic_Bps_per_copy:pi.g*nic.gbps*1e9/8*0.95*s.scale.nics,
+        analytic:{step_s:steps(p), ttft_mean_s:pl.mean_s, ttft_pX_s:pl.pX_s, ttft_head_s:pl.head_s, budget_s:L.ttft, meets:pl.head_s!==null && pl.head_s<=L.ttft}}; }
+    return out;
+  });
+}
+
 /* Full-load (provisioning) power: every accelerator at its peak compute and DRAM bandwidth, fabric and NICs busy,
    hosts at baseline; what a rack must be fed and cooled for, as opposed to the average at the target rate. */
 function fullPower(s){

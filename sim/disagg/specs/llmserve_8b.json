@@ -1,0 +1,55 @@
+{
+ "schema": "hw-explorer-disagg/1",
+ "explorer": {
+  "model_hash": "fnv1a32:2b7f7c7f",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "LLM serving from the model’s shape (Llama 3.1 70B FP8, 2,000 users)",
+  "example": "llmserve",
+  "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve,llm.model:l8,llm.params:8.03,llm.active:8.03,llm.layers:32,llm.dModel:4096"
+ },
+ "model": {
+  "key": "l8",
+  "disagg": "llama3-8b",
+  "params": 8.03,
+  "active": 8.03,
+  "layers": 32,
+  "d_model": 4096,
+  "kv": 2048,
+  "w_bytes": 1,
+  "kv_bytes": 1
+ },
+ "device": {
+  "peak_8bit_ops": 1979000000000000,
+  "util": 0.5,
+  "dram_peak_Bps": 6144000000000,
+  "dram_eff": 0.9199576237631334,
+  "capacity_B": 144000000000
+ },
+ "workload": {
+  "users": 2000,
+  "tps": 20,
+  "batch": 500,
+  "ctx": 4096,
+  "prefill": false,
+  "prompt": 3600,
+  "reply": 1000,
+  "arrival_cv": 0.2,
+  "percentile": 0.99
+ },
+ "decode": {
+  "copies": 4,
+  "accelerators_per_copy": 4,
+  "analytic": {
+   "step_s": 0.009581751843694832,
+   "users_fit": 2115.8531308174133,
+   "latency_mean_s": 0.009603063472366334,
+   "latency_head_s": 0.010426020443490471,
+   "head_label": "p99",
+   "budget_s": 0.05,
+   "meets": true
+  }
+ },
+ "prefill": null
+}

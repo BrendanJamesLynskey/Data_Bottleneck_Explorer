@@ -2,7 +2,8 @@
 //   1. export every example's design spec (simSpec, schema hw-explorer-sim/1) to sim/examples/<id>.json, in headless Chrome;
 //   2. embed sim/sim.py (for Export and the in-browser run), sim/results.json (the Checks tab's model-vs-simulation
 //      table) and sim/trace_results.json (its real-traffic table) in index.html, between their <script> tags;
-//   3. export the real-traffic specs (simTraceSpec, from sim/traces/stats.json) to sim/traces/specs/.
+//   3. export the real-traffic specs (simTraceSpec, from sim/traces/stats.json) to sim/traces/specs/;
+//   4. export the Disaggregated_Inference_Sim cross-check specs (simLlmSpec) to sim/disagg/specs/.
 // --check writes nothing and fails if any file is stale, so CI catches a model change that wasn't re-exported.
 const puppeteer = require('puppeteer');
 const fs = require('fs'), path = require('path');
@@ -49,6 +50,16 @@ const check = process.argv.includes('--check');
       out.push([`llmsplit_${name}_designed`, simTraceSpec(base, prompt)], [`llmsplit_${name}_traceca`, simTraceSpec(base, prompt, t.arrival_cv)],
                [`llmsplit_${name}_busiest`, simTraceSpec(base, prompt, undefined, {load: t.token_peak_to_average['60s'], rate: t.rate_per_s})]); }
     return out; }, stats);
+  // the Disaggregated_Inference_Sim cross-check (sim/TOLERANCE.md): the two LLM serving examples and three variants of
+  // llmserve fixed in advance (batch 128 and 32 at four copies, and Llama 3.1 8B)
+  const lspecs = await page.evaluate(() => { const out = [];
+    const at = (id, f) => { applyPreset(id); const s = clone(S); s.preset = id; if (f) f(s); return s; };
+    out.push(['llmserve', simLlmSpec(at('llmserve'))],
+             ['llmserve_b128', simLlmSpec(at('llmserve', s => { s.llm.batch = 128; s.llm.users = 512; }))],
+             ['llmserve_b32', simLlmSpec(at('llmserve', s => { s.llm.batch = 32; s.llm.users = 128; }))],
+             ['llmserve_8b', simLlmSpec(at('llmserve', s => { s.llm.model = 'l8'; Object.assign(s.llm, {params:8.03, active:8.03, layers:32, dModel:4096, kv:2048}); }))],
+             ['llmsplit', simLlmSpec(at('llmsplit'))]);
+    return out; });
   await browser.close();
   fs.mkdirSync(EX, {recursive: true});
   const want = new Set();
@@ -56,10 +67,13 @@ const check = process.argv.includes('--check');
   const TS = path.join(ROOT, 'sim', 'traces', 'specs');
   fs.mkdirSync(TS, {recursive: true});
   for (const [id, spec] of tspecs) put(path.join(TS, id + '.json'), JSON.stringify(spec, null, 1) + '\n');
+  const DS = path.join(ROOT, 'sim', 'disagg', 'specs');
+  fs.mkdirSync(DS, {recursive: true});
+  for (const [id, spec] of lspecs) put(path.join(DS, id + '.json'), JSON.stringify(spec, null, 1) + '\n');
   for (const f of fs.readdirSync(EX)) if (f.endsWith('.json') && !want.has(path.join(EX, f))) { stale.push('sim/examples/' + f + ' (no such example)'); if (!check) fs.unlinkSync(path.join(EX, f)); }
 
   if (check) {
     if (stale.length) { console.log('FAIL simulation files out of step with the page (run node tools/sim_sync.js): ' + stale.join(', ')); process.exit(1); }
-    console.log(`ok   simulation files in step: ${specs.length} example specs, ${tspecs.length} real-traffic specs, sim.py and both results embedded in the page`);
+    console.log(`ok   simulation files in step: ${specs.length} example specs, ${tspecs.length} real-traffic specs, ${lspecs.length} cross-check specs, sim.py and both results embedded in the page`);
   } else console.log(stale.length ? 'updated ' + stale.join(', ') : 'nothing to update');
 })();

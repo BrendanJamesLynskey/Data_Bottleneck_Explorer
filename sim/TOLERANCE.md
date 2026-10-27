@@ -131,3 +131,81 @@ requests arriving in its busiest minute, from the original-order run.
 I had seen the diagnostics before choosing the method (the busiest minute's load, 126 % and 280 % of the busiest
 stage's capacity at the design's average). The method and its inputs follow from them, with nothing fitted to
 the replay's latencies.
+
+## Cross-check: Disaggregated_Inference_Sim
+
+Fixed on 2026-10-27, before the first run. As above, neither the rule nor the settings change to make a row pass.
+
+`sim/disagg_compare.py` runs the explorer's LLM serving designs through
+[Disaggregated_Inference_Sim](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim), the owner's
+SimPy simulator of prefill/decode serving, pinned at commit `ba37774` (`sim/requirements.txt`). It writes
+`sim/disagg_results.json`.
+
+The two tools model serving differently. The explorer is a steady-state sizing model: a decode step reads the
+weights and every user's KV cache, its stages (memory, arithmetic, the tensor-parallel all-reduce) add up in
+series, and users are served at a fixed tokens per second. The simulator runs request by request with continuous
+batching and a roofline step (memory and arithmetic overlap, plus a fixed 0.5 ms per step). The check asks whether
+the explorer's figures survive that more detailed model.
+
+### Same hardware, different models
+
+Each spec is exported from the page (`simLlmSpec`, by `tools/sim_sync.js`, to `sim/disagg/specs/`). The simulator
+gets the explorer's own hardware figures, so differences come from the modelling, not the catalogue:
+- **The device:**
+  - peak arithmetic is the explorer's 8-bit dense rate, given as half that in BF16 with native FP8 units at 2×;
+  - achievable arithmetic is the explorer's utilisation;
+  - memory bandwidth is the explorer's peak, at the explorer's own DRAM efficiency for this traffic;
+  - capacity is the explorer's device memory.
+- **Formats:** weights and KV cache at the explorer's widths (8-bit runs as FP8), computing in that format.
+- **Pools:**
+  - decode: one instance per copy of the model, with the explorer's accelerators per copy, and its batch as the
+    largest decode batch;
+  - prefill: the explorer's prefill copies (one node each), one prompt per prefill step, as the explorer models it.
+- **The KV hand-off:** one channel per prefill copy, at that node's NIC bandwidth with the explorer's 95 %
+  efficiency.
+- **Everything else** stays at the simulator's defaults: its step overhead, its 90 % memory allowance, and no cost
+  for the tensor-parallel all-reduce.
+
+The decode-only designs have no prefill in the explorer. In the simulator they use the split example's prefill
+pool, and only their decode rows are judged.
+
+### Designs
+
+Fixed in advance:
+- `llmserve` as it stands: Llama 3.1 70B at 8 bits, 2,000 users, batch 500, a 4,096-token context;
+- the same at batch 128 (512 users) and at batch 32 (128 users), so four copies of the model throughout;
+- the same with Llama 3.1 8B;
+- `llmsplit` as it stands.
+
+Each decode-only design's requests have prompts of the context less half the reply, so the average context
+matches the explorer's.
+
+### The workload and runs
+
+- **Requests:** arrive at the design's rate (users × tokens per second ÷ reply length), with gamma-distributed
+  gaps at the design's arrival CV; fixed prompt and reply lengths.
+- **Duration:** six request lifetimes at the design's tokens per second, with the first third discarded as warm-up.
+- **Runs:** 10 seeds from 1, with 95 % Student-t confidence intervals over the runs.
+
+### Rows and the rule
+
+For every design:
+
+| Row | Explorer | Simulator | Agrees when |
+|---|---|---|---|
+| Decode step at the design's batch and context | its decode stages' fixed and transfer times, summed (no queueing) | the cost model's decode step | within ±10 % |
+| Users per copy that fit in memory | the copy's device memory less the weights, ÷ one user's KV cache | KV-cache tokens per instance ÷ the context | within ±10 % |
+| Decode meets its budget (1 ÷ tokens per second) | its decode latency headline at or under the budget | the mean over runs of the p99 time per output token at or under the budget | the verdicts match |
+
+For the split design, as well:
+
+| Row | Explorer | Simulator | Agrees when |
+|---|---|---|---|
+| Prefill of one prompt | its prefill stages' fixed and transfer times, summed | the cost model's prefill step | within ±10 % |
+| Mean time to first token | the prefill pool's mean latency | mean TTFT, 95 % CI | within the CI widened by 5 % |
+| p99 time to first token | the prefill pool's p99 latency | p99 TTFT, 95 % CI | within the CI widened by 10 % |
+| Time to first token meets its budget | the prefill pool's headline at or under it | the mean p99 TTFT at or under it | the verdicts match |
+
+±10 % for the deterministic rows: both are first-order models of the same hardware, and this is the band they
+should agree within if neither leaves out a first-order cost. The simulated rows use the same widening as the
+per-example checks.
