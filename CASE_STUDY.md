@@ -111,8 +111,12 @@ understates time to first token by one to two orders of magnitude: 9× to 284×.
 
 The arrival CV isn't the cause: conversation traffic looks random request to request. The cause is load that
 swings over minutes: at a 66 % average, 11 of 58 minutes run above 90 %. Kingman, even given the measured CV,
-can't see that. It is the most useful finding so far, and it points at the next change to the model: latency
-evaluated at the busiest minute's load, not the average.
+can't see that. It is the most useful finding so far, and it led to the next change to the model: a busiest-spell
+input that figures latency for a stretch of higher load, with each queue followed by a fluid approximation. I
+committed it, and a rule for its row, before replaying again. Figured for each trace's busiest minute, the model no
+longer understates the replays: it is at or above them, by up to 4×. But against the conversation hour in its
+original order, the p99 is still 1.7× low, because busy minutes come in runs and each inherits the last one's
+queue.
 
 Behind that, a regression suite runs in GitHub Actions on every push:
 - **Regression:** all 32 examples against golden results within 2 %.

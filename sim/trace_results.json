@@ -30,6 +30,9 @@
      "10s": 12.792084854014599,
      "60s": 4.177664385944567
     },
+    "token_peak_to_average": {
+     "60s": 4.286940496273873
+    },
     "prompt": {
      "mean": 2047.848282118154,
      "p50": 1469,
@@ -227,6 +230,36 @@
      "w": 0.1,
      "verdict": "miss",
      "note": ""
+    },
+    {
+     "kind": "mean",
+     "variant": "busiest",
+     "check": "Mean time to first token, model for the trace's busiest minute (4.29\u00d7 load for 8.8 s, arrival CV 0.2)",
+     "model": 7.96379584904704,
+     "sim": {
+      "mean": 6.685619749884049,
+      "lo": 5.510474045347881,
+      "hi": 7.860765454420217,
+      "n": 20
+     },
+     "w": 0.05,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "pct",
+     "variant": "busiest",
+     "check": "Time to first token, p99, model for the trace's busiest minute (4.29\u00d7 load for 8.8 s, arrival CV 0.2)",
+     "model": 38.401557163120316,
+     "sim": {
+      "mean": 22.875896258004484,
+      "lo": 19.436467080581544,
+      "hi": 26.315325435427425,
+      "n": 20
+     },
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
     }
    ],
    "diagnostics": {
@@ -239,7 +272,12 @@
     },
     "original_order": {
      "mean_s": 6.871654263022286,
-     "p99_s": 21.03998511016073
+     "p99_s": 21.03998511016073,
+     "busiest_minute": {
+      "requests": 632,
+      "mean_s": 10.210363173101397,
+      "p99_s": 17.86088489994944
+     }
     },
     "poisson_arrivals": {
      "mean_s": 0.1587535192925908,
@@ -261,6 +299,9 @@
      "1s": 2.8927907457136954,
      "10s": 1.7713282379673623,
      "60s": 1.5213409902219464
+    },
+    "token_peak_to_average": {
+     "60s": 1.902181639295461
     },
     "prompt": {
      "mean": 1154.6974078281523,
@@ -459,6 +500,36 @@
      "w": 0.1,
      "verdict": "miss",
      "note": ""
+    },
+    {
+     "kind": "mean",
+     "variant": "busiest",
+     "check": "Mean time to first token, model for the trace's busiest minute (1.9\u00d7 load for 11 s, arrival CV 0.2)",
+     "model": 1.292880431500899,
+     "sim": {
+      "mean": 0.3236539505151538,
+      "lo": 0.2782459674006649,
+      "hi": 0.3690619336296427,
+      "n": 20
+     },
+     "w": 0.05,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "pct",
+     "variant": "busiest",
+     "check": "Time to first token, p99, model for the trace's busiest minute (1.9\u00d7 load for 11 s, arrival CV 0.2)",
+     "model": 6.138293273665308,
+     "sim": {
+      "mean": 2.8283403495818833,
+      "lo": 2.407114136426491,
+      "hi": 3.2495665627372756,
+      "n": 20
+     },
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
     }
    ],
    "diagnostics": {
@@ -471,7 +542,12 @@
     },
     "original_order": {
      "mean_s": 1.387027902322391,
-     "p99_s": 10.353361914209643
+     "p99_s": 10.353361914209643,
+     "busiest_minute": {
+      "requests": 507,
+      "mean_s": 8.118224542036366,
+      "p99_s": 9.442840136737061
+     }
     },
     "poisson_arrivals": {
      "mean_s": 0.09795374923371743,

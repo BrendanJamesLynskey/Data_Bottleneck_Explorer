@@ -243,11 +243,11 @@ lengths. The two files are in `sim/traces/`, unchanged and SHA-256-pinned, with 
 - each request is served for its own prompt, using the model's own service times at a grid of prompt lengths;
 - each run is a moving-block bootstrap of the trace, with 60-second segments, stretched to the design's rate.
 
-The model is judged twice, by a rule fixed before the first replay (in `sim/TOLERANCE.md`): once with the example's
-inputs, and once given the trace's measured arrival CV.
+The model is judged three times, each by a rule fixed before its replay (in `sim/TOLERANCE.md`): with the
+example's inputs, given the trace's measured arrival CV, and figured for the trace's busiest minute.
 
-**Outcome: 3 of 10 rows agree.** Both utilisation rows agree, as does code completion's mean once the model has
-its CV.
+**Outcome: 4 of 14 rows agree.** Both utilisation rows agree, and so does code completion's mean, both once the
+model has the trace's CV and once it is figured for the busiest minute.
 
 - **With its own inputs**, the model understates time to first token by one to two orders of magnitude: 9× (mean)
   and 63× (p99) for conversation, and 103× and 284× for code completion.
@@ -260,7 +260,20 @@ its CV.
     and 13.8× low on the p99.
 - **These figures are if anything optimistic.** The bootstrap breaks up busy spells longer than a minute: the
   conversation trace in its original order gives a mean of 1.39 s and a p99 of 10.3 s.
-- **What it means in practice:** size prefill for its busiest minute, not its average.
+- **Figured for the busiest minute, the model no longer understates the replays.** This uses the busiest-spell
+  input, added after the first replay: the busiest minute's prompt tokens are 4.29× the average minute's for code
+  completion and 1.9× for conversation, and the spell lasts one trace minute at the design's rate.
+  - Code completion: the mean agrees, and the p99 is 1.7× high.
+  - Conversation: the mean is 4.0× high and the p99 2.2× high. High is the side to expect: the figures describe
+    the busiest minute, while the replays describe the hour.
+  - Against the conversation hour in its original order, the margin is thin:
+    - the model's mean (1.29 s) is 7 % below the hour's;
+    - its p99 (6.14 s) is 1.7× below the hour's 10.3 s;
+    - the 507 requests arriving in the busiest minute get their first token after 8.1 s on average.
+  - Busy minutes come in runs, each inheriting the last one's queue, while the model starts the spell from the
+    average.
+- **What it means in practice:** size prefill for its busiest minute, not its average, and treat even that figure
+  as a floor when busy minutes cluster.
 
 Decode isn't replayed: its steps are clocked and batched. That is for a cross-check against a serving simulator.
 
@@ -557,6 +570,10 @@ the alternative:
 - **Arrival burstiness and jitter** feed Kingman's G/G/1 queueing formula. Clocked work such as LLM
   decode steps and camera frames arrives regularly; random requests are Poisson. Each later queue sees the
   departures of the one before, smoothed by its load (Whitt's linking equation).
+- **Busiest spell** (load × the average, and how long it lasts) figures latency for a stretch of higher load
+  rather than the average. Each queue starts from the average's steady state and follows the pointwise-stationary
+  fluid approximation (Wang, Nicol & Feldman, 1996), so a spell above 100 % gives a long but finite wait. At 1×,
+  the default, nothing changes.
 - **Catalogue tolerance** (±10–30 %) draws every capacity figure at random and reports how often the
   design stays under the ceiling, and which component turns out weakest.
 

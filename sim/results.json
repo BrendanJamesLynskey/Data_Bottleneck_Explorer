@@ -66,7 +66,7 @@
    "id": "8k",
    "name": "8K60 broadcast encoder card",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -243,7 +243,7 @@
    "id": "adas",
    "name": "Autonomous-driving perception SoC",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -390,7 +390,7 @@
    "id": "chiparray",
    "name": "GB200-class accelerator from its compute array: six chiplets at low voltage",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -552,7 +552,7 @@
    "id": "compress",
    "name": "Storage compression offload (zstd)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -774,7 +774,7 @@
    "id": "correlator",
    "name": "Radio-telescope correlator (X-engine)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1011,7 +1011,7 @@
    "id": "dlrm",
    "name": "Recommendation embeddings (DLRM lookups)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1203,7 +1203,7 @@
    "id": "fhe",
    "name": "FHE bootstrapping accelerator (CKKS)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1425,7 +1425,7 @@
    "id": "gbms",
    "name": "1 GB per ms stream (the 1 TB/s question)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1512,7 +1512,7 @@
    "id": "genomics",
    "name": "Genomic read alignment (FPGA card)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1734,7 +1734,7 @@
    "id": "gpudb",
    "name": "GPU database join over PCIe \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1821,7 +1821,7 @@
    "id": "gpuhost",
    "name": "Training data loader starving an accelerator \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1908,7 +1908,7 @@
    "id": "hft",
    "name": "Low-latency trading feed handler \u2717",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -1995,7 +1995,7 @@
    "id": "isp",
    "name": "Smartphone camera ISP + NPU",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -2142,7 +2142,7 @@
    "id": "linescan",
    "name": "Line-scan machine-vision inspection",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -2319,7 +2319,7 @@
    "id": "llm",
    "name": "LLM decode on an edge accelerator (8B, INT4)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -2466,7 +2466,7 @@
    "id": "llmdc",
    "name": "LLM decode on an 8-accelerator server (70B, batch 32)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -2628,7 +2628,7 @@
    "id": "llmserve",
    "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -2790,7 +2790,7 @@
    "id": "llmsplit",
    "name": "Prefill and decode on separate pools (Llama 3.1 70B, 3,600-token prompts)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "decode pool",
@@ -3151,7 +3151,7 @@
    "id": "moenoc",
    "name": "Mixture-of-experts layer on an 8 \u00d7 8 mesh \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -3238,7 +3238,7 @@
    "id": "nvl72",
    "name": "Rack-scale LLM inference (72 accelerators, one NVLink domain)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -3400,7 +3400,7 @@
    "id": "oran",
    "name": "5G O-RAN distributed unit (L1 offload)",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -3607,7 +3607,7 @@
    "id": "prefill",
    "name": "LLM prefill on one accelerator (70B FP8, 2k-token prompts)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -3769,7 +3769,7 @@
    "id": "radar",
    "name": "Radar / SDR front end over 400 GbE",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -3961,7 +3961,7 @@
    "id": "scan",
    "name": "NVMe scan / filter offload",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -4198,7 +4198,7 @@
    "id": "stencil",
    "name": "CFD stencil on a GPU-class part",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -4345,7 +4345,7 @@
    "id": "tls",
    "name": "400 GbE inline TLS / IPsec offload",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -4552,7 +4552,7 @@
    "id": "tp8pcie",
    "name": "Tensor-parallel prefill on 8 PCIe cards \u2717",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -4639,7 +4639,7 @@
    "id": "train1k",
    "name": "LLM training cluster (1,024 accelerators, 64 racks)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -4816,7 +4816,7 @@
    "id": "trainllm",
    "name": "LLM training from the model\u2019s shape (Llama 3.1 70B, BF16, 1,024 accelerators)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -4993,7 +4993,7 @@
    "id": "trigger",
    "name": "Particle-detector trigger board \u2717",
    "percentile": 0.999,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -5080,7 +5080,7 @@
    "id": "ultrasound",
    "name": "Ultrasound beamformer (128 channels)",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
@@ -5272,7 +5272,7 @@
    "id": "video",
    "name": "4 \u00d7 4K60 video analytics at the edge",
    "percentile": 0.99,
-   "model_hash": "fnv1a32:42c6d3a6",
+   "model_hash": "fnv1a32:2b7f7c7f",
    "pools": [
     {
      "name": "system",
