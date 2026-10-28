@@ -280,6 +280,20 @@ Fixed in advance, each the multiply on the design's Chip tab:
 ±10 % as for the Disaggregated_Inference_Sim step rows: both are first-order models of the same multiply on the same
 hardware.
 
+Before the first run, one design was corrected to match its description above: the export first named the
+`train1k` example, whose Chip tab multiply is the custom 4,096-cubed one (the same as `chiparray`), not the training
+FFN; `trainllm` is the example with the training workload on. Nothing had been run.
+
+### Outcome (2026-10-28, `sim/simfront_results.json`)
+
+18 of 24 rows agree; neither the rule nor the designs changed after the run.
+- **Arithmetic** agrees within 8 % where both stream a long depth; it misses on `llmserve` weight-stationary (1.10×)
+  and at batch 32 (3.00×), where the explorer's array pays fill and drain on each weight tile and the
+  output-stationary-only simulator cannot.
+- **Traffic** misses on `llmserve` (both dataflows, 1.10×) and `trainllm` (2.04×): the explorer writes partial sums
+  to DRAM and reads them back; the simulator keeps them on chip. For `llmserve` the operand reads are identical.
+- **Time** misses only at batch 32 (2.54×), following the array; **bounds** all match, all compute.
+
 ## The three tools together
 
 The Checks tab ends with one table: for each kind of figure, how many rows agree with the explorer's own simulator
