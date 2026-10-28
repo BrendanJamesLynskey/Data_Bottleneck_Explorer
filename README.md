@@ -294,13 +294,13 @@ Decode isn't replayed: its steps are clocked and batched. The cross-check below 
 
 `sim/disagg_compare.py` runs the explorer's LLM serving designs through
 [Disaggregated_Inference_Sim](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim) (pinned at
-`ba37774`), a SimPy simulator of prefill/decode serving with continuous batching and roofline steps.
+`a2c14e2`), a SimPy simulator of prefill/decode serving with continuous batching and roofline steps.
 - **Same hardware:** the page exports each design (`simLlmSpec`, to `sim/disagg/specs/`) with the explorer's own
   peak rates, efficiencies and memory, so the two tools differ only in how they model serving.
 - **Designs:** the two LLM examples plus three variants of `llmserve` (batch 128, batch 32, Llama 3.1 8B), fixed in
   `sim/TOLERANCE.md` with the rule before the first run.
 
-**Outcome: 6 of 19 rows agree.** Every miss has a cause the stage breakdowns show:
+**Outcome: 5 of 19 rows agree.** Every miss has a cause the stage breakdowns show:
 - **Step times: the explorer is conservative.** It adds memory, arithmetic and the tensor-parallel all-reduce in
   series; the simulator takes the larger of memory and arithmetic, plus 0.5 ms, and leaves the all-reduce out.
   - 70B decode at batch 500 is 1.88× the simulator's: 18.0 ms + 19.2 ms + 4.9 ms against a roofline's
@@ -312,12 +312,16 @@ Decode isn't replayed: its steps are clocked and batched. The cross-check below 
 - **Budgets:** the simulator decodes as fast as it can, so its p99 time per output token is 1–5 ms against the
   50 ms budget. The verdicts match for four of five designs; for `llmsplit` the explorer's p99 step of 50.7 ms is
   just over.
-- **Time to first token** agrees at the p99 and is 11 % high on the mean, partly because two errors offset: the
-  explorer's all-reduce, and a 38 ms mean prefill wait in the simulator.
-- **A finding about the simulator:** its prefill dispatcher counts waiting prompts but not the one in service, so
-  new prompts pile onto the first instance (busy 99 %, 99 %, 62 %, 0 %). Fixed in Disaggregated_Inference_Sim on
-  2026-10-28 ([PR #2](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim/pull/2)); this cross-check
-  stays pinned at `ba37774` until it is re-run under the same rule.
+- **Time to first token: the explorer is high,** 75 % on the mean and 2.17× at the p99. In the simulator a prompt
+  barely waits for a prefill instance, so its time to first token is one 65.9 ms prefill step; the explorer's is its
+  111.5 ms prefill, all-reduce included, plus its queueing model's wait.
+- **A finding about the simulator:** at the commit first pinned (`ba37774`), its prefill dispatcher counted waiting
+  prompts but not the one in service, so new prompts piled onto the first instance (busy 99 %, 99 %, 62 %, 0 %; a
+  38 ms mean wait). That wait offset the explorer's all-reduce, and the p99 time to first token agreed (6 of 19).
+  Fixed on 2026-10-28 ([PR #2](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim/pull/2), the only
+  change in `a2c14e2`) and re-run under the same rule and seeds: the instances run 83 %, 81 %, 76 %, 19 % busy, the
+  step and memory figures are unchanged, and that one agreement becomes a miss. The earlier run is kept in
+  `sim/disagg_results_ba37774.json`.
 
 ### Cross-check: Torch_Sim_Frontend's accelerator model
 
@@ -347,7 +351,7 @@ event through DMA engines, the buffer and an output-stationary array.
 ### The three simulators together
 
 The Checks tab ends with a table of rows that agree, by kind of figure and by simulator, counted from the rows above:
-210 of 233 for the explorer's own simulator on the examples, 4 of 14 on the Azure traces, 6 of 19 for
+210 of 233 for the explorer's own simulator on the examples, 4 of 14 on the Azure traces, 5 of 19 for
 Disaggregated_Inference_Sim and 18 of 24 for `simfront.accel`.
 
 ![Model vs simulation](sim.png)
@@ -360,7 +364,7 @@ Files:
 - `sim/examples/*.json`: each example's exported spec.
 - `sim/results.json`: the committed run.
 - `sim/disagg_compare.py`, `sim/disagg/specs/*.json` and `sim/disagg_results.json`: the Disaggregated_Inference_Sim
-  cross-check.
+  cross-check; `sim/disagg_results_ba37774.json` is its first run, on the simulator before the dispatch fix.
 - `sim/simfront_compare.py`, `sim/simfront/specs/*.json` and `sim/simfront_results.json`: the Torch_Sim_Frontend
   cross-check.
 - `sim/requirements.txt`: pinned SimPy and pytest.

@@ -138,7 +138,7 @@ Fixed on 2026-10-27, before the first run. As above, neither the rule nor the se
 
 `sim/disagg_compare.py` runs the explorer's LLM serving designs through
 [Disaggregated_Inference_Sim](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim), the owner's
-SimPy simulator of prefill/decode serving, pinned at commit `ba37774` (`sim/requirements.txt`). It writes
+SimPy simulator of prefill/decode serving, pinned at commit `a2c14e2` (`sim/requirements.txt`; first run at `ba37774`). It writes
 `sim/disagg_results.json`.
 
 The two tools model serving differently. The explorer is a steady-state sizing model: a decode step reads the
@@ -222,6 +222,19 @@ Neither the rule nor the verdicts changed; a second run with the same seeds repr
   balanced, from the roofline's 19.4 ms to 22.3 ms.
 - **A finding about the simulator:** its prefill dispatcher measures load by waiting prompts alone, not the one in
   service, so ties send new prompts to the first instance. That adds a 38 ms mean wait in the split design.
+
+### Re-run on the fixed simulator (2026-10-28)
+
+The dispatcher was fixed in Disaggregated_Inference_Sim
+([PR #2](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim/pull/2)); `a2c14e2` is `ba37774` plus
+that fix alone. The pin moved to it and the check re-ran with the rule, settings, specs and seeds unchanged. The
+first run's results are kept in `sim/disagg_results_ba37774.json`.
+- **Unchanged:** every step and memory figure (the cost model doesn't depend on dispatch), and every decode verdict.
+- **Changed:** in the split design the four prefill instances run 83 %, 81 %, 76 % and 19 % busy (were 99 %, 99 %,
+  62 %, 0 %) and the mean wait for one falls from 38 ms to under a microsecond. Time to first token falls to one
+  prefill step, 65.9 ms, at the mean and the p99 (were 103.5 and 131.4 ms).
+- **One verdict flips:** the p99 time to first token, which agreed (explorer 143.2 ms) only because the
+  simulator's wait offset the explorer's all-reduce, now misses at 2.17×. **5 of 19 rows agree** (were 6).
 
 ## Cross-check: Torch_Sim_Frontend's accelerator model
 

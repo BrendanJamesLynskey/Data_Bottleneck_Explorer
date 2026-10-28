@@ -33,7 +33,7 @@ SPECS = os.path.join(HERE, "disagg", "specs")
 RESULTS = os.path.join(HERE, "disagg_results.json")
 DESIGNS = ["llmserve", "llmserve_b128", "llmserve_b32", "llmserve_8b", "llmsplit"]
 SPLIT = "llmsplit"            # its prefill pool serves the decode-only designs, whose prefill isn't judged
-DISAGG_COMMIT = "ba37774fe2315ca960d7471be352382e301f89a1"
+DISAGG_COMMIT = "a2c14e23f300bb04881e392d453280d961d4113e"
 # fixed in TOLERANCE.md before the first run: ±10 % for the two tools' deterministic figures, the per-example
 # widening of the CI for the simulated ones, matching verdicts against each budget
 RULE = {"step": 0.10, "fit": 0.10, "mean": sim.RULE["mean"], "pct": sim.RULE["pct"]}
