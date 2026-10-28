@@ -629,9 +629,13 @@ the model uses:
 
 The Minimum specs link table shows each option's total overhead.
 
-DRAM now comes as **51 speed grades in 16 types**, for example DDR5-4800 to 7200, GDDR6 14–20 Gb/s,
+Device DRAM comes as **51 speed grades in 16 types**, for example DDR5-4800 to 7200, GDDR6 14–20 Gb/s,
 HBM3 5.2–6.4 Gb/s, HBM3E 8.0–9.8 Gb/s and HBM4 6.4–10 Gb/s. You pick the type, the speed grade and the
 number of channels, devices or stacks.
+
+Two DDR6 grades (8,800 and 17,600 MT/s) are listed for comparison as host memory only. JEDEC has not
+published DDR6: the rates are reported targets and every other figure is DDR5's. They are not offered as device
+DRAM and the optimiser does not search them; with them the Model tab's catalogue lists 53 grades in 17 types.
 
 ## Variability, percentiles and the weakest link
 
@@ -689,7 +693,7 @@ would have to carry 4 TB/s to feed that link.
 - **Minimum specs**: every DRAM technology (DDR4/5, LPDDR4/4X/5/5X/6, GDDR6/6X/7, HBM2 to HBM4)
   sized for the requirement, with bus width, capacity, power, PHY area, beachfront, signal pins and a
   practical / stretch / impractical verdict. Also every link (PCIe 3.0 to 7.0, UCIe), host memory
-  channels, scale-up fabrics, scale-out NICs, compute, host cores, network ports and SSDs. One click
+  (DDR4, DDR5, proposed DDR6, LPDDR5X, LPDDR6 and, for comparison, GDDR6/7, each with its availability), scale-up fabrics, scale-out NICs, compute, host cores, network ports and SSDs. One click
   applies any option.
 - **Rate sweep**: the lowest-power practical DRAM at every rate from a hundredth to a hundred times the
   target, and the optimiser's cheapest whole design at each rate (see above).

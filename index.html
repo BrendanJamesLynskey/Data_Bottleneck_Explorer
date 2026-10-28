@@ -488,7 +488,23 @@ for(const L of DRAM_LINES){
   }
 }
 const DRAM_LINE_TOP = Object.fromEntries(DRAM_LINES.map(L=>[L.line, Object.keys(DRAMS).filter(k=>DRAMS[k].line===L.line && DRAMS[k].top)[0]]));
-const HOST_DRAMS = ['ddr4_3200','ddr5_5600','ddr5_6400','ddr5_8800','lp5x_8533','lp5x_10667'];
+/* DDR6, for comparison as host memory only (not offered as device DRAM, not searched by the optimiser): JEDEC has not
+   published it. The data rates are the reported targets, 8,800 MT/s at launch scaling to 17,600 MT/s (Wikipedia
+   "DDR6 SDRAM" and IntuitionLabs "DDR6 Explained", both read 2026-10-28); the sub-channel layout is not settled, so it
+   is sized per 64 data bits like DDR5, and every other figure is DDR5's carried over. */
+for(const rate of [8800, 17600]){
+  const b = DRAMS.ddr5_6400;
+  DRAMS['ddr6_'+rate] = {...b, line:'DDR6', unit:'64 data bits', rate, name:`DDR6-${rate} (proposed)`, top:rate===17600, future:true};
+}
+const HOST_DRAMS = ['ddr4_3200','ddr5_5600','ddr5_6400','ddr5_8800','ddr6_8800','ddr6_17600','lp5x_8533','lp5x_10667',
+  'lp6_10667','lp6_14400','gddr6_14','gddr7_32'];
+const HOST_DRAMS_FIX = ['ddr4_3200','ddr5_5600','ddr5_6400','ddr5_8800','lp5x_8533','lp5x_10667'];   // what a fix may step up to: shipping server parts
+/* availability as host memory (read 2026-10-28): JEDEC JESD209-6 published July 2025, mobile parts shipping from the
+   second half of 2026, server SOCAMM2 modules not yet standardised (TrendForce, 24 April 2026); GDDR is soldered beside
+   its processor and no server CPU uses it as host memory, though consoles do (PlayStation 5: 16 GB of 14 Gb/s GDDR6) */
+const HOST_AVAIL = {DDR4:'shipping', DDR5:'shipping', 'DDR5 MRDIMM':'shipping (Xeon 6)', DDR6:'proposed: no JEDEC standard yet; products expected about 2027–28',
+  LPDDR5X:'shipping (e.g. Grace)', LPDDR6:'JEDEC standard (2025); phones from late 2026, server modules (SOCAMM2) expected about 2027',
+  GDDR6:'not used as server host memory; consoles (PS5)', GDDR7:'not used as host memory; graphics cards only'};
 
 /* host link. pcie: gt = GT/s per lane per direction; flit = 6.0+ FLIT mode. pj = end-to-end pJ/bit,
    idle = W per lane (both ends), phy/shore per lane on the accelerator die, rtt = read round trip, µs */
@@ -1927,7 +1943,7 @@ function optimise(base, opt){
   const fixHost = s => { let m = model(s);
     for(let g=0; g<8 && m.U.host>ceil; g++){
       if(s.host.units<12) s.host.units = Math.min(12, Math.ceil(s.host.units*m.U.host/ceil));
-      else { const bw = id => dramUnitBW(DRAMS[id]), nx = HOST_DRAMS.filter(id=>bw(id)>bw(s.host.dram)).sort((a,b)=>bw(a)-bw(b))[0]; if(!nx) break; s.host.dram = nx; s.host.units = 8; }
+      else { const bw = id => dramUnitBW(DRAMS[id]), nx = HOST_DRAMS_FIX.filter(id=>bw(id)>bw(s.host.dram)).sort((a,b)=>bw(a)-bw(b))[0]; if(!nx) break; s.host.dram = nx; s.host.units = 8; }
       m = model(s); }
     if(m.U.cpu>ceil) s.host.cores = Math.min(192, Math.ceil(s.host.cores*m.U.cpu/ceil*1.05));
     return s; };
@@ -2002,7 +2018,7 @@ function paneOpt(m){
 /* sizing: minimum spec of each component for the current requirement (per accelerator) */
 function sizeDram(s, m){
   const need = m.Tba*(m.dR+m.dW)/s.ceil;
-  return Object.entries(DRAMS).map(([id,d])=>{
+  return Object.entries(DRAMS).filter(([,d])=>!d.future).map(([id,d])=>{
     const per = dramUnitBW(d)*devEff(d, s, m.dR, m.dW);
     const nBW = need>0 ? Math.ceil(need/per) : 0;
     const nCap = Math.ceil(s.resident/dramCapPerUnit(d, s.ecc));
@@ -2831,12 +2847,16 @@ function paneSizing(m){
       Object.entries(NICS).map(([id,n])=>{ const k = Math.max(1, Math.ceil(needOut/(n.gbps*1e9/8*0.95))); return `<tr class="${id===S.scale.nic?'cur':''}"><td>${n.name}</td><td class="n">${k}</td><td class="n">${fmtN(k*m.tp.nA)}</td><td class="n">${fmtW(k*m.tp.nA*n.w)}</td></tr>`; }).join('')}</tbody></table></div></div>`;
   }
   const hostRows = HOST_DRAMS.map(id=>{ const d = DRAMS[id]; const pr = dramUnitBW(d)*dramEff(d,'block',m.hR,m.hW,false);
-    const n = Math.max(1, Math.ceil(m.Tbn*(m.hR+m.hW)/S.ceil/pr)); return `<tr class="${id===S.host.dram?'cur':''}"><td>${d.name}</td><td class="n">${n} × ${d.unit}</td><td>${tag(n<=8?'ok':n<=12?'warn':'bad', n<=8?'desktop/server':n<=12?'big server':'beyond one socket')}</td></tr>`; }).join('');
+    const n = Math.max(1, Math.ceil(m.Tbn*(m.hR+m.hW)/S.ceil/pr));
+    const fit = d.fam==='DDR' ? tag(n<=8?'ok':n<=12?'warn':'bad', n<=8?'desktop/server':n<=12?'big server':'beyond one socket')
+      : tag(n<=d.pract?'ok':n<=d.ext?'warn':'bad', n<=d.pract?'practical width':n<=d.ext?'wide':'beyond practical');
+    return `<tr class="${id===S.host.dram?'cur':''}"><td>${d.name}</td><td class="n">${n} × ${d.unit}</td><td>${fit}</td><td>${HOST_AVAIL[d.line]}</td></tr>`; }).join('');
   return ans + `<div class="cols"><div class="card span"><h3>Device DRAM${per}, every technology</h3>${dramT}</div>
     <div class="card span"><h3>Host ↔ accelerator link${per}</h3>${linkT}<p class="note">Full duplex: each direction sized on its own. Overhead covers encoding or FLIT/FEC, TLP headers at your payload and completion sizes, DLLPs or replays; click the link block for the step-by-step breakdown.</p></div>
     ${fabT}
-    <div class="card"><h3>Host memory${m.tp.nN>1?' per node':''}</h3><div class="tbl-wrap"><table class="t"><tbody>${hostRows}</tbody></table></div></div>
-    <div class="card"><h3>Compute &amp; CPU</h3>${stat('Peak compute needed per accelerator', sig(m.Tba*S.ops/(S.acc.util*S.ceil)/1e12)+' TOPS')}${stat('Host cores for I/O'+(m.tp.nN>1?' per node':''), sig(m.dem.cpu/S.ceil))}${stat('Blocks per second'+(m.tp.nN>1?' per node':''), fmtIOPS(m.Tbn/S.block))}</div></div>`;
+    <div class="card span"><h3>Host memory${m.tp.nN>1?' per node':''}</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Memory</th><th class="n">Needed</th><th>Fit</th><th>Availability</th></tr></thead><tbody>${hostRows}</tbody></table></div>
+      <p class="note">Units are sized for bandwidth at block-access efficiency. DDR6 is a proposal: its rates are reported targets and its other figures are DDR5’s. GDDR is listed for comparison: it is soldered beside its processor, so capacity is small.</p></div>
+    <div class="card span"><h3>Compute &amp; CPU</h3>${stat('Peak compute needed per accelerator', sig(m.Tba*S.ops/(S.acc.util*S.ceil)/1e12)+' TOPS')}${stat('Host cores for I/O'+(m.tp.nN>1?' per node':''), sig(m.dem.cpu/S.ceil))}${stat('Blocks per second'+(m.tp.nN>1?' per node':''), fmtIOPS(m.Tbn/S.block))}</div></div>`;
 }
 
 /* rate sweep: the sizing questions asked at rates either side of the target. Device DRAM is re-sized at each rate
@@ -3356,7 +3376,7 @@ function paneModel(){
   return `<div class="cols"><div class="card span"><h3>How the model works</h3>
   <p style="margin:0;color:var(--t2)">Everything flows from the processing rate <i>T</i>. With <i>N</i> accelerators across <i>n</i> nodes, each accelerator handles <i>T/N</i> and each host <i>T/n</i>. A component's demand is its share × peak-to-average × the bytes it moves per processed byte; capacity is peak × efficiency; utilisation is demand ÷ capacity and the bottleneck is the largest. Peer traffic is split into what stays inside the scale-up domain and what crosses the scale-out network. Power is traffic × energy per bit plus standby per unit, compute pJ/op and leakage, plus fans and power-conversion losses set by how the rack is cooled (${(overhead(S)*100).toFixed(1)} % here, ${coolOf(S).name}); area is compute + SRAM + PHYs + 15 %, or the area a square die needs for enough PHY edge. Latency is one block through every stage with M/D/1 queueing.</p>
   <p class="note">Units are decimal (1 GB = 10⁹ B). Catalogue values are indicative first-order figures for a 5 nm-class design from JEDEC rates, public datasheets and published estimates; energy and area vary by about 2× between implementations.</p></div>
-  <div class="card span"><h3>DRAM · ${Object.keys(DRAMS).length} speed grades in ${DRAM_LINES.length} types</h3><details class="more"><summary>Show the catalogue</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>Technology</th><th class="n">MT/s</th><th class="n">Bits</th><th class="n">Peak/unit</th><th class="n">Cap</th><th class="n">Latency</th><th class="n">pJ/bit</th><th class="n">Standby W</th><th class="n">PHY mm²</th><th class="n">Edge mm</th><th class="n">Max units</th></tr></thead><tbody>${dr}</tbody></table></div></details></div>
+  <div class="card span"><h3>DRAM · ${Object.keys(DRAMS).length} speed grades in ${new Set(Object.values(DRAMS).map(d=>d.line)).size} types</h3><details class="more"><summary>Show the catalogue</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>Technology</th><th class="n">MT/s</th><th class="n">Bits</th><th class="n">Peak/unit</th><th class="n">Cap</th><th class="n">Latency</th><th class="n">pJ/bit</th><th class="n">Standby W</th><th class="n">PHY mm²</th><th class="n">Edge mm</th><th class="n">Max units</th></tr></thead><tbody>${dr}</tbody></table></div></details></div>
   <div class="card span"><h3>Host links</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Link</th><th class="n">Rate</th><th class="n">Encoding</th><th class="n">pJ/bit</th><th class="n">PHY mm²/lane</th><th class="n">Read RTT</th></tr></thead><tbody>${lk}</tbody></table></div></div>
   <div class="card span"><h3>Scale-up fabrics (per accelerator, per direction)</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Fabric</th><th class="n">Raw</th><th class="n">Efficiency</th><th class="n">pJ/bit</th><th class="n">Switch W/acc.</th><th class="n">Max domain</th></tr></thead><tbody>${fb}</tbody></table></div>
   <p class="note">Scale-out traffic is charged 15 pJ/bit (NIC, optics, switches) plus NIC power per port.</p></div>
@@ -3662,7 +3682,7 @@ const REQ_MAP = {
   peak_correlation:['vary.corr','enum',['indep','partial','full'],null,'peak correlation',String], catalogue_tolerance:['vary.tol','enum',[0,0.1,0.2,0.3],null,'tolerance',v=>'±'+v*100+' %'],
 };
 const HW_MAP = {
-  dram_type:['dev.dram','enum',Object.keys(DRAMS),null,'DRAM',v=>DRAMS[v].name], dram_units:['dev.units','int',1,64,'DRAM units',String],
+  dram_type:['dev.dram','enum',Object.keys(DRAMS).filter(k=>!DRAMS[k].future),null,'DRAM',v=>DRAMS[v].name], dram_units:['dev.units','int',1,64,'DRAM units',String],
   host_link:['link.id','enum',Object.keys(LINKS),null,'host link',v=>LINKS[v].name], link_lanes:['link.lanes','enum',[1,2,4,8,16],null,'lanes',v=>'x'+v],
   links_per_accelerator:['link.count','int',1,64,'links',String],
   accelerator_peak_tops:['acc.tops','num',0.01,50000,'peak compute',v=>sig(v)+' TOPS'], compute_utilisation:['acc.util','num',0.05,1,'compute utilisation',v=>(v*100).toFixed(0)+' %'],
