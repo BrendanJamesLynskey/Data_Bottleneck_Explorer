@@ -19,12 +19,24 @@ minimum specification of every component, and the power, performance and area (P
 
 A sober black-and-white page with little on screen at once: the verdict, a one-line summary of the
 requirements and a compact live block diagram, with the analysis in tabs below. Detail is hidden until
-you ask for it: hover a block for its figures, click it for its settings, and open the legend, the
-example's description, the less-used tabs (Latency, Headroom, Roofline, Model), the impractical DRAM
+you ask for it: hover a block for its figures, click it for its settings, and open the legend, the less-used tabs (Latency, Headroom, Roofline, Model), the impractical DRAM
 options and the passing checks only when you want them. Status is shown by weight and inversion rather than colour
 (grey within the utilisation ceiling, dashed above it, white over capacity, the bottleneck inverted).
 Inputs live in a drawer that slides in from the left; clicking any block opens its settings in a drawer
 on the right. On wide screens the drawers push the page aside so the diagram stays visible while you drag.
+
+Hover the mouse over almost anything, or tab to it, and a box explains it:
+- **The five headline figures:** what the number is, worked out from this design.
+  - **Most loaded part:** why it is the bottleneck (the next most loaded part, and how much more capacity it would
+    take before that one took over), whether it stops the system reaching the required speed (under the ceiling,
+    above it, or over capacity, and by how much), and what would bring it back under the ceiling.
+  - **Latency:** against the budget, and its largest stage.
+  - **Power:** against the rack limit at full load.
+- **Each link in the weakest-link strip:** the rate it could carry alone, and its rank.
+- **The tabs, the header buttons and the diagram's blocks.**
+
+Clicking a headline figure still opens the full working. On touch screens, where there is no hover, a tap does that.
+The loaded example's description stays under the requirements line for as long as the example is loaded.
 
 ![Inputs drawer](inputs.png)
 
@@ -160,7 +172,7 @@ model no longer pay for a network they don't use.
 checks that every overhead breakdown multiplies out to the model's capacities, that the optimiser finds a
 design for every example that can be fixed, that the rate sweep finds a design at every rate, that compare
 round-trips through a shared link, that every example (changed or not) survives a short link exactly, that each
-spec sheet fits one A4 page, that each explanation works out to its headline figure, that the LLM serving and training workloads match hand calculations, that the cost parts add up and the
+spec sheet fits one A4 page, that each explanation works out to its headline figure, that every hover explanation names its figure, that the LLM serving and training workloads match hand calculations, that the cost parts add up and the
 cost goal finds the cheapest design, and that all 32 examples match their golden results within 2 %. An axe-core
 audit then checks the page, all 14 tabs, the drawers, the spec sheet, an explanation panel and a simulation
 in progress and finished for accessibility violations, with none allowed. Text meets WCAG AA contrast. Tables that scroll sideways, the headline figures and

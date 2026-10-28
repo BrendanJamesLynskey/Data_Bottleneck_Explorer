@@ -66,6 +66,8 @@ select option, select optgroup{background:var(--s1); color:var(--t1)}
 .verdict{display:grid; grid-template-columns:1.8fr repeat(4,1fr); border:1px solid var(--l1); border-radius:8px; overflow:hidden}
 .kpi{padding:12px 16px; border-right:1px solid var(--l1); min-width:0}
 .kpi:last-child{border-right:none}
+.tip{position:fixed; z-index:80; max-width:min(360px, calc(100vw - 16px)); padding:10px 12px; background:var(--s3); color:var(--t1); border:1px solid var(--l3); border-radius:6px; font-size:13px; line-height:1.45; pointer-events:none; box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.tip[hidden]{display:none} .tip p{margin:6px 0 0} .tip .tk{color:var(--t3); font-size:12px}
 .kpi .l{font-size:11px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em}
 .kpi[data-why]{cursor:pointer} .kpi[data-why]:hover .l,.kpi[aria-expanded="true"] .l{color:var(--t1)} .kpi[aria-expanded="true"]{box-shadow:inset 0 -2px 0 var(--t1)}
 .why{margin-top:10px; border-left:2px solid var(--t1); padding:6px 0 6px 14px; font-size:13px; color:var(--t2); line-height:1.6}
@@ -366,16 +368,17 @@ footer{max-width:1240px; margin:0 auto; padding:10px 28px 36px; color:var(--t3);
 </style>
 </head>
 <body>
+<div class="tip" id="tip" role="tooltip" hidden></div>
 <div id="page">
 <header class="top">
   <a class="brand" href="./" aria-label="Hardware System Design Explorer, home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 9h10v14H3zM19 9h10v14H19z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M13 16h6" stroke="currentColor" stroke-width="4"/></svg><h1>Hardware System Design Explorer</h1></a>
   <div class="ctrl">
-    <select id="preset" aria-label="Example application"></select>
-    <button class="btn" id="openAssist"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12v8H7l-3 3v-3H2z"/></svg>Assistant</button>
-    <button class="btn" id="openInputs"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5" cy="4" r="1.6" fill="#0a0a0a"/><circle cx="11" cy="8" r="1.6" fill="#0a0a0a"/><circle cx="7" cy="12" r="1.6" fill="#0a0a0a"/></svg>Inputs</button>
+    <select id="preset" aria-label="Example application" title="Load one of the example designs"></select>
+    <button class="btn" id="openAssist" title="Describe a change in plain words and the assistant makes it (with your own API key)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12v8H7l-3 3v-3H2z"/></svg>Assistant</button>
+    <button class="btn" id="openInputs" title="Every input: the requirement, the workload, memory, links, the chip and the scale"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5" cy="4" r="1.6" fill="#0a0a0a"/><circle cx="11" cy="8" r="1.6" fill="#0a0a0a"/><circle cx="7" cy="12" r="1.6" fill="#0a0a0a"/></svg>Inputs</button>
     <button class="btn" id="pinBtn" title="Pin the current design as A, then change anything to compare">Compare</button>
-    <button class="btn" id="share">Share</button>
-    <a class="btn" href="guide.html" style="text-decoration:none">Guide</a>
+    <button class="btn" id="share" title="Copy a link that opens this exact design">Share</button>
+    <a class="btn" href="guide.html" style="text-decoration:none" title="How to use the explorer, with worked examples">Guide</a>
   </div>
 </header>
 
@@ -2547,7 +2550,7 @@ function tick(ts){
    ===================================================================== */
 /* "how is this worked out": click a headline figure for its calculation, with this design's numbers in it */
 let whyKey = null;
-const whyAttr = k => `data-why="${k}" role="button" tabindex="0" aria-expanded="${whyKey===k}" aria-controls="why" title="How this is worked out"`;
+const whyAttr = k => `data-why="${k}" data-tip="${k}" role="button" tabindex="0" aria-expanded="${whyKey===k}" aria-controls="why"`;
 function whyHTML(k, m, plain){
   const tp = m.tp, eq = (...p) => `<div class="eq">${p.join(' ')}</div>`, row = (l, v) => `<tr><td>${l}</td><td class="n">${v}</td></tr>`, Y = sysOf(m);
   if((k==='worst' || k==='max') && Y.pool && !plain){   // two pools: the most loaded part may be in either
@@ -2631,8 +2634,110 @@ function paintChain(m){
   const items = CHAIN.filter(([k])=>byK[k]).map(([k,label])=>({k, label, c:byK[k], rate:m.T/byK[k].U, weak:ts ? (ts.per.find(x=>x.k===k)||{}).weak||0 : null}));
   const ranked = [...items].sort((a,b)=>a.rate-b.rate), min = ranked[0].rate, second = ranked[1] ? ranked[1].rate : null;
   // figures only on the weakest two links (and any the tolerance draws name weakest); the rest on hover
-  document.getElementById('chain').innerHTML = `<span class="ch-l">Weakest link</span>` + items.map((i,n)=>`${n?'<span class="ch-a">→</span>':''}<span class="ch ${i.rate===min?'weak':''} ${state(i.c.U)}" title="${esc(i.c.name)}: alone it would sustain ${fmtBps(i.rate)} (${fmtPct(i.c.U)} loaded at the target)${i.weak!==null?'; weakest in '+fmtPct(i.weak)+' of tolerance draws':''}">${i.label}${i.rate===min||i.rate===second?` <b>${fmtBps(i.rate)}</b>`:''}${i.weak>0.005?` <i>${fmtPct(i.weak)}</i>`:''}</span>`).join('');
+  document.getElementById('chain').innerHTML = `<span class="ch-l">Weakest link</span>` + items.map((i,n)=>`${n?'<span class="ch-a">→</span>':''}<span class="ch ${i.rate===min?'weak':''} ${state(i.c.U)}" data-tip="chain" data-k="${i.k}" data-w="${i.weak===null?'':i.weak}">${i.label}<span class="sr">: ${esc(i.c.name)} alone would sustain ${fmtBps(i.rate)} (${fmtPct(i.c.U)} loaded at the target)</span>${i.rate===min||i.rate===second?` <b>${fmtBps(i.rate)}</b>`:''}${i.weak>0.005?` <i>${fmtPct(i.weak)}</i>`:''}</span>`).join('');
 }
+
+/* explanation boxes: hover over (or tab to) anything with data-tip for an explanation worked out from this design; anything
+   with a title, and each part of the diagram, shows its text in the same box instead of the browser's own tooltip */
+const TAB_TIPS = {opt:'Search for a design that meets the requirement: every DRAM type and speed grade, host link and on-chip interconnect at practical sizes, keeping the designs that no other beats.',
+  sizing:'The smallest of each part that carries the target: device DRAM in every technology, the host link and, with more than one accelerator, the fabric between them.',
+  sweep:'Each technology sized at every rate, as in Minimum specs, showing where each stops being practical.',
+  chip:'The accelerator’s compute: cores, array shape, dataflow, clock and voltage, how well a representative matrix multiply maps onto the array, and chiplets.',
+  onchip:'The interconnect inside the accelerator, between its tiles and SRAM banks: its bandwidth, hops and energy.',
+  rack:'Power per accelerator and per rack at full load, against the rack’s power and cooling limit.',
+  ppa:'Performance, power and die area per accelerator.', cost:'What the hardware, the facility and the electricity cost, and the cost per unit of work.',
+  cons:'Anything that fails or runs tight, and why.', latency:'The latency distribution: every stage drawn many times (Monte Carlo), against the budget.',
+  checks:'How far to trust the figures: published measurements, a discrete-event simulation of the model, and cross-checks with other simulators.',
+  headroom:'Each part’s load as the rate rises: the first to cross 100 % is the bottleneck, and where it crosses is the maximum rate.',
+  roofline:'Arithmetic intensity against the roofline: whether compute or memory bandwidth limits the accelerator.',
+  model:'The model’s equations and catalogue values, with their sources.'};
+const TIPS = {
+  worst(m){
+    const Y = sysOf(m), w = Y.worst, pm = Y.pool==='prefill pool' ? m.pre : m, nx = pm.comps.filter(c=>c!==w && isFinite(c.U) && c.U>0).sort((a,b)=>b.U-a.U)[0];
+    const over = pm.comps.filter(c=>c!==w && c.U>1);
+    const fix = `Giving it ${sig(w.U/S.ceil)}× its capacity would bring it down to the ceiling.`;
+    const verdict = w.U>1 ? `<b>It stops the system reaching the required speed.</b> It needs ${sig(w.U)}× the capacity it has, so the system sustains only ${fmtBps(Y.maxT)}, ${fmtPct(1/w.U)} of the target. ${fix}${over.length ? ` ${over.map(c=>esc(c.name)).join(', ')} ${over.length>1 ? 'are' : 'is'} over capacity too, so fixing ${esc(w.name)} alone is not enough.` : ''} The Optimise tab searches for a design that meets the target.`
+      : w.U>S.ceil ? `<b>It can carry the target, but runs above the ${fmtPct(S.ceil)} ceiling</b> set as the most any part should be loaded. Near full load its queue grows sharply, so latency suffers and bursts are not absorbed. ${fix}`
+      : `<b>It does not stop the system reaching the required speed.</b> It is under the ${fmtPct(S.ceil)} ceiling: the target could grow ${sig(S.ceil/w.U)}× before it reached the ceiling, and ${sig(1/w.U)}× before it was fully loaded.`;
+    return `<b>${esc(w.name)} is the most loaded part${Y.pool ? ', in the '+Y.pool : ''}.</b>
+      <p>${fmtPct(w.U)} is its load at the target rate: what it has to do (${w.f(w.need)}) ÷ what it can do (${w.f(w.have)}). Every part on the data path is worked out the same way, and the most loaded one sets how fast the whole system can go.</p>
+      ${nx ? `<p>Next most loaded: ${esc(nx.name)}, at ${fmtPct(nx.U)}. ${esc(w.name)} would need ${sig(w.U/nx.U)}× its capacity before ${esc(nx.name)} took over.</p>` : ''}
+      <p>${verdict}</p><p class="tk">Click for the working.</p>`;
+  },
+  max(m){
+    const Y = sysOf(m), w = Y.worst;
+    return `<b>${fmtBps(Y.maxT)}: the highest rate this design can sustain.</b>
+      <p>The target (${fmtBps(m.T)}) ÷ the load on the most loaded part (${esc(w.name)}, ${fmtPct(Y.U)}): the rate at which that part would be exactly fully loaded.</p>
+      <p>${Y.maxT>=m.T ? `<b>That is ${sig(Y.maxT/m.T)}× the target, so the target is within reach.</b>` : `<b>That is short of the target by ${fmtPct(1-Y.maxT/m.T)}.</b>`} At this rate there is no headroom: queues grow without limit as a part nears full load. To keep every part under the ${fmtPct(S.ceil)} ceiling, run at up to ${fmtBps(Y.maxT*S.ceil)}.</p><p class="tk">Click for the working.</p>`;
+  },
+  lat(m){
+    const ls = latencyStats(m), lh = latHead(m);
+    if(ls.unbounded) return `<b>Latency: unbounded.</b><p>A part is at or over full load, so its queue grows without limit and no latency can be promised. Fix the bottleneck first.</p><p class="tk">Click for the working.</p>`;
+    const big = m.stages.reduce((a, b)=>b.t>a.t ? b : a), q = isFinite(big.q) ? big.q : 0;
+    return `<b>${latLabel()} latency: ${fmtT(lh)}, against a budget of ${fmtT(S.lat)}.</b>
+      <p>The time for one block (${fmtB(S.block)}) to pass through every stage: each stage’s fixed delay, transfer time and queueing wait, with their spread combined for the ${latLabel()}.</p>
+      <p>The largest stage is ${esc(big.name)}: ${fmtT(big.t)} of the ${fmtT(m.latency)} mean${q>big.t/2 ? `, mostly queueing (${fmtT(q)})` : ''}.</p>
+      <p>${lh>S.lat ? `<b>Over budget</b> by ${fmtT(lh-S.lat)} (${sig(lh/S.lat)}×).` : `<b>Within budget</b>, with ${fmtT(S.lat-lh)} to spare.`}</p><p class="tk">Click for the working.</p>`;
+  },
+  power(m){
+    const Y = sysOf(m), tp = m.tp, fp = fullPower(S), lim = S.scale.rackKW*1000;
+    return `<b>${fmtW(Y.Ptot)} at the target rate${Y.pool ? ', both pools' : ''}.</b>
+      <p>Every accelerator and host at the load the target puts on it, plus fans and power conversion. With every part at its peak it would draw ${fmtW(sysFull(S))}: the supply and the cooling have to be sized for that.</p>
+      ${tp.nA>1 ? `<p>Each rack draws up to ${fmtW(fp.rack)} at full load, against a ${S.scale.rackKW} kW limit: <b>${fp.rack>lim ? 'over the limit' : 'within it'}</b>.</p>` : `<p>That is ${sig(m.Ptot/m.T*1e12)} pJ for every byte processed.</p>`}<p class="tk">Click for the working.</p>`;
+  },
+  cost(m){
+    const c = costOf(S, m);
+    return `<b>${fmtUSD(c.unit)} ${c.unitName}.</b>
+      <p>What the system costs a year (${fmtUSD(c.perYear)}: the hardware written off over ${S.cost.years} years, the facility, and electricity) ÷ the work it does in a year at ${fmtPct(S.cost.duty)} utilisation.</p>
+      <p>Buying it costs ${fmtUSD(c.capex)} up front. The Cost tab breaks it down.</p><p class="tk">Click for the working.</p>`;
+  },
+  chain(m, el){
+    const c = m.comps.find(x=>x.k===el.dataset.k); if(!c) return '';
+    const rated = m.comps.filter(x=>isFinite(x.U) && x.U>0).sort((a, b)=>b.U-a.U), rank = rated.indexOf(c), w = rated[0], weak = el.dataset.w==='' ? null : +el.dataset.w;
+    return `<b>${esc(c.name)}${m.pre ? ', decode pool' : ''}</b>
+      <p>On its own it could carry ${fmtBps(m.T/c.U)}: the target ÷ its load (${fmtPct(c.U)}).</p>
+      <p>${rank===0 ? `<b>The weakest link:</b> the slowest part on the data path, so it sets the most the system can carry.` : `${['', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'][rank] || (rank+1)+'th'} weakest of ${rated.length}. It does not limit the system; ${esc(w.name)} does, at ${fmtBps(m.T/w.U)}.`}
+      ${c.U>1 ? ' On its own it cannot carry the target.' : c.U>S.ceil ? ` It is above the ${fmtPct(S.ceil)} ceiling.` : ''}</p>
+      ${weak ? `<p>With every catalogue figure varied within its tolerance, it comes out weakest in ${fmtPct(weak)} of the draws.</p>` : ''}`;
+  },
+  tab: (m, el) => TAB_TIPS[el.dataset.t] ? esc(TAB_TIPS[el.dataset.t]) : ''
+};
+let tipCur = null, tipTimer = 0;
+const tipTarget = n => n && n.closest ? n.closest('[data-tip],[title],[data-tipt],g.node') : null;
+function tipHTML(el){
+  if(el.dataset.tip) return TIPS[el.dataset.tip] ? TIPS[el.dataset.tip](M, el) : '';
+  if(el.hasAttribute('title')){ el.dataset.tipt = el.getAttribute('title'); el.removeAttribute('title'); }   // the box replaces the browser's tooltip
+  const t = el.querySelector(':scope > title');                                                         // a diagram part: its SVG title, silenced while shown
+  if(t){ if(t.textContent) el.dataset.tipt = t.textContent; t.textContent = ''; }
+  return el.dataset.tipt ? esc(el.dataset.tipt) : '';
+}
+function tipShow(el){
+  const box = document.getElementById('tip'), html = el.isConnected ? tipHTML(el) : ''; if(!html) return;
+  box.innerHTML = html; box.hidden = false; el.setAttribute('aria-describedby', 'tip');
+  const r = el.getBoundingClientRect(), b = box.getBoundingClientRect(), pad = 8;
+  const left = Math.max(pad, Math.min(r.left, innerWidth - b.width - pad));
+  const top = r.bottom + pad + b.height <= innerHeight || r.top - pad - b.height < 0 ? r.bottom + pad : r.top - pad - b.height;
+  box.style.left = left+'px'; box.style.top = Math.max(pad, top)+'px';
+}
+function tipHide(){
+  clearTimeout(tipTimer);
+  const el = tipCur; tipCur = null; document.getElementById('tip').hidden = true;
+  if(!el) return;
+  el.removeAttribute('aria-describedby');
+  const t = el.querySelector(':scope > title'); if(t && !t.textContent && el.dataset.tipt) t.textContent = el.dataset.tipt;
+}
+document.addEventListener('pointerover', e=>{
+  if(e.pointerType!=='mouse') return;                                                                   // touch: a tap opens the working instead
+  const el = tipTarget(e.target); if(el===tipCur) return;
+  tipHide(); if(!el) return;
+  tipCur = el; tipTimer = setTimeout(()=>tipShow(el), 300);
+});
+document.addEventListener('pointerout', e=>{ if(!e.relatedTarget) tipHide(); });
+document.addEventListener('focusin', e=>{ const el = tipTarget(e.target); tipHide(); if(el && el===e.target && el.matches(':focus-visible')){ tipCur = el; tipShow(el); } });
+document.addEventListener('focusout', tipHide);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') tipHide(); });
+document.addEventListener('click', tipHide, true);
+addEventListener('scroll', tipHide, true);
 
 /* compare: pin a design as A, change anything, and the current design (B) is set against it */
 let pinA = null, cmpOpen = false, digA = null;
@@ -2676,7 +2781,7 @@ let moreOpen = false;
 let tab = 'sizing';
 function buildTabs(){
   if(TABS.find(t=>t.id===tab).more) moreOpen = true;
-  document.getElementById('tabbar').innerHTML = TABS.map(t=>`<button class="tab${t.id===tab?' on':''}${t.more?' more':''}" aria-current="${t.id===tab}" data-t="${t.id}" ${t.more&&!moreOpen?'hidden':''}>${t.name}<span class="n" id="n_${t.id}" hidden></span></button>`).join('')
+  document.getElementById('tabbar').innerHTML = TABS.map(t=>`<button class="tab${t.id===tab?' on':''}${t.more?' more':''}" aria-current="${t.id===tab}" data-t="${t.id}" data-tip="tab" ${t.more&&!moreOpen?'hidden':''}>${t.name}<span class="n" id="n_${t.id}" hidden></span></button>`).join('')
     + `<button class="tab moretog" id="moreTog" aria-expanded="${moreOpen}">${moreOpen?'Less':'More'} <span aria-hidden="true">${moreOpen?'‹':'›'}</span></button>`;
   document.getElementById('panes').innerHTML = TABS.map(t=>`<div class="pane${t.id===tab?' on':''}" id="p_${t.id}"></div>`).join('');
   document.querySelectorAll('.tab[data-t]').forEach(b=>b.onclick=()=>{ tab=b.dataset.t; document.querySelectorAll('.tab[data-t]').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-current', x===b); });

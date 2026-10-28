@@ -157,6 +157,25 @@ const update = process.argv.includes('--update');
     for (const id of ids) { applyPreset(id); openSpec(); const h = document.getElementById('sheet').getBoundingClientRect().height; if (h > 1039) tall[id] = Math.round(h); }
     return {tall, link: document.getElementById('sheet').textContent.includes(location.hash), n: ids.length};
   }, Object.keys(result.presets));
+  // hover explanations: every headline figure, chain link and tab, in every example, names its figure and says whether
+  // the most loaded part stops the target being met
+  const tips = await page.evaluate(ids => {
+    const bad = [], kinds = new Set();
+    const el = d => { const e = document.createElement('span'); Object.assign(e.dataset, d); return e; };
+    for (const id of ids) {
+      applyPreset(id); const m = M, Y = sysOf(m), w = Y.worst;
+      const t = Object.fromEntries(['worst', 'max', 'lat', 'power', 'cost'].map(k => [k, TIPS[k](m)]));
+      const verdict = w.U > 1 ? 'stops the system' : w.U > S.ceil ? 'runs above the' : 'does not stop'; kinds.add(verdict);
+      if (!t.worst.includes(fmtPct(w.U)) || !t.worst.includes(verdict)) bad.push(id + ': most loaded');
+      if (!t.max.includes(fmtBps(Y.maxT))) bad.push(id + ': max');
+      if (!t.power.includes(fmtW(Y.Ptot)) || !t.cost.includes(fmtUSD(costOf(S, m).unit))) bad.push(id + ': power or cost');
+      if (isFinite(latHead(m)) && !t.lat.includes(fmtT(latHead(m)))) bad.push(id + ': latency');
+      for (const c of m.comps) if (!TIPS.chain(m, el({k: c.k, w: ''})).includes(esc(c.name))) bad.push(id + ': chain ' + c.k);
+      for (const k of TABS.map(x => x.id)) if (!TIPS.tab(m, el({t: k}))) bad.push('tab ' + k);
+      for (const [k, v] of Object.entries(t)) if (/NaN|undefined|null/.test(v)) bad.push(id + ': ' + k + ' has NaN or undefined');
+    }
+    return {bad: [...new Set(bad)], kinds: kinds.size, n: ids.length};
+  }, Object.keys(result.presets));
   await browser.close();
 
   let fails = 0;
@@ -201,6 +220,8 @@ const update = process.argv.includes('--update');
   else console.log(`ok   voltage and heat: junction solves its own leakage (${Math.round(heat.T)} °C in the chiplet example), clock and energy follow V; controller limits match their formulas`);
   if (links.bad.length || !links.legacy) fail(`short links: ${JSON.stringify(links)}`);
   else console.log(`ok   short links: all examples round-trip (longest changed design ${links.longest} characters); old links load`);
+  if (tips.bad.length || tips.kinds < 3) fail(`hover explanations: ${JSON.stringify(tips)}`);
+  else console.log(`ok   hover explanations: every headline figure, chain link and tab in all ${tips.n} examples, naming its figure; all three verdicts on the most loaded part occur`);
   if (Object.keys(spec.tall).length || !spec.link) fail(`spec sheet: ${JSON.stringify(spec)}`);
   else console.log(`ok   spec sheet: one A4 page for all ${spec.n} examples, with the share link`);
 
