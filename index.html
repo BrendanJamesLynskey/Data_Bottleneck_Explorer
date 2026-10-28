@@ -2623,8 +2623,12 @@ function paintSummary(m){
   const p = PRESETS.find(x=>x.id===S.preset);
   const L = S.llm, lm = L.on ? `${esc(LLM_MODELS[L.model] ? LLM_MODELS[L.model].name : 'Custom LLM')} · ${fmtN(L.users)} users × ${L.tps} tok/s · ` : '';
   document.getElementById('reqLine').innerHTML = `<span>${lm}${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${m.pre ? `${fmtN(tp.nA)} decode + ${fmtN(m.pre.tp.nA)} prefill accelerators (the diagram is the decode pool)` : tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
-    <button class="link" data-open="left">Edit inputs</button><button class="link" id="specBtn" title="A one-page summary to print or save as PDF">Spec sheet</button><button class="link" id="simExport" title="Download this design and the simulator (design.json and sim.py) to run on your own machine">Export simulation</button><button class="link" id="simJump" title="Run this design as a discrete-event simulation in the browser, on the Checks tab">Simulate</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span>`:''}`;
-  document.getElementById('scen').innerHTML = p ? esc(p.d) : '';     // the example's description, for as long as it is loaded
+    <button class="link" data-open="left">Edit inputs</button><button class="link" id="specBtn" title="A one-page summary to print or save as PDF">Spec sheet</button><button class="link" id="simExport" title="Download this design and the simulator (design.json and sim.py) to run on your own machine">Export simulation</button><button class="link" id="simJump" title="Run this design as a discrete-event simulation in the browser, on the Checks tab">Simulate</button>`;
+  // the loaded example's name and description, and the picker showing it, for as long as it is loaded
+  document.getElementById('scen').innerHTML = p ? `<b>${esc(p.name)}</b>${S.mod?' <i>(modified)</i>':''}<br>${esc(p.d)}` : '';
+  // a modified example shows as its own entry, so choosing the example itself still reloads it
+  const sel = document.getElementById('preset'), cur = document.getElementById('presetCur');
+  if(cur){ cur.textContent = p && S.mod ? p.name+' (modified)' : ''; sel.value = !p ? '' : S.mod ? '_cur' : p.id; }
   paintWhy(m); paintChain(m);
 }
 /* the throughput chain: every component on the data path with the rate it alone could sustain; the weakest link sets the system */
@@ -3514,9 +3518,9 @@ function loadHash(){
   try{ S = readS(t); if(!validS(S)) throw 0; return true; }catch(e){ S = clone(BASE); return false; }
 }
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('on'), 1800); }
-document.getElementById('preset').innerHTML = `<option value="">Examples (${PRESETS.length})…</option>`+
+document.getElementById('preset').innerHTML = `<option value="">Examples (${PRESETS.length})…</option><option value="_cur" id="presetCur" hidden></option>`+
   [...new Set(PRESETS.map(p=>p.g))].map(g=>`<optgroup label="${esc(g)}">${PRESETS.filter(p=>p.g===g).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>`).join('');
-document.getElementById('preset').addEventListener('change', e=>{ if(e.target.value){ applyPreset(e.target.value); toast(e.target.selectedOptions[0].text); } e.target.value=''; });
+document.getElementById('preset').addEventListener('change', e=>{ if(e.target.value && e.target.value!=='_cur') applyPreset(e.target.value); });   // the picker and the summary keep its name
 document.getElementById('share').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(location.href); toast('Link copied'); }catch(e){ toast('Copy the address bar to share'); } });
 
 /* spec sheet: the current design on one page — requirement, result, parts with their power, every limit's load

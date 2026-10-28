@@ -36,7 +36,8 @@ Hover the mouse over almost anything, or tab to it, and a box explains it:
 - **The tabs, the header buttons and the diagram's blocks.**
 
 Clicking a headline figure still opens the full working. On touch screens, where there is no hover, a tap does that.
-The loaded example's description stays under the requirements line for as long as the example is loaded.
+The loaded example's name and description stay under the requirements line, and its name in the examples picker,
+until another example or a new design replaces it; once its inputs change it is marked *(modified)*.
 
 ![Inputs drawer](inputs.png)
 
