@@ -3,3 +3,6 @@ simpy==4.1.1
 pytest==8.3.5
 # The cross-check against the owner's serving simulator (sim/disagg_compare.py), pinned to a commit on its main
 disagg-sim @ git+https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim@ba37774fe2315ca960d7471be352382e301f89a1
+# The cross-check against Torch_Sim_Frontend's accelerator model (sim/simfront_compare.py) needs only simfront.accel,
+# which runs on SimPy. Install it without its PyTorch dependencies, as CI does:
+#   pip install --no-deps "simfront @ git+https://github.com/BrendanJamesLynskey/Torch_Sim_Frontend@53b1419c9eb26fa01b4eb6f1fd2593a715c142d9"

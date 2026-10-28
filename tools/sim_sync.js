@@ -1,10 +1,12 @@
 // Keep the simulation files in step with the page:  node tools/sim_sync.js [--check]
 //   1. export every example's design spec (simSpec, schema hw-explorer-sim/1) to sim/examples/<id>.json, in headless Chrome;
 //   2. embed sim/sim.py (for Export and the in-browser run), sim/results.json (the Checks tab's model-vs-simulation
-//      table), sim/trace_results.json (its real-traffic table) and sim/disagg_results.json (its serving-simulator
-//      cross-check) in index.html, between their <script> tags;
+//      table), sim/trace_results.json (its real-traffic table), sim/disagg_results.json (its serving-simulator
+//      cross-check) and sim/simfront_results.json (its accelerator-simulator cross-check) in index.html, between their
+//      <script> tags;
 //   3. export the real-traffic specs (simTraceSpec, from sim/traces/stats.json) to sim/traces/specs/;
-//   4. export the Disaggregated_Inference_Sim cross-check specs (simLlmSpec) to sim/disagg/specs/.
+//   4. export the Disaggregated_Inference_Sim cross-check specs (simLlmSpec) to sim/disagg/specs/;
+//   5. export the Torch_Sim_Frontend cross-check specs (simChipSpec) to sim/simfront/specs/.
 // --check writes nothing and fails if any file is stale, so CI catches a model change that wasn't re-exported.
 const puppeteer = require('puppeteer');
 const fs = require('fs'), path = require('path');
@@ -36,6 +38,8 @@ const check = process.argv.includes('--check');
   html = embed(html, 'simTraceResults', fs.existsSync(tres) ? JSON.stringify(JSON.parse(fs.readFileSync(tres, 'utf8')), small) + '\n' : 'null\n');
   const dres = path.join(ROOT, 'sim', 'disagg_results.json');
   html = embed(html, 'simDisaggResults', fs.existsSync(dres) ? JSON.stringify(JSON.parse(fs.readFileSync(dres, 'utf8')), small) + '\n' : 'null\n');
+  const sres = path.join(ROOT, 'sim', 'simfront_results.json');
+  html = embed(html, 'simSimfrontResults', fs.existsSync(sres) ? JSON.stringify(JSON.parse(fs.readFileSync(sres, 'utf8')), small) + '\n' : 'null\n');
   put(PAGE, html);
 
   const browser = await puppeteer.launch({headless: true, args: ['--no-sandbox']});
@@ -63,6 +67,15 @@ const check = process.argv.includes('--check');
              ['llmserve_8b', simLlmSpec(at('llmserve', s => { s.llm.model = 'l8'; Object.assign(s.llm, {params:8.03, active:8.03, layers:32, dModel:4096, kv:2048}); }))],
              ['llmsplit', simLlmSpec(at('llmsplit'))]);
     return out; });
+  // the Torch_Sim_Frontend cross-check (sim/TOLERANCE.md): the Chip tab's multiply in four examples and variants fixed in advance
+  const cspecs = await page.evaluate(() => {
+    const at = (id, f) => { applyPreset(id); const s = clone(S); s.preset = id; if (f) f(s); return s; };
+    return [['chiparray', simChipSpec(at('chiparray'))],
+            ['chiparray_os', simChipSpec(at('chiparray', s => { s.chip.flow = 'os'; }))],
+            ['llmserve', simChipSpec(at('llmserve'))],
+            ['llmserve_os', simChipSpec(at('llmserve', s => { s.chip.flow = 'os'; }))],
+            ['llmserve_b32', simChipSpec(at('llmserve', s => { s.llm.batch = 32; s.llm.users = 128; }))],
+            ['trainllm', simChipSpec(at('trainllm'))]]; });
   await browser.close();
   fs.mkdirSync(EX, {recursive: true});
   const want = new Set();
@@ -73,10 +86,13 @@ const check = process.argv.includes('--check');
   const DS = path.join(ROOT, 'sim', 'disagg', 'specs');
   fs.mkdirSync(DS, {recursive: true});
   for (const [id, spec] of lspecs) put(path.join(DS, id + '.json'), JSON.stringify(spec, null, 1) + '\n');
+  const CS = path.join(ROOT, 'sim', 'simfront', 'specs');
+  fs.mkdirSync(CS, {recursive: true});
+  for (const [id, spec] of cspecs) put(path.join(CS, id + '.json'), JSON.stringify(spec, null, 1) + '\n');
   for (const f of fs.readdirSync(EX)) if (f.endsWith('.json') && !want.has(path.join(EX, f))) { stale.push('sim/examples/' + f + ' (no such example)'); if (!check) fs.unlinkSync(path.join(EX, f)); }
 
   if (check) {
     if (stale.length) { console.log('FAIL simulation files out of step with the page (run node tools/sim_sync.js): ' + stale.join(', ')); process.exit(1); }
-    console.log(`ok   simulation files in step: ${specs.length} example specs, ${tspecs.length} real-traffic specs, ${lspecs.length} cross-check specs, sim.py and all three results embedded in the page`);
+    console.log(`ok   simulation files in step: ${specs.length} example specs, ${tspecs.length} real-traffic specs, ${lspecs.length + cspecs.length} cross-check specs, sim.py and all four results embedded in the page`);
   } else console.log(stale.length ? 'updated ' + stale.join(', ') : 'nothing to update');
 })();

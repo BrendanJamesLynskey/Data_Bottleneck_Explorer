@@ -1,0 +1,48 @@
+{
+ "schema": "hw-explorer-chip/1",
+ "explorer": {
+  "model_hash": "fnv1a32:2b7f7c7f",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "GB200-class accelerator from its compute array: six chiplets at low voltage",
+  "example": "chiparray",
+  "link": "https://hw-system-design-explorer.vercel.app/#d=chiparray"
+ },
+ "gemm": {
+  "M": 4096,
+  "K": 4096,
+  "N": 4096,
+  "bytes": 1,
+  "what": "set under Chip micro-architecture"
+ },
+ "chip": {
+  "cores": 1747,
+  "rows": 32,
+  "cols": 32,
+  "clock_hz": 1397850682.7295783,
+  "flow": "ws",
+  "sram_B": 50000000,
+  "dram_Bps": 7507084549019.608
+ },
+ "analytic": {
+  "cycles": 41600,
+  "array_s": 0.00002975997401866115,
+  "traffic_B": 83886080,
+  "dram_s": 0.000011174255391989044,
+  "time_s": 0.00002975997401866115,
+  "bound": "compute",
+  "util": 0.9234080401567523,
+  "tile": {
+   "Tm": 2048,
+   "Tn": 2048,
+   "Tk": 4096,
+   "t": 83886080
+  },
+  "rounds": 10,
+  "tiles": 16384,
+  "spatial": 1,
+  "temporal": 0.9846153846153847,
+  "parallel": 0.9378362907842015
+ }
+}

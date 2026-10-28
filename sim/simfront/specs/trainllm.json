@@ -1,0 +1,48 @@
+{
+ "schema": "hw-explorer-chip/1",
+ "explorer": {
+  "model_hash": "fnv1a32:2b7f7c7f",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "LLM training from the model’s shape (Llama 3.1 70B, BF16, 1,024 accelerators)",
+  "example": "trainllm",
+  "link": "https://hw-system-design-explorer.vercel.app/#d=trainllm"
+ },
+ "gemm": {
+  "M": 8192,
+  "K": 8192,
+  "N": 3584,
+  "bytes": 2,
+  "what": "training: the FFN up-projection for one micro-batch"
+ },
+ "chip": {
+  "cores": 64,
+  "rows": 32,
+  "cols": 32,
+  "clock_hz": 1800000000,
+  "flow": "ws",
+  "sram_B": 50000000,
+  "dram_Bps": 5263936284118.543
+ },
+ "analytic": {
+  "cycles": 3698688,
+  "array_s": 0.002054826666666667,
+  "traffic_B": 1149239296,
+  "dram_s": 0.00021832317755579415,
+  "time_s": 0.002054826666666667,
+  "bound": "compute",
+  "util": 0.9922480620155039,
+  "tile": {
+   "Tm": 1024,
+   "Tn": 2048,
+   "Tk": 2048,
+   "t": 1149239296
+  },
+  "rounds": 448,
+  "tiles": 28672,
+  "spatial": 1,
+  "temporal": 0.9922480620155039,
+  "parallel": 1
+ }
+}

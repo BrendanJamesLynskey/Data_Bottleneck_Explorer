@@ -222,3 +222,66 @@ Neither the rule nor the verdicts changed; a second run with the same seeds repr
   balanced, from the roofline's 19.4 ms to 22.3 ms.
 - **A finding about the simulator:** its prefill dispatcher measures load by waiting prompts alone, not the one in
   service, so ties send new prompts to the first instance. That adds a 38 ms mean wait in the split design.
+
+## Cross-check: Torch_Sim_Frontend's accelerator model
+
+Fixed on 2026-10-28, before the first run. As above, neither the rule nor the settings change to make a row pass.
+
+`sim/simfront_compare.py` runs the matrix multiply the Chip tab analyses through `simfront.accel`, the SimPy
+accelerator model in [Torch_Sim_Frontend](https://github.com/BrendanJamesLynskey/Torch_Sim_Frontend), pinned at
+commit `53b1419`. It writes `sim/simfront_results.json`. Only `simfront.accel` and the trace format are used, so it
+is installed without PyTorch (`pip install --no-deps`).
+
+The two tools model the multiply differently:
+- **The explorer (`gemmMap`)** maps the multiply onto its cores with the chosen dataflow, paying the array's fill
+  and drain (rows + columns cycles) once per round of tiles. It picks the SRAM tiling with the least DRAM traffic,
+  partial sums included, and takes the time as the larger of arithmetic and DRAM transfer.
+- **`simfront.accel`** cuts the multiply into blocks that fit its buffer, halving the largest dimension until they
+  do. Every block loads both operands, with no reuse between blocks, and keeps its partial sums on chip. It then
+  runs the blocks through DMA engines, a buffer with back-pressure and an output-stationary array, event by event.
+  Load, compute and store overlap only as far as the buffer and the order allow.
+
+### Same hardware
+
+Each spec is exported from the page (`simChipSpec`, by `tools/sim_sync.js`, to `sim/simfront/specs/`):
+- **The array:** one array of the explorer's rows × columns, clocked at the explorer's core clock × its cores.
+  `simfront.accel` models one array, so this keeps the peak multiply-accumulate rate. It treats the cores as
+  perfectly balanced: the explorer's rounding of tiles to whole rounds of cores has no counterpart.
+- **The buffer:** the explorer's on-chip SRAM, half of it for a tile, as the explorer assumes.
+- **Memory:** the bandwidth the explorer uses for the multiply (`devBW`: its DRAM at its own efficiency), as one
+  channel, with an interconnect as fast so it never binds.
+- **Elements:** operands and results at the explorer's width.
+- **Everything else** stays at the simulator's defaults: 100 ns of memory and 20 ns of interconnect latency per
+  transfer, and an output-stationary array whatever the explorer's dataflow.
+
+### Designs
+
+Fixed in advance, each the multiply on the design's Chip tab:
+- `chiparray` as it stands: 4,096 × 4,096 × 4,096 at 8 bits on 1,747 cores of 32 × 32, weight-stationary;
+- the same, output-stationary;
+- `llmserve`: the decode FFN up-projection for one copy's batch of 500, on the default chip (64 cores of 32 × 32,
+  weight-stationary);
+- the same, output-stationary;
+- the same at batch 32;
+- `trainllm`: the training FFN up-projection for one micro-batch (Llama 3.1 70B, BF16, 8,192-token sequences, tensor
+  parallel 8).
+
+### Rows and the rule
+
+`simfront.accel` is deterministic, so each design runs once. For every design:
+
+| Row | Explorer | `simfront.accel` | Agrees when |
+|---|---|---|---|
+| Array time | cycles ÷ clock | the array's busy time | within ±10 % |
+| DRAM traffic | bytes for its best tiling | bytes loaded plus bytes stored | within ±10 % |
+| Time for the multiply | the larger of array time and DRAM time | the run's makespan | within ±10 % |
+| What bounds it | DRAM or compute | compute when the array is busy for longer than memory, else DRAM | the verdicts match |
+
+±10 % as for the Disaggregated_Inference_Sim step rows: both are first-order models of the same multiply on the same
+hardware.
+
+## The three tools together
+
+The Checks tab ends with one table: for each kind of figure, how many rows agree with the explorer's own simulator
+(`sim/sim.py`, per example and on real traffic), with Disaggregated_Inference_Sim and with `simfront.accel`. It is a
+count of the rows above, with no rule of its own.

@@ -1,0 +1,48 @@
+{
+ "schema": "hw-explorer-chip/1",
+ "explorer": {
+  "model_hash": "fnv1a32:2b7f7c7f",
+  "url": "https://hw-system-design-explorer.vercel.app/"
+ },
+ "design": {
+  "name": "LLM serving from the model’s shape (Llama 3.1 70B FP8, 2,000 users)",
+  "example": "llmserve",
+  "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve,chip.flow:os"
+ },
+ "gemm": {
+  "M": 500,
+  "K": 8192,
+  "N": 7168,
+  "bytes": 1,
+  "what": "decode: the FFN up-projection for one copy’s batch"
+ },
+ "chip": {
+  "cores": 64,
+  "rows": 32,
+  "cols": 32,
+  "clock_hz": 1800000000,
+  "flow": "os",
+  "sram_B": 50000000,
+  "dram_Bps": 5652252023017.716
+ },
+ "analytic": {
+  "cycles": 462336,
+  "array_s": 0.00025685333333333335,
+  "traffic_B": 77664256,
+  "dram_s": 0.000013740409253466965,
+  "time_s": 0.00025685333333333335,
+  "bound": "compute",
+  "util": 0.9689922480620154,
+  "tile": {
+   "Tm": 500,
+   "Tn": 4096,
+   "Tk": 4096,
+   "t": 77664256
+  },
+  "rounds": 56,
+  "tiles": 3584,
+  "spatial": 0.9765625,
+  "temporal": 0.9922480620155039,
+  "parallel": 1
+ }
+}
