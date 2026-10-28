@@ -2486,7 +2486,6 @@ function tick(ts){
 /* =====================================================================
    SUMMARY
    ===================================================================== */
-let scenOpen = false;
 /* "how is this worked out": click a headline figure for its calculation, with this design's numbers in it */
 let whyKey = null;
 const whyAttr = k => `data-why="${k}" role="button" tabindex="0" aria-expanded="${whyKey===k}" aria-controls="why" title="How this is worked out"`;
@@ -2562,9 +2561,8 @@ function paintSummary(m){
   const p = PRESETS.find(x=>x.id===S.preset);
   const L = S.llm, lm = L.on ? `${esc(LLM_MODELS[L.model] ? LLM_MODELS[L.model].name : 'Custom LLM')} · ${fmtN(L.users)} users × ${L.tps} tok/s · ` : '';
   document.getElementById('reqLine').innerHTML = `<span>${lm}${fmtBps(S.T)} · latency ≤ ${fmtT(S.lat)} · ${sig(S.ops)} op/B · ${m.pre ? `${fmtN(tp.nA)} decode + ${fmtN(m.pre.tp.nA)} prefill accelerators (the diagram is the decode pool)` : tp.nA>1?fmtN(tp.nA)+' accelerators':'1 accelerator'}</span>
-    <button class="link" data-open="left">Edit inputs</button><button class="link" id="specBtn" title="A one-page summary to print or save as PDF">Spec sheet</button><button class="link" id="simExport" title="Download this design and the simulator (design.json and sim.py) to run on your own machine">Export simulation</button><button class="link" id="simJump" title="Run this design as a discrete-event simulation in the browser, on the Checks tab">Simulate</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span> <button class="link" id="scenMore">${scenOpen?'hide':'about'}</button>`:''}`;
-  document.getElementById('scen').innerHTML = p && scenOpen ? esc(p.d) : '';
-  const sm = document.getElementById('scenMore'); if(sm) sm.onclick = ()=>{ scenOpen = !scenOpen; paintSummary(M); };
+    <button class="link" data-open="left">Edit inputs</button><button class="link" id="specBtn" title="A one-page summary to print or save as PDF">Spec sheet</button><button class="link" id="simExport" title="Download this design and the simulator (design.json and sim.py) to run on your own machine">Export simulation</button><button class="link" id="simJump" title="Run this design as a discrete-event simulation in the browser, on the Checks tab">Simulate</button>${p?`<span class="sep">·</span><span>${esc(p.name)}${S.mod?' <i>(modified)</i>':''}</span>`:''}`;
+  document.getElementById('scen').innerHTML = p ? esc(p.d) : '';     // the example's description, for as long as it is loaded
   paintWhy(m); paintChain(m);
 }
 /* the throughput chain: every component on the data path with the rate it alone could sustain; the weakest link sets the system */
