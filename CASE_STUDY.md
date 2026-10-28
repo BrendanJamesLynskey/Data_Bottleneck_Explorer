@@ -125,6 +125,14 @@ arithmetic and the all-reduce in series where a roofline overlaps them. On memor
 because it counts every byte as usable. The cross-check also found a dispatch flaw in the other simulator: it sends
 new prompts to an instance that is already busy.
 
+**And a third, for the chip.** The Chip tab's matrix multiply went through `simfront.accel`, the event-driven
+accelerator model in my Torch_Sim_Frontend, on the same array, SRAM and memory bandwidth, again under a rule fixed
+first. 18 of 24 rows agree. Where both tools stream a long depth through the array, the arithmetic agrees to 1–8 %.
+The misses have two causes. The explorer's weight-stationary array pays its fill and drain on every tile, which at a
+decode batch of 32 is two thirds of its time; the simulator only has an output-stationary array. And the explorer
+sends partial sums to DRAM and back, where the simulator keeps them on chip: for decode that is the whole of a 10 %
+traffic gap. The Checks tab now ends with one table of all three simulators, by kind of figure.
+
 Behind that, a regression suite runs in GitHub Actions on every push:
 - **Regression:** all 32 examples against golden results within 2 %.
 - **Hand calculations:**

@@ -1,0 +1,630 @@
+{
+ "schema": "hw-explorer-sim/1/simfront",
+ "simfront": {
+  "commit": "53b1419c9eb26fa01b4eb6f1fd2593a715c142d9",
+  "url": "https://github.com/BrendanJamesLynskey/Torch_Sim_Frontend"
+ },
+ "rule": {
+  "array": 0.1,
+  "traffic": 0.1,
+  "time": 0.1
+ },
+ "summary": {
+  "rows": 24,
+  "pass": 18
+ },
+ "designs": [
+  {
+   "id": "chiparray",
+   "name": "GB200-class accelerator from its compute array: six chiplets at low voltage",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=chiparray",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "gemm": {
+    "M": 4096,
+    "K": 4096,
+    "N": 4096,
+    "bytes": 1,
+    "what": "set under Chip micro-architecture"
+   },
+   "chip": {
+    "cores": 1747,
+    "rows": 32,
+    "cols": 32,
+    "clock_hz": 1397850682.7295783,
+    "flow": "ws",
+    "sram_B": 50000000,
+    "dram_Bps": 7507084549019.608
+   },
+   "explorer": {
+    "cycles": 41600,
+    "array_s": 2.975997401866115e-05,
+    "traffic_B": 83886080,
+    "dram_s": 1.1174255391989044e-05,
+    "time_s": 2.975997401866115e-05,
+    "bound": "compute",
+    "util": 0.9234080401567523,
+    "tile": {
+     "Tm": 2048,
+     "Tn": 2048,
+     "Tk": 4096,
+     "t": 83886080
+    },
+    "rounds": 10,
+    "tiles": 16384,
+    "spatial": 1,
+    "temporal": 0.9846153846153847,
+    "parallel": 0.9378362907842015
+   },
+   "sim": {
+    "time_s": 3.0514267961851966e-05,
+    "array_s": 2.7480704113854706e-05,
+    "memory_s": 1.6843957548784656e-05,
+    "traffic_B": 83886080,
+    "loads_B": 67108864,
+    "stores_B": 16777216,
+    "bound": "compute",
+    "tiles": 4,
+    "macs": 68719476736,
+    "stalls_s": {
+     "compute": 2.7480704113854706e-05,
+     "load bandwidth": 2.354851078397809e-06,
+     "buffer full": 0.0,
+     "dependency": 0.0,
+     "store tail": 6.78712769599452e-07
+    },
+    "hotspot": "compute array",
+    "block": {
+     "load_B": 16777216,
+     "store_B": 4194304
+    }
+   },
+   "rows": [
+    {
+     "kind": "array",
+     "check": "Array time",
+     "model": 2.975997401866115e-05,
+     "sim": 2.7480704113854706e-05,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "traffic",
+     "check": "DRAM traffic",
+     "model": 83886080,
+     "sim": 83886080,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "time",
+     "check": "Time for the multiply",
+     "model": 2.975997401866115e-05,
+     "sim": 3.0514267961851966e-05,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "bound",
+     "check": "What bounds it",
+     "model": "compute",
+     "sim": "compute",
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "chiparray_os",
+   "name": "GB200-class accelerator from its compute array: six chiplets at low voltage",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=chiparray,chip.flow:os",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "gemm": {
+    "M": 4096,
+    "K": 4096,
+    "N": 4096,
+    "bytes": 1,
+    "what": "set under Chip micro-architecture"
+   },
+   "chip": {
+    "cores": 1747,
+    "rows": 32,
+    "cols": 32,
+    "clock_hz": 1397850682.7295783,
+    "flow": "os",
+    "sram_B": 50000000,
+    "dram_Bps": 7507084549019.608
+   },
+   "explorer": {
+    "cycles": 41600,
+    "array_s": 2.975997401866115e-05,
+    "traffic_B": 83886080,
+    "dram_s": 1.1174255391989044e-05,
+    "time_s": 2.975997401866115e-05,
+    "bound": "compute",
+    "util": 0.9234080401567523,
+    "tile": {
+     "Tm": 2048,
+     "Tn": 2048,
+     "Tk": 4096,
+     "t": 83886080
+    },
+    "rounds": 10,
+    "tiles": 16384,
+    "spatial": 1,
+    "temporal": 0.9846153846153847,
+    "parallel": 0.9378362907842015
+   },
+   "sim": {
+    "time_s": 3.0514267961851966e-05,
+    "array_s": 2.7480704113854706e-05,
+    "memory_s": 1.6843957548784656e-05,
+    "traffic_B": 83886080,
+    "loads_B": 67108864,
+    "stores_B": 16777216,
+    "bound": "compute",
+    "tiles": 4,
+    "macs": 68719476736,
+    "stalls_s": {
+     "compute": 2.7480704113854706e-05,
+     "load bandwidth": 2.354851078397809e-06,
+     "buffer full": 0.0,
+     "dependency": 0.0,
+     "store tail": 6.78712769599452e-07
+    },
+    "hotspot": "compute array",
+    "block": {
+     "load_B": 16777216,
+     "store_B": 4194304
+    }
+   },
+   "rows": [
+    {
+     "kind": "array",
+     "check": "Array time",
+     "model": 2.975997401866115e-05,
+     "sim": 2.7480704113854706e-05,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "traffic",
+     "check": "DRAM traffic",
+     "model": 83886080,
+     "sim": 83886080,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "time",
+     "check": "Time for the multiply",
+     "model": 2.975997401866115e-05,
+     "sim": 3.0514267961851966e-05,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "bound",
+     "check": "What bounds it",
+     "model": "compute",
+     "sim": "compute",
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "llmserve",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "gemm": {
+    "M": 500,
+    "K": 8192,
+    "N": 7168,
+    "bytes": 1,
+    "what": "decode: the FFN up-projection for one copy\u2019s batch"
+   },
+   "chip": {
+    "cores": 64,
+    "rows": 32,
+    "cols": 32,
+    "clock_hz": 1800000000,
+    "flow": "ws",
+    "sram_B": 50000000,
+    "dram_Bps": 5652252023017.716
+   },
+   "explorer": {
+    "cycles": 505344,
+    "array_s": 0.00028074666666666665,
+    "traffic_B": 77664256,
+    "dram_s": 1.3740409253466965e-05,
+    "time_s": 0.00028074666666666665,
+    "bound": "compute",
+    "util": 0.8865248226950354,
+    "tile": {
+     "Tm": 500,
+     "Tn": 4096,
+     "Tk": 4096,
+     "t": 77664256
+    },
+    "rounds": 896,
+    "tiles": 57344,
+    "spatial": 1,
+    "temporal": 0.8865248226950354,
+    "parallel": 1
+   },
+   "sim": {
+    "time_s": 0.00025838102587156066,
+    "array_s": 0.0002548644444444444,
+    "memory_s": 1.6271781818078143e-05,
+    "traffic_B": 70496256,
+    "loads_B": 66912256,
+    "stores_B": 3584000,
+    "bound": "compute",
+    "tiles": 4,
+    "macs": 29360128000,
+    "stalls_s": {
+     "compute": 0.0002548644444444444,
+     "load bandwidth": 3.079539654615215e-06,
+     "buffer full": 0.0,
+     "dependency": 0.0,
+     "store tail": 4.370417725010358e-07
+    },
+    "hotspot": "compute array",
+    "block": {
+     "load_B": 16728064,
+     "store_B": 0
+    }
+   },
+   "rows": [
+    {
+     "kind": "array",
+     "check": "Array time",
+     "model": 0.00028074666666666665,
+     "sim": 0.0002548644444444444,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "traffic",
+     "check": "DRAM traffic",
+     "model": 77664256,
+     "sim": 70496256,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "time",
+     "check": "Time for the multiply",
+     "model": 0.00028074666666666665,
+     "sim": 0.00025838102587156066,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "bound",
+     "check": "What bounds it",
+     "model": "compute",
+     "sim": "compute",
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "llmserve_os",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve,chip.flow:os",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "gemm": {
+    "M": 500,
+    "K": 8192,
+    "N": 7168,
+    "bytes": 1,
+    "what": "decode: the FFN up-projection for one copy\u2019s batch"
+   },
+   "chip": {
+    "cores": 64,
+    "rows": 32,
+    "cols": 32,
+    "clock_hz": 1800000000,
+    "flow": "os",
+    "sram_B": 50000000,
+    "dram_Bps": 5652252023017.716
+   },
+   "explorer": {
+    "cycles": 462336,
+    "array_s": 0.00025685333333333335,
+    "traffic_B": 77664256,
+    "dram_s": 1.3740409253466965e-05,
+    "time_s": 0.00025685333333333335,
+    "bound": "compute",
+    "util": 0.9689922480620154,
+    "tile": {
+     "Tm": 500,
+     "Tn": 4096,
+     "Tk": 4096,
+     "t": 77664256
+    },
+    "rounds": 56,
+    "tiles": 3584,
+    "spatial": 0.9765625,
+    "temporal": 0.9922480620155039,
+    "parallel": 1
+   },
+   "sim": {
+    "time_s": 0.00025838102587156066,
+    "array_s": 0.0002548644444444444,
+    "memory_s": 1.6271781818078143e-05,
+    "traffic_B": 70496256,
+    "loads_B": 66912256,
+    "stores_B": 3584000,
+    "bound": "compute",
+    "tiles": 4,
+    "macs": 29360128000,
+    "stalls_s": {
+     "compute": 0.0002548644444444444,
+     "load bandwidth": 3.079539654615215e-06,
+     "buffer full": 0.0,
+     "dependency": 0.0,
+     "store tail": 4.370417725010358e-07
+    },
+    "hotspot": "compute array",
+    "block": {
+     "load_B": 16728064,
+     "store_B": 0
+    }
+   },
+   "rows": [
+    {
+     "kind": "array",
+     "check": "Array time",
+     "model": 0.00025685333333333335,
+     "sim": 0.0002548644444444444,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "traffic",
+     "check": "DRAM traffic",
+     "model": 77664256,
+     "sim": 70496256,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "time",
+     "check": "Time for the multiply",
+     "model": 0.00025685333333333335,
+     "sim": 0.00025838102587156066,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "bound",
+     "check": "What bounds it",
+     "model": "compute",
+     "sim": "compute",
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "llmserve_b32",
+   "name": "LLM serving from the model\u2019s shape (Llama 3.1 70B FP8, 2,000 users)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=llmserve,llm.users:128,llm.batch:32",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "gemm": {
+    "M": 32,
+    "K": 8192,
+    "N": 7168,
+    "bytes": 1,
+    "what": "decode: the FFN up-projection for one copy\u2019s batch"
+   },
+   "chip": {
+    "cores": 64,
+    "rows": 32,
+    "cols": 32,
+    "clock_hz": 1800000000,
+    "flow": "ws",
+    "sram_B": 50000000,
+    "dram_Bps": 5652415631518.678
+   },
+   "explorer": {
+    "cycles": 86016,
+    "array_s": 4.778666666666667e-05,
+    "traffic_B": 59932672,
+    "dram_s": 1.0603019294230037e-05,
+    "time_s": 4.778666666666667e-05,
+    "bound": "compute",
+    "util": 0.3333333333333333,
+    "tile": {
+     "Tm": 32,
+     "Tn": 4096,
+     "Tk": 4096,
+     "t": 59932672
+    },
+    "rounds": 896,
+    "tiles": 57344,
+    "spatial": 1,
+    "temporal": 0.3333333333333333,
+    "parallel": 1
+   },
+   "sim": {
+    "time_s": 1.8811720891604152e-05,
+    "array_s": 1.593111111111111e-05,
+    "memory_s": 1.1497262477251141e-05,
+    "traffic_B": 59473920,
+    "loads_B": 59244544,
+    "stores_B": 229376,
+    "bound": "compute",
+    "tiles": 4,
+    "macs": 1879048192,
+    "stalls_s": {
+     "compute": 1.593111111111111e-05,
+     "load bandwidth": 2.7403196943641207e-06,
+     "buffer full": 0.0,
+     "dependency": 0.0,
+     "store tail": 1.4029008612892433e-07
+    },
+    "hotspot": "compute array",
+    "block": {
+     "load_B": 14811136,
+     "store_B": 0
+    }
+   },
+   "rows": [
+    {
+     "kind": "array",
+     "check": "Array time",
+     "model": 4.778666666666667e-05,
+     "sim": 1.593111111111111e-05,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "traffic",
+     "check": "DRAM traffic",
+     "model": 59932672,
+     "sim": 59473920,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "time",
+     "check": "Time for the multiply",
+     "model": 4.778666666666667e-05,
+     "sim": 1.8811720891604152e-05,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "bound",
+     "check": "What bounds it",
+     "model": "compute",
+     "sim": "compute",
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "trainllm",
+   "name": "LLM training from the model\u2019s shape (Llama 3.1 70B, BF16, 1,024 accelerators)",
+   "link": "https://hw-system-design-explorer.vercel.app/#d=trainllm",
+   "model_hash": "fnv1a32:2b7f7c7f",
+   "gemm": {
+    "M": 8192,
+    "K": 8192,
+    "N": 3584,
+    "bytes": 2,
+    "what": "training: the FFN up-projection for one micro-batch"
+   },
+   "chip": {
+    "cores": 64,
+    "rows": 32,
+    "cols": 32,
+    "clock_hz": 1800000000,
+    "flow": "ws",
+    "sram_B": 50000000,
+    "dram_Bps": 5263936284118.543
+   },
+   "explorer": {
+    "cycles": 3698688,
+    "array_s": 0.002054826666666667,
+    "traffic_B": 1149239296,
+    "dram_s": 0.00021832317755579415,
+    "time_s": 0.002054826666666667,
+    "bound": "compute",
+    "util": 0.9922480620155039,
+    "tile": {
+     "Tm": 1024,
+     "Tn": 2048,
+     "Tk": 2048,
+     "t": 1149239296
+    },
+    "rounds": 448,
+    "tiles": 28672,
+    "spatial": 1,
+    "temporal": 0.9922480620155039,
+    "parallel": 1
+   },
+   "sim": {
+    "time_s": 0.002043537955105033,
+    "array_s": 0.0020389155555555556,
+    "memory_s": 0.00011157118902363711,
+    "traffic_B": 562036736,
+    "loads_B": 503316480,
+    "stores_B": 58720256,
+    "bound": "compute",
+    "tiles": 32,
+    "macs": 240518168576,
+    "stalls_s": {
+     "compute": 0.0020389155555555556,
+     "load bandwidth": 3.1079996928256503e-06,
+     "buffer full": 0.0,
+     "dependency": 0.0,
+     "store tail": 1.5143998566518983e-06
+    },
+    "hotspot": "compute array",
+    "block": {
+     "load_B": 15728640,
+     "store_B": 0
+    }
+   },
+   "rows": [
+    {
+     "kind": "array",
+     "check": "Array time",
+     "model": 0.002054826666666667,
+     "sim": 0.0020389155555555556,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "traffic",
+     "check": "DRAM traffic",
+     "model": 1149239296,
+     "sim": 562036736,
+     "w": 0.1,
+     "verdict": "miss",
+     "note": ""
+    },
+    {
+     "kind": "time",
+     "check": "Time for the multiply",
+     "model": 0.002054826666666667,
+     "sim": 0.002043537955105033,
+     "w": 0.1,
+     "verdict": "pass",
+     "note": ""
+    },
+    {
+     "kind": "bound",
+     "check": "What bounds it",
+     "model": "compute",
+     "sim": "compute",
+     "verdict": "pass",
+     "note": ""
+    }
+   ]
+  }
+ ]
+}

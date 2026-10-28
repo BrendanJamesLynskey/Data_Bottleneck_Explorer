@@ -302,7 +302,40 @@ Decode isn't replayed: its steps are clocked and batched. The cross-check below 
 - **Time to first token** agrees at the p99 and is 11 % high on the mean, partly because two errors offset: the
   explorer's all-reduce, and a 38 ms mean prefill wait in the simulator.
 - **A finding about the simulator:** its prefill dispatcher counts waiting prompts but not the one in service, so
-  new prompts pile onto the first instance (busy 99 %, 99 %, 62 %, 0 %).
+  new prompts pile onto the first instance (busy 99 %, 99 %, 62 %, 0 %). Fixed in Disaggregated_Inference_Sim on
+  2026-10-28 ([PR #2](https://github.com/BrendanJamesLynskey/Disaggregated_Inference_Sim/pull/2)); this cross-check
+  stays pinned at `ba37774` until it is re-run under the same rule.
+
+### Cross-check: Torch_Sim_Frontend's accelerator model
+
+`sim/simfront_compare.py` runs the matrix multiply each design's Chip tab analyses through `simfront.accel`, the SimPy
+accelerator model in [Torch_Sim_Frontend](https://github.com/BrendanJamesLynskey/Torch_Sim_Frontend) (pinned at
+`53b1419`, installed without PyTorch). It cuts the multiply into blocks that fit its buffer and runs them event by
+event through DMA engines, the buffer and an output-stationary array.
+- **Same hardware:** the page exports each design (`simChipSpec`, to `sim/simfront/specs/`): the explorer's cores as
+  one array at their combined clock, its SRAM (half per tile), and its DRAM bandwidth.
+- **Designs:** `chiparray`, `llmserve` (each weight- and output-stationary), `llmserve` at batch 32 and `trainllm`,
+  fixed in `sim/TOLERANCE.md` with the rule (±10 % on array time, traffic and time; matching bound verdicts) before
+  the first run.
+
+**Outcome: 18 of 24 rows agree.**
+- **Arithmetic agrees where both stream a long depth:** 1.01× for the decode multiply mapped output-stationary and
+  for the training multiply; 1.08× for the 4,096-cubed multiply on 1,747 cores, which the explorer rounds to whole
+  rounds of cores.
+- **Misses on arithmetic come from the dataflow.** The simulator has only an output-stationary array. The explorer's
+  weight-stationary mapping pays 64 cycles of fill and drain per weight tile while only the batch streams through:
+  1.10× at batch 500 (just outside), 3.00× at batch 32, where fill and drain take 67 % of the array's time.
+- **Misses on traffic come from partial sums.** The explorer writes them to DRAM and reads them back; the simulator
+  keeps them on chip. For decode, the operand reads are identical (66.9 MB) and the 7.17 MB of partial sums is the
+  whole 1.10× gap. For training, 352 MB of partial sums plus more operand re-reads (738 MB against 503 MB) make it 2.04×.
+- **Bound verdicts all match, but all six multiplies are compute-bound in both tools,** so those rows test little,
+  and the traffic misses don't reach the time.
+
+### The three simulators together
+
+The Checks tab ends with a table of rows that agree, by kind of figure and by simulator, counted from the rows above:
+210 of 233 for the explorer's own simulator on the examples, 4 of 14 on the Azure traces, 6 of 19 for
+Disaggregated_Inference_Sim and 18 of 24 for `simfront.accel`.
 
 ![Model vs simulation](sim.png)
 
@@ -314,6 +347,8 @@ Files:
 - `sim/examples/*.json`: each example's exported spec.
 - `sim/results.json`: the committed run.
 - `sim/disagg_compare.py`, `sim/disagg/specs/*.json` and `sim/disagg_results.json`: the Disaggregated_Inference_Sim
+  cross-check.
+- `sim/simfront_compare.py`, `sim/simfront/specs/*.json` and `sim/simfront_results.json`: the Torch_Sim_Frontend
   cross-check.
 - `sim/requirements.txt`: pinned SimPy and pytest.
 - `sim/traces/`: the Azure LLM traces and their source; `sim/azure_trace.py` loads and resamples them;

@@ -67,6 +67,7 @@ def run(spec: dict) -> dict:
         sum(tm.store_end[i] - tm.store_start[i] for i in range(len(tiles)) if tiles[i].stores)
     return {"time_s": tm.makespan, "array_s": array_s, "memory_s": memory_s,
             "traffic_B": sum(t.load_bytes + t.store_bytes for t in tiles),
+            "loads_B": sum(t.load_bytes for t in tiles), "stores_B": sum(t.store_bytes for t in tiles),
             "bound": "compute" if array_s > memory_s else "DRAM",
             "tiles": len(tiles), "macs": sum(t.macs for t in tiles), "stalls_s": rep.stalls, "hotspot": rep.hotspot,
             "block": _block(prog)}
